@@ -5,7 +5,6 @@
   "author": "NEXUS",
   "license": "MIT",
   "main": "dist-electron/main/index.js",
-  "type": "module",
   "scripts": {
     "dev": "concurrently -k -n VITE,ELECTRON -c magenta,cyan \"vite\" \"wait-on tcp:5173 && tsc -p electron.tsconfig.json && cross-env-shell DEV=1 electron .\"",
     "dev:vite": "vite",
