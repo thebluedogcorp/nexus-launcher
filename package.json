@@ -1,0 +1,93 @@
+{
+  "name": "nexus-launcher",
+  "version": "1.0.0",
+  "description": "NEXUS — Universal Game Launcher for Windows. Detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox, patches rich metadata via RAWG, and launches games natively.",
+  "author": "NEXUS",
+  "license": "MIT",
+  "main": "dist-electron/main/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n VITE,ELECTRON -c magenta,cyan \"vite\" \"wait-on tcp:5173 && tsc -p electron.tsconfig.json && cross-env-shell DEV=1 electron .\"",
+    "dev:vite": "vite",
+    "build": "tsc -p electron.tsconfig.json && vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext .ts,.tsx",
+    "dist": "tsc -p electron.tsconfig.json && vite build && electron-builder --win",
+    "dist:portable": "tsc -p electron.tsconfig.json && vite build && electron-builder --win portable",
+    "dist:nsis": "tsc -p electron.tsconfig.json && vite build && electron-builder --win nsis",
+    "rebuild": "electron-rebuild -f -w better-sqlite3"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^22.5.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "concurrently": "^9.0.1",
+    "cross-env": "^7.0.3",
+    "electron": "^32.0.1",
+    "electron-builder": "^25.0.0",
+    "electron-rebuild": "^3.2.9",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.2",
+    "vite-plugin-electron": "^0.28.8",
+    "vite-plugin-electron-renderer": "^0.14.6",
+    "wait-on": "^8.0.0"
+  },
+  "build": {
+    "appId": "com.nexus.launcher",
+    "productName": "NEXUS",
+    "copyright": "Copyright © 2025 NEXUS",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist-electron/**/*",
+      "dist-renderer/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "resources"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "resources/icon.ico",
+      "artifactName": "NEXUS-Setup-${version}.${ext}",
+      "publisherName": "NEXUS",
+      "verifyUpdateCodeSignature": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "NEXUS",
+      "deleteAppDataOnUninstall": false,
+      "installerIcon": "resources/icon.ico",
+      "uninstallerIcon": "resources/icon.ico",
+      "installerHeaderIcon": "resources/icon.ico"
+    },
+    "portable": {
+      "artifactName": "NEXUS-Portable-${version}.exe"
+    }
+  }
+}
