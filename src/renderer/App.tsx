@@ -82,26 +82,34 @@ export function App() {
   // Initial load + settings + auto-scan.
   useEffect(() => {
     (async () => {
-      const s = await window.nexus.getSettings();
-      setSettings(s);
-      setFilters((f) => ({ ...f, sort: s.defaultSort }));
-      await refreshAll();
-      if (s.autoScanOnStart) {
-        // Kick off a silent background scan on launch.
-        try {
-          const summary = await window.nexus.runScan(
-            PLATFORM_LIST.filter((p) => p.id !== "custom" && p.id !== "manual").map((p) => p.id as PlatformId),
-          );
-          if (summary.detected.length > 0) {
-            const imported = await window.nexus.importDetected(summary.detected);
-            if (imported.length > 0) {
-              toast("success", `Auto-scan found ${imported.length} new game${imported.length === 1 ? "" : "s"}`);
-              await refreshAll();
+      try {
+        const s = await window.nexus.getSettings();
+        setSettings(s);
+        setFilters((f) => ({ ...f, sort: s.defaultSort }));
+        await refreshAll();
+        if (s.autoScanOnStart) {
+          // Kick off a silent background scan on launch.
+          try {
+            const summary = await window.nexus.runScan(
+              PLATFORM_LIST.filter((p) => p.id !== "custom" && p.id !== "manual").map((p) => p.id as PlatformId),
+            );
+            if (summary.detected.length > 0) {
+              const imported = await window.nexus.importDetected(summary.detected);
+              if (imported.length > 0) {
+                toast("success", `Auto-scan found ${imported.length} new game${imported.length === 1 ? "" : "s"}`);
+                await refreshAll();
+              }
             }
+          } catch {
+            // Silent failure on auto-scan.
           }
-        } catch {
-          // Silent failure on auto-scan.
         }
+      } catch (e) {
+        // Database / IPC layer failed — show a clear toast instead of a blank screen.
+        console.error("[NEXUS] init failed:", e);
+        toast("error", "Couldn't load library", "The local database may be locked or better-sqlite3 failed to load.");
+      } finally {
+        setLoading(false);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

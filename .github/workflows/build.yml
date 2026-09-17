@@ -50,28 +50,40 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v1.0.0"
-          $title = "NEXUS v1.0.0 — Universal Game Launcher"
+          $tag = "v1.0.1"
+          $title = "NEXUS v1.0.1 — Universal Game Launcher"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
+
+          **v1.0.1 fixes the blank-screen issue** by:
+          - Fixing the Vite outDir so the renderer (index.html + CSS + JS) is correctly placed and packaged
+          - Adding asarUnpack for better-sqlite3 so the native module loads in the packaged app
+          - Adding defensive error handling: any failure now shows a clear dialog instead of a blank black screen
+          - Relaxing the CSP to allow file:// module loading in the packaged renderer
 
           Auto-detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox, patches rich metadata via the RAWG API, and launches games natively.
 
           **Downloads:**
-          - \`NEXUS-Setup-1.0.0.exe\` — NSIS installer (recommended). Creates desktop + Start Menu shortcuts.
-          - \`NEXUS-Portable-1.0.0.exe\` — single-file portable build, no install required.
+          - \`NEXUS-Setup-1.0.1.exe\` — NSIS installer (recommended). Creates desktop + Start Menu shortcuts.
+          - \`NEXUS-Portable-1.0.1.exe\` — single-file portable build, no install required.
 
           Minimum: Windows 10 64-bit.
           "@
 
-          # Create or update the release (idempotent).
-          gh release create $tag release/NEXUS-Setup-1.0.0.exe release/NEXUS-Portable-1.0.0.exe `
+          # Create or update the release (idempotent). Use globs so the
+          # workflow stays correct across version bumps.
+          $setup = (Get-ChildItem release/NEXUS-Setup-*.exe | Select-Object -First 1).FullName
+          $portable = (Get-ChildItem release/NEXUS-Portable-*.exe | Select-Object -First 1).FullName
+          Write-Host "Setup: $setup"
+          Write-Host "Portable: $portable"
+
+          gh release create $tag $setup $portable `
             --title $title --notes $notes --target main 2>$null
 
           # If create failed because the release already exists, just re-upload the assets.
           if ($LASTEXITCODE -ne 0) {
             Write-Host "Release $tag already exists — uploading assets to it."
-            gh release upload $tag release/NEXUS-Setup-1.0.0.exe release/NEXUS-Portable-1.0.0.exe --clobber
+            gh release upload $tag $setup $portable --clobber
           }
 
           Write-Host "=== Release assets ==="

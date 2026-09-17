@@ -56,8 +56,30 @@ interface ProductRow {
 
 function queryAgentDb(): ProductRow[] {
   // Lazy import so the renderer build never tries to bundle better-sqlite3.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const Database = require("better-sqlite3");
+  let Database: typeof import("better-sqlite3");
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    Database = require("better-sqlite3");
+  } catch {
+    // Packaged: try the unpacked path.
+    try {
+      const path = require("path");
+      const fs = require("fs") as typeof import("fs");
+      const candidate = path.join(
+        process.resourcesPath || "",
+        "app.asar.unpacked",
+        "node_modules",
+        "better-sqlite3",
+      );
+      if (fs.existsSync(candidate)) {
+        Database = require(candidate);
+      } else {
+        return [];
+      }
+    } catch {
+      return [];
+    }
+  }
   if (!existsSync(AGENT_DB)) return [];
   try {
     const conn: import("better-sqlite3").Database = new Database(AGENT_DB, {

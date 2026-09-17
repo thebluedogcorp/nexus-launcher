@@ -5,18 +5,49 @@
 //   macOS:   ~/Library/Application Support/NEXUS/nexus.db
 //   Linux:   ~/.config/NEXUS/nexus.db
 //
-// Schema versioning is kept intentionally simple (a `meta` table holds the
-// current version). On startup we run migrations idempotently.
+// better-sqlite3 is a native addon. In a packaged app it must be loaded from
+// the unpacked location (app.asar.unpacked/node_modules/better-sqlite3) — we
+// require it lazily and resolve the unpacked path explicitly so it never
+// throws at module-load time and blanks the window.
 
 import { app } from "electron";
 import { join, dirname } from "path";
 import { mkdirSync, existsSync } from "fs";
 import type { Game, DetectedGame, LauncherSettings } from "@shared/types";
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const Database = require("better-sqlite3") as typeof import("better-sqlite3");
+type BetterSqlite3Module = typeof import("better-sqlite3");
+type SqliteDatabase = import("better-sqlite3").Database;
 
-let _db: import("better-sqlite3").Database | null = null;
+let _DatabaseCtor: BetterSqlite3Module | null = null;
+let _db: SqliteDatabase | null = null;
+
+function loadBetterSqlite3(): BetterSqlite3Module {
+  if (_DatabaseCtor) return _DatabaseCtor;
+  // 1. Normal require (dev + packaged when asarUnpack is configured).
+  try {
+    _DatabaseCtor = require("better-sqlite3") as BetterSqlite3Module;
+    return _DatabaseCtor;
+  } catch (e1) {
+    // 2. Packaged fallback: resolve from app.asar.unpacked absolute path.
+    try {
+      const candidate = join(
+        process.resourcesPath || "",
+        "app.asar.unpacked",
+        "node_modules",
+        "better-sqlite3",
+      );
+      if (existsSync(candidate)) {
+        _DatabaseCtor = require(candidate) as BetterSqlite3Module;
+        return _DatabaseCtor;
+      }
+    } catch {
+      // fall through
+    }
+    throw new Error(
+      `better-sqlite3 could not be loaded.\n  direct: ${e1 instanceof Error ? e1.message : e1}\n  unpacked fallback also failed.\n  resourcesPath=${process.resourcesPath}`,
+    );
+  }
+}
 
 function dbPath(): string {
   const dir = app.getPath("userData");
@@ -24,8 +55,9 @@ function dbPath(): string {
   return join(dir, "nexus.db");
 }
 
-function db(): import("better-sqlite3").Database {
+function db(): SqliteDatabase {
   if (_db) return _db;
+  const Database = loadBetterSqlite3();
   const p = dbPath();
   const conn = new Database(p);
   conn.pragma("journal_mode = WAL");
