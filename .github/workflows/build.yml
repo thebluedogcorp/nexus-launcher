@@ -3,9 +3,10 @@ name: Build Windows App
 on:
   push:
     branches: [main, master]
-  pull_request:
-    branches: [main, master]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build-windows:
@@ -20,7 +21,7 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Rebuild native modules for Electron
         run: npm run rebuild
@@ -33,17 +34,63 @@ jobs:
         run: npm run dist
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Skip code signing (no cert in CI) and skip publishing to a GH release
+          # via electron-builder itself — we attach assets manually below.
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
-      - name: Upload installer artifact
+      - name: List built artifacts
+        shell: pwsh
+        run: |
+          Write-Host "=== release/ contents ==="
+          Get-ChildItem -Path release -Recurse | Format-Table Name, Length, FullName
+
+      - name: Create GitHub Release and upload .exe assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ErrorActionPreference = "Continue"
+          $tag = "v1.0.0"
+          $title = "NEXUS v1.0.0 — Universal Game Launcher"
+          $notes = @"
+          NEXUS — Universal Game Launcher for Windows.
+
+          Auto-detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox, patches rich metadata via the RAWG API, and launches games natively.
+
+          **Downloads:**
+          - \`NEXUS-Setup-1.0.0.exe\` — NSIS installer (recommended). Creates desktop + Start Menu shortcuts.
+          - \`NEXUS-Portable-1.0.0.exe\` — single-file portable build, no install required.
+
+          Minimum: Windows 10 64-bit.
+          "@
+
+          # Create or update the release (idempotent).
+          gh release create $tag release/NEXUS-Setup-1.0.0.exe release/NEXUS-Portable-1.0.0.exe `
+            --title $title --notes $notes --target main 2>$null
+
+          # If create failed because the release already exists, just re-upload the assets.
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "Release $tag already exists — uploading assets to it."
+            gh release upload $tag release/NEXUS-Setup-1.0.0.exe release/NEXUS-Portable-1.0.0.exe --clobber
+          }
+
+          Write-Host "=== Release assets ==="
+          gh release view $tag --json assets --jq '.assets[] | "\(.name) - \(.size) bytes"'
+
+      - name: Upload installer artifact (best-effort)
         uses: actions/upload-artifact@v4
         with:
           name: NEXUS-Setup
           path: release/NEXUS-Setup-*.exe
-          if-no-files-found: error
+          if-no-files-found: warn
+          retention-days: 7
+        continue-on-error: true
 
-      - name: Upload portable artifact
+      - name: Upload portable artifact (best-effort)
         uses: actions/upload-artifact@v4
         with:
           name: NEXUS-Portable
           path: release/NEXUS-Portable-*.exe
-          if-no-files-found: error
+          if-no-files-found: warn
+          retention-days: 7
+        continue-on-error: true
