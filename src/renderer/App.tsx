@@ -32,18 +32,14 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [focusedIdx, setFocusedIdxState] = useState(0);
-  // A ref that mirrors focusedIdx for synchronous reads in the gamepad callback.
-  // React state updates are async — during continuous gamepad navigation, multiple
-  // setFocusedIdx calls batch together and stateRef.current.focusedIdx becomes stale,
-  // causing the callback to read the OLD index and select/skip the wrong game.
-  // This ref is updated synchronously inside our custom setFocusedIdx wrapper.
+  // TRULY synchronous ref — updated BEFORE React state, so the gamepad
+  // callback always reads the real current value even during rapid navigation.
   const focusedIdxRef = useRef(0);
   const setFocusedIdx = useCallback((updater: number | ((prev: number) => number)) => {
-    setFocusedIdxState((prev) => {
-      const next = typeof updater === "function" ? updater(prev) : updater;
-      focusedIdxRef.current = next; // synchronous update
-      return next;
-    });
+    const prev = focusedIdxRef.current;
+    const next = typeof updater === "function" ? updater(prev) : updater;
+    focusedIdxRef.current = next; // synchronous, before React processes anything
+    setFocusedIdxState(next);     // just sync React state to match
   }, []);
   const [patching, setPatching] = useState(false);
   const [patchProgress, setPatchProgress] = useState<{ current: number; total: number; title: string } | null>(null);
@@ -257,11 +253,10 @@ export function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [pageGame, games, focusedIdx, openPage]);
 
-  // Smooth-scroll the focused tile into the CENTER of the carousel viewport.
-  // Uses requestAnimationFrame + manual easing to avoid the native
-  // scrollTo({behavior:"smooth"}) drift/skip issue that happens when
-  // multiple scroll commands stack up during continuous gamepad navigation.
-  const scrollRef = useRef<{ raf: number | null; target: number }>({ raf: null, target: 0 });
+  // Instantly scroll the focused tile to the CENTER of the carousel.
+  // No animation — the CSS transitions on tiles (scale/filter) provide the
+  // visual smoothness. Animating the scroll causes drift when commands stack
+  // during continuous gamepad navigation. Instant = deterministic.
   useEffect(() => {
     const carousel = document.querySelector(".carousel") as HTMLElement | null;
     const tile = document.querySelector(".tile.focused") as HTMLElement | null;
@@ -269,33 +264,7 @@ export function App() {
     const tileCenter = tile.offsetLeft + tile.offsetWidth / 2;
     const carouselCenter = carousel.clientWidth / 2;
     const targetScroll = Math.max(0, tileCenter - carouselCenter);
-    scrollRef.current.target = targetScroll;
-
-    // Cancel any in-flight animation
-    if (scrollRef.current.raf != null) cancelAnimationFrame(scrollRef.current.raf);
-
-    const animate = () => {
-      const carousel = document.querySelector(".carousel") as HTMLElement | null;
-      if (!carousel) return;
-      const current = carousel.scrollLeft;
-      const target = scrollRef.current.target;
-      const diff = target - current;
-      // If we're close enough (within 1px), snap to target and stop.
-      if (Math.abs(diff) < 1) {
-        carousel.scrollLeft = target;
-        scrollRef.current.raf = null;
-        return;
-      }
-      // Ease: move 20% of the remaining distance each frame.
-      // This is fast enough to feel responsive but smooth enough to not skip.
-      carousel.scrollLeft = current + diff * 0.2;
-      scrollRef.current.raf = requestAnimationFrame(animate);
-    };
-    scrollRef.current.raf = requestAnimationFrame(animate);
-
-    return () => {
-      if (scrollRef.current.raf != null) cancelAnimationFrame(scrollRef.current.raf);
-    };
+    carousel.scrollLeft = targetScroll; // instant, no animation
   }, [focusedIdx]);
 
   const focusedGame = games[focusedIdx] ?? null;
