@@ -78,8 +78,8 @@ a{color:inherit;text-decoration:none}
 .carousel-arrow.right{right:8px}
 .carousel-wrap:hover .carousel-arrow{opacity:0.85}
 .carousel-arrow.hidden{display:none}
-/* overflow-x: auto (scrollable) + overflow-y: visible (tiles don't clip). */
-.carousel{display:flex;gap:14px;overflow-x:auto;overflow-y:visible;padding:60px 40px 40px;scroll-behavior:auto;align-items:center;flex:1;contain:layout style;scrollbar-width:none}
+/* CSS smooth scroll — the browser handles the animation natively (GPU). */
+.carousel{display:flex;gap:14px;overflow-x:auto;overflow-y:visible;padding:60px 40px 40px;scroll-behavior:smooth;align-items:center;flex:1;contain:layout style;scrollbar-width:none}
 .carousel::-webkit-scrollbar{display:none}
 
 .tile{position:relative;flex-shrink:0;width:160px;aspect-ratio:3/4;border-radius:14px;overflow:hidden;cursor:pointer;transition:transform .3s cubic-bezier(.2,.8,.2,1),filter .3s,box-shadow .3s,border-color .3s;border:2px solid transparent;background:var(--surface);box-shadow:0 6px 20px -8px rgba(0,0,0,0.5);will-change:transform,filter;contain:layout style paint}
@@ -335,3 +335,18 @@ textarea.field-input{height:auto;padding:11px 13px;resize:vertical;font-family:"
 
 /* Missing games badge */
 .missing-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;background:rgba(248,113,113,0.12);border:1px solid rgba(248,113,113,0.25);font-size:10px;font-weight:600;color:var(--danger)}
+
+/* ============ GAMEPAD FOCUS SYSTEM ============ */
+/* When a controller is connected, elements with .gp-focus get a visible ring */
+.gp-focus{outline:2px solid rgba(255,255,255,0.5)!important;outline-offset:2px}
+.gp-focus.tile{outline:none;border-color:rgba(255,255,255,0.6)!important;box-shadow:0 0 0 1px rgba(255,255,255,0.2),0 0 16px rgba(255,255,255,0.2),0 12px 30px -8px rgba(0,0,0,0.7)}
+.gp-focus.tb-icon,.gp-focus.tb-icon.primary{outline:2px solid rgba(255,255,255,0.5)!important;outline-offset:2px}
+.gp-focus.filter-pill{outline:2px solid rgba(255,255,255,0.5)!important;outline-offset:2px}
+.gp-focus.btn{outline:2px solid rgba(255,255,255,0.5)!important;outline-offset:2px}
+.gp-focus.update-badge{outline:2px solid rgba(74,222,128,0.5)!important;outline-offset:2px}
+.gp-focus.modal-close{outline:2px solid rgba(255,255,255,0.5)!important;outline-offset:2px}
+.gp-focus.ctx-item{outline:2px solid rgba(255,255,255,0.3)!important;outline-offset:-2px}
+.gp-focus.platform-card{outline:2px solid rgba(255,255,255,0.4)!important;outline-offset:0}
+.gp-focus.suggest-item{outline:2px solid rgba(255,255,255,0.3)!important;outline-offset:-2px}
+.gp-focus.tb-select{outline:2px solid rgba(255,255,255,0.5)!important;outline-offset:2px}
+.gp-focus .field-input,.gp-focus.field-input{outline:2px solid rgba(255,255,255,0.5)!important;outline-offset:2px}

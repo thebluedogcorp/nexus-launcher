@@ -156,27 +156,163 @@ export function App() {
     finally { setPatching(false); setPatchProgress(null); }
   }, [refreshAll, toast]);
 
-  // Controller support
+  // Controller support — full app navigation
+  // Focus zones: "topbar" → "filters" → "carousel" → "info" → "hints"
+  const [gpZone, setGpZone] = useState<"topbar" | "filters" | "carousel" | "info">("carousel");
+  const gpZoneRef = useRef<"topbar" | "filters" | "carousel" | "info">("carousel");
+  gpZoneRef.current = gpZone;
+  // Sub-index within each zone (e.g. which button in the topbar)
+  const gpSubIdx = useRef(0);
   const stateRef = useRef({ games, pageGame, addOpen, scanOpen, settingsOpen, updateDialogOpen });
   stateRef.current = { games, pageGame, addOpen, scanOpen, settingsOpen, updateDialogOpen };
+
   const onGamepad = useCallback((action: string) => {
     const s = stateRef.current;
+    // Modal handling — controller navigates within the modal
     if (s.addOpen || s.scanOpen || s.settingsOpen || s.updateDialogOpen) {
-      if (action === "back") { if (s.addOpen) setAddOpen(false); else if (s.scanOpen) setScanOpen(false); else if (s.settingsOpen) setSettingsOpen(false); else if (s.updateDialogOpen) setUpdateDialogOpen(false); }
+      if (action === "back") {
+        if (s.addOpen) setAddOpen(false);
+        else if (s.scanOpen) setScanOpen(false);
+        else if (s.settingsOpen) setSettingsOpen(false);
+        else if (s.updateDialogOpen) setUpdateDialogOpen(false);
+      } else if (action === "confirm" || action === "play") {
+        // Click the focused element in the modal
+        const el = document.querySelector(".modal .gp-focus, .modal-overlay .gp-focus") as HTMLElement;
+        if (el) el.click();
+      } else if (action === "up" || action === "down") {
+        // Navigate up/down within modal focusable elements
+        const focusables = Array.from(document.querySelectorAll<HTMLElement>(
+          ".modal button:not([disabled]), .modal input, .modal select, .modal textarea, .modal-overlay button:not([disabled])"
+        )).filter((el) => el.offsetParent !== null);
+        if (focusables.length === 0) return;
+        const currentIdx = focusables.findIndex((el) => el.classList.contains("gp-focus"));
+        const dir = action === "down" ? 1 : -1;
+        const nextIdx = currentIdx === -1 ? 0 : Math.max(0, Math.min(focusables.length - 1, currentIdx + dir));
+        focusables.forEach((el) => el.classList.remove("gp-focus"));
+        focusables[nextIdx].classList.add("gp-focus");
+        focusables[nextIdx].focus();
+      } else if (action === "left" || action === "right") {
+        // For platform cards in scan dialog, navigate left/right
+        const focusables = Array.from(document.querySelectorAll<HTMLElement>(".platform-card")).filter((el) => el.offsetParent !== null);
+        if (focusables.length > 0) {
+          const currentIdx = focusables.findIndex((el) => el.classList.contains("gp-focus"));
+          const dir = action === "right" ? 1 : -1;
+          const nextIdx = currentIdx === -1 ? 0 : Math.max(0, Math.min(focusables.length - 1, currentIdx + dir));
+          focusables.forEach((el) => el.classList.remove("gp-focus"));
+          focusables[nextIdx].classList.add("gp-focus");
+          focusables[nextIdx].focus();
+        }
+      }
       return;
     }
-    if (s.pageGame) { if (action === "back") setPageGame(null); else if (action === "play" || action === "confirm") handleLaunch(s.pageGame); return; }
-    if (s.games.length === 0) { if (action === "scan" || action === "confirm") setScanOpen(true); return; }
-    // Use focusedIdxRef.current (synchronous) instead of stateRef.current.focusedIdx (stale)
-    const idx = focusedIdxRef.current;
-    if (action === "left") { focusSourceRef.current = "nav"; setFocusedIdx((i) => Math.max(0, i - 1)); }
-    else if (action === "right") { focusSourceRef.current = "nav"; setFocusedIdx((i) => Math.min(s.games.length - 1, i + 1)); }
-    else if (action === "confirm") { const g = s.games[idx]; if (g) openPage(g.id); }
-    else if (action === "play") { const g = s.games[idx]; if (g) handleLaunch(g); }
-    else if (action === "details") { const g = s.games[idx]; if (g) openPage(g.id); }
-    else if (action === "menu") setSettingsOpen(true);
-    else if (action === "scan") setScanOpen(true);
+    // Game page — back closes, play launches
+    if (s.pageGame) {
+      if (action === "back") setPageGame(null);
+      else if (action === "play" || action === "confirm") handleLaunch(s.pageGame);
+      return;
+    }
+    if (s.games.length === 0) {
+      if (action === "scan" || action === "confirm") setScanOpen(true);
+      return;
+    }
+
+    // Zone-based navigation
+    const zone = gpZoneRef.current;
+
+    if (action === "up") {
+      // Move to the zone above
+      if (zone === "info") { gpZoneRef.current = "carousel"; setGpZone("carousel"); }
+      else if (zone === "carousel") { gpZoneRef.current = "filters"; setGpZone("filters"); gpSubIdx.current = 0; }
+      else if (zone === "filters") { gpZoneRef.current = "topbar"; setGpZone("topbar"); gpSubIdx.current = 0; }
+      updateFocus();
+      return;
+    }
+    if (action === "down") {
+      // Move to the zone below
+      if (zone === "topbar") { gpZoneRef.current = "filters"; setGpZone("filters"); gpSubIdx.current = 0; }
+      else if (zone === "filters") { gpZoneRef.current = "carousel"; setGpZone("carousel"); }
+      else if (zone === "carousel") { gpZoneRef.current = "info"; setGpZone("info"); gpSubIdx.current = 0; }
+      updateFocus();
+      return;
+    }
+
+    if (zone === "carousel") {
+      // Carousel: left/right navigates tiles, up/down changes zones
+      if (action === "left") { focusSourceRef.current = "nav"; setFocusedIdx((i) => Math.max(0, i - 1)); }
+      else if (action === "right") { focusSourceRef.current = "nav"; setFocusedIdx((i) => Math.min(s.games.length - 1, i + 1)); }
+      else if (action === "confirm") { const g = s.games[focusedIdxRef.current]; if (g) openPage(g.id); }
+      else if (action === "play") { const g = s.games[focusedIdxRef.current]; if (g) handleLaunch(g); }
+      else if (action === "details") { const g = s.games[focusedIdxRef.current]; if (g) openPage(g.id); }
+      else if (action === "menu") setSettingsOpen(true);
+      else if (action === "scan") setScanOpen(true);
+    } else if (zone === "topbar") {
+      // Topbar: left/right navigates between buttons
+      const focusables = getZoneFocusables("topbar");
+      if (focusables.length === 0) return;
+      if (action === "left" || action === "right") {
+        const dir = action === "right" ? 1 : -1;
+        gpSubIdx.current = Math.max(0, Math.min(focusables.length - 1, gpSubIdx.current + dir));
+        updateFocus();
+      } else if (action === "confirm") {
+        if (focusables[gpSubIdx.current]) focusables[gpSubIdx.current].click();
+      }
+    } else if (zone === "filters") {
+      // Filter pills: left/right navigates between pills
+      const focusables = getZoneFocusables("filters");
+      if (focusables.length === 0) return;
+      if (action === "left" || action === "right") {
+        const dir = action === "right" ? 1 : -1;
+        gpSubIdx.current = Math.max(0, Math.min(focusables.length - 1, gpSubIdx.current + dir));
+        updateFocus();
+      } else if (action === "confirm") {
+        if (focusables[gpSubIdx.current]) focusables[gpSubIdx.current].click();
+      }
+    } else if (zone === "info") {
+      // Info actions: left/right navigates between buttons
+      const focusables = getZoneFocusables("info");
+      if (focusables.length === 0) return;
+      if (action === "left" || action === "right") {
+        const dir = action === "right" ? 1 : -1;
+        gpSubIdx.current = Math.max(0, Math.min(focusables.length - 1, gpSubIdx.current + dir));
+        updateFocus();
+      } else if (action === "confirm" || action === "play") {
+        if (focusables[gpSubIdx.current]) focusables[gpSubIdx.current].click();
+      }
+    }
   }, [handleLaunch, openPage]);
+
+  // Get all focusable elements within a zone
+  const getZoneFocusables = (zone: string): HTMLElement[] => {
+    let selector: string;
+    if (zone === "topbar") {
+      selector = ".topbar button, .topbar select, .topbar .update-badge";
+    } else if (zone === "filters") {
+      selector = ".filter-pill, .filter-row button";
+    } else if (zone === "info") {
+      selector = ".info-actions button";
+    } else {
+      return [];
+    }
+    return Array.from(document.querySelectorAll<HTMLElement>(selector)).filter((el) => el.offsetParent !== null);
+  };
+
+  // Apply/remove the .gp-focus class based on the current zone + sub-index
+  const updateFocus = () => {
+    // Clear all existing gp-focus
+    document.querySelectorAll(".gp-focus").forEach((el) => el.classList.remove("gp-focus"));
+
+    const zone = gpZoneRef.current;
+    if (zone === "carousel") return; // carousel uses .tile.focused, not .gp-focus
+
+    const focusables = getZoneFocusables(zone);
+    if (focusables.length > 0 && focusables[gpSubIdx.current]) {
+      focusables[gpSubIdx.current].classList.add("gp-focus");
+    }
+  };
+
+  // Update focus when zone changes or games change
+  useEffect(() => { updateFocus(); });
+
   const { connected: controllerConnected } = useGamepadController({ onAction: onGamepad });
 
   // v2.0 feature handlers
@@ -514,7 +650,7 @@ export function App() {
       {/* Stats dashboard */}
       {statsOpen && <StatsDashboard onClose={() => setStatsOpen(false)} onExport={handleExport} onImport={handleImportFile} onCheckMissing={handleCheckMissing} />}
 
-      {controllerConnected && !pageGame && <div className="hints-bar"><span className="hint"><span className="k r">A</span> Select</span><span className="hint"><span className="k r">B</span> Back</span><span className="hint"><span className="k r">X</span> Play</span><span className="hint"><span className="k r">Y</span> Details</span><span className="hint"><span className="k">←</span><span className="k">→</span> Browse</span></div>}
+      {controllerConnected && !pageGame && <div className="hints-bar"><span className="hint"><span className="k">↑↓</span> {gpZone === "topbar" ? "Top Bar" : gpZone === "filters" ? "Filters" : gpZone === "carousel" ? "Games" : "Actions"}</span><span className="hint"><span className="k">←→</span> Navigate</span><span className="hint"><span className="k r">A</span> Select</span><span className="hint"><span className="k r">X</span> Play</span><span className="hint"><span className="k r">Y</span> Details</span><span className="hint"><span className="k r">B</span> Back</span><span className="hint"><span className="k">☰</span> Settings</span></div>}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
