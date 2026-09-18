@@ -1,74 +1,57 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 
-// Standard gamepad button mapping (Xbox controller layout; works with most).
-// The Gamepad API exposes buttons by index:
-//   0: A (confirm), 1: B (back), 2: X, 3: Y,
-//   4: LB, 5: RB, 6: LT, 7: RT,
-//   8: Back/Share, 9: Start/Menu,
-//   12: D-pad up, 13: D-pad down, 14: D-pad left, 15: D-pad right,
-//   16: Xbox/PS button
-//
-// Axes: 0 = left stick X, 1 = left stick Y, 2 = right stick X, 3 = right stick Y.
-
 export type GamepadAction =
-  | "left"      // D-pad left / left stick left
-  | "right"     // D-pad right / left stick right
-  | "up"        // D-pad up / left stick up
-  | "down"      // D-pad down / left stick down
-  | "confirm"   // A / Cross
-  | "back"      // B / Circle
-  | "play"      // X / Square
-  | "details"   // Y / Triangle
-  | "menu"      // Start / Menu
-  | "scan";     // Back/Share
+  | "left"
+  | "right"
+  | "up"
+  | "down"
+  | "confirm"
+  | "back"
+  | "play"
+  | "details"
+  | "menu"
+  | "scan";
 
 export interface ControllerState {
   connected: boolean;
-  lastIndex: number; // index of the most-recently-pressed action (for focus rings)
 }
 
-const DEADZONE = 0.5; // stick threshold
+const DEADZONE = 0.4;
+const REPEAT_DELAY = 150; // ms between continuous navigations when stick is held
 
 interface Callbacks {
   onAction: (action: GamepadAction) => void;
 }
 
 /**
- * useGamepadController — polls the Web Gamepad API on a rAF loop and fires
- * callbacks for D-pad / stick navigation and face buttons.
+ * useGamepadController — polls the Web Gamepad API on a rAF loop.
  *
- * Returns { connected, lastIndex } so the UI can render a "controller
- * connected" indicator and show gamepad focus rings (vs mouse hover).
+ * Features:
+ * - D-pad: edge-triggered (fires once per press)
+ * - Analog stick: CONTINUOUS — hold the stick and navigation repeats every
+ *   REPEAT_DELAY ms until the stick is released. This gives the console-like
+ *   feel where holding right scrolls through cards continuously.
+ * - Face buttons (A/B/X/Y): edge-triggered
+ * - Start/Back: edge-triggered
  */
 export function useGamepadController({ onAction }: Callbacks): ControllerState {
   const [connected, setConnected] = useState(false);
-  const [lastIndex, setLastIndex] = useState(0);
   const rafRef = useRef<number | null>(null);
-  // Track previous button/axis state so we only fire on edge transitions
-  // (not on every frame while held).
-  const prevState = useRef<{
-    buttons: boolean[];
-    axes: number[];
-  }>({ buttons: [], axes: [] });
+  const prevState = useRef<{ buttons: boolean[]; axes: number[] }>({ buttons: [], axes: [] });
+  // For continuous analog navigation:
+  const stickRepeatRef = useRef<{ dir: string | null; lastFire: number }>({ dir: null, lastFire: 0 });
   const onActionRef = useRef(onAction);
   onActionRef.current = onAction;
 
   const fire = useCallback((action: GamepadAction) => {
-    setLastIndex((i) => i + 1);
     onActionRef.current(action);
   }, []);
 
   useEffect(() => {
     let cancelled = false;
 
-    const onConnect = (e: GamepadEvent) => {
-      if (e.gamepad) {
-        setConnected(true);
-        // Start polling if not already running.
-        startPolling();
-      }
-    };
-    const onDisconnect = (e: GamepadEvent) => {
+    const onConnect = () => { setConnected(true); startPolling(); };
+    const onDisconnect = () => {
       const remaining = navigator.getGamepads?.().filter((g) => g && g.connected);
       if (!remaining || remaining.length === 0) setConnected(false);
     };
@@ -81,30 +64,47 @@ export function useGamepadController({ onAction }: Callbacks): ControllerState {
         const buttons = pad.buttons.map((b) => b.pressed);
         const axes = pad.axes.slice(0, 4);
         const prev = prevState.current;
+        const now = performance.now();
 
-        // D-pad (buttons 12-15)
+        // --- D-pad (edge-triggered) ---
         if (buttons[12] && !prev.buttons[12]) fire("up");
         if (buttons[13] && !prev.buttons[13]) fire("down");
         if (buttons[14] && !prev.buttons[14]) fire("left");
         if (buttons[15] && !prev.buttons[15]) fire("right");
 
-        // Left stick (axes 0,1) — with deadzone + edge detection
+        // --- Face buttons (edge-triggered) ---
+        if (buttons[0] && !prev.buttons[0]) fire("confirm");
+        if (buttons[1] && !prev.buttons[1]) fire("back");
+        if (buttons[2] && !prev.buttons[2]) fire("play");
+        if (buttons[3] && !prev.buttons[3]) fire("details");
+        if (buttons[9] && !prev.buttons[9]) fire("menu");
+        if (buttons[8] && !prev.buttons[8]) fire("scan");
+
+        // --- Analog stick (CONTINUOUS with repeat delay) ---
         const lx = axes[0] ?? 0;
         const ly = axes[1] ?? 0;
-        const plx = prev.axes[0] ?? 0;
-        const ply = prev.axes[1] ?? 0;
-        if (lx < -DEADZONE && plx >= -DEADZONE) fire("left");
-        if (lx > DEADZONE && plx <= DEADZONE) fire("right");
-        if (ly < -DEADZONE && ply >= -DEADZONE) fire("up");
-        if (ly > DEADZONE && ply <= DEADZONE) fire("down");
+        let currentDir: string | null = null;
+        if (lx < -DEADZONE) currentDir = "left";
+        else if (lx > DEADZONE) currentDir = "right";
+        else if (ly < -DEADZONE) currentDir = "up";
+        else if (ly > DEADZONE) currentDir = "down";
 
-        // Face buttons
-        if (buttons[0] && !prev.buttons[0]) fire("confirm");   // A
-        if (buttons[1] && !prev.buttons[1]) fire("back");     // B
-        if (buttons[2] && !prev.buttons[2]) fire("play");      // X
-        if (buttons[3] && !prev.buttons[3]) fire("details");   // Y
-        if (buttons[9] && !prev.buttons[9]) fire("menu");      // Start/Menu
-        if (buttons[8] && !prev.buttons[8]) fire("scan");      // Back/Share
+        if (currentDir) {
+          const sr = stickRepeatRef.current;
+          if (sr.dir !== currentDir) {
+            // Direction changed — fire immediately.
+            sr.dir = currentDir;
+            sr.lastFire = now;
+            fire(currentDir as GamepadAction);
+          } else if (now - sr.lastFire >= REPEAT_DELAY) {
+            // Same direction held — fire again (continuous).
+            sr.lastFire = now;
+            fire(currentDir as GamepadAction);
+          }
+        } else {
+          // Stick released.
+          stickRepeatRef.current.dir = null;
+        }
 
         prevState.current = { buttons, axes };
       }
@@ -112,14 +112,9 @@ export function useGamepadController({ onAction }: Callbacks): ControllerState {
     };
 
     const startPolling = () => {
-      if (rafRef.current == null) {
-        rafRef.current = requestAnimationFrame(poll);
-      }
+      if (rafRef.current == null) rafRef.current = requestAnimationFrame(poll);
     };
 
-    // Some browsers require a button press before exposing the gamepad.
-    // Listen for the connect event AND start polling immediately (the poll
-    // loop re-checks navigator.getGamepads() every frame).
     window.addEventListener("gamepadconnected", onConnect);
     window.addEventListener("gamepaddisconnected", onDisconnect);
     startPolling();
@@ -133,5 +128,5 @@ export function useGamepadController({ onAction }: Callbacks): ControllerState {
     };
   }, [fire]);
 
-  return { connected, lastIndex };
+  return { connected };
 }

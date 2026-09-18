@@ -71,10 +71,12 @@ a{color:inherit;text-decoration:none}
 /* The carousel container clips horizontally but NOT vertically, so the
    focused tile (which scales up) is never cut off. */
 .carousel-wrap{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
-.carousel{display:flex;gap:14px;overflow-x:auto;overflow-y:visible;padding:60px 0 40px;scroll-behavior:smooth;scroll-snap-type:x mandatory;scrollbar-width:none;align-items:center;flex:1;mask-image:linear-gradient(90deg,transparent 0%,black 3%,black 97%,transparent 100%);-webkit-mask-image:linear-gradient(90deg,transparent 0%,black 3%,black 97%,transparent 100%)}
+/* No scroll-snap (causes skipping/stuck). No mask on left/right edges
+   (crops the first/last card). Instead, generous horizontal padding. */
+.carousel{display:flex;gap:14px;overflow-x:auto;overflow-y:visible;padding:60px 40px 40px;scroll-behavior:smooth;scrollbar-width:none;align-items:center;flex:1}
 .carousel::-webkit-scrollbar{display:none}
 
-.tile{position:relative;flex-shrink:0;width:160px;aspect-ratio:3/4;border-radius:14px;overflow:hidden;cursor:pointer;scroll-snap-align:center;transition:transform .4s cubic-bezier(.2,.8,.2,1),filter .4s,box-shadow .4s,border-color .3s;border:2px solid transparent;background:var(--surface);box-shadow:0 6px 20px -8px rgba(0,0,0,0.5)}
+.tile{position:relative;flex-shrink:0;width:160px;aspect-ratio:3/4;border-radius:14px;overflow:hidden;cursor:pointer;transition:transform .4s cubic-bezier(.2,.8,.2,1),filter .4s,box-shadow .4s,border-color .3s;border:2px solid transparent;background:var(--surface);box-shadow:0 6px 20px -8px rgba(0,0,0,0.5)}
 .tile img,.tile .tile-proc{width:100%;height:100%;object-fit:cover;transition:transform .5s cubic-bezier(.2,.8,.2,1)}
 .tile:hover img,.tile:hover .tile-proc{transform:scale(1.05)}
 

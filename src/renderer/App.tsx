@@ -220,10 +220,16 @@ export function App() {
     if (pageGame?.id === g.id) setPageGame(await window.nexus.getGame(g.id));
   }, [refreshAll, toast, pageGame]);
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts — edge-triggered, no auto-repeat
   useEffect(() => {
+    let lastKeyTime = 0;
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      // Debounce key repeat so holding doesn't skip cards too fast
+      const now = performance.now();
+      if (e.repeat && now - lastKeyTime < 200) return;
+      lastKeyTime = now;
+
       if (pageGame) { if (e.key === "Escape") setPageGame(null); return; }
       if (e.key === "/" || ((e.ctrlKey || e.metaKey) && e.key === "k")) { e.preventDefault(); const el = document.querySelector(".tb-search input") as HTMLInputElement; el?.focus(); }
       else if (e.key === "ArrowLeft") setFocusedIdx((i) => Math.max(0, i - 1));
@@ -236,10 +242,17 @@ export function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [pageGame, games, focusedIdx, openPage]);
 
-  // Scroll focused tile into view
+  // Smooth-scroll the focused tile into the CENTER of the carousel viewport.
+  // This replaces scrollIntoView (which used scroll-snap and caused skipping).
   useEffect(() => {
-    const el = document.querySelector(".tile.focused") as HTMLElement | null;
-    if (el) el.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+    const carousel = document.querySelector(".carousel") as HTMLElement | null;
+    const tile = document.querySelector(".tile.focused") as HTMLElement | null;
+    if (!carousel || !tile) return;
+    // Calculate the scroll position that centers the tile in the carousel.
+    const tileCenter = tile.offsetLeft + tile.offsetWidth / 2;
+    const carouselCenter = carousel.clientWidth / 2;
+    const targetScroll = tileCenter - carouselCenter;
+    carousel.scrollTo({ left: targetScroll, behavior: "smooth" });
   }, [focusedIdx]);
 
   const focusedGame = games[focusedIdx] ?? null;
