@@ -31,7 +31,20 @@ export function App() {
   const [scanOpen, setScanOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [focusedIdx, setFocusedIdx] = useState(0);
+  const [focusedIdx, setFocusedIdxState] = useState(0);
+  // A ref that mirrors focusedIdx for synchronous reads in the gamepad callback.
+  // React state updates are async — during continuous gamepad navigation, multiple
+  // setFocusedIdx calls batch together and stateRef.current.focusedIdx becomes stale,
+  // causing the callback to read the OLD index and select/skip the wrong game.
+  // This ref is updated synchronously inside our custom setFocusedIdx wrapper.
+  const focusedIdxRef = useRef(0);
+  const setFocusedIdx = useCallback((updater: number | ((prev: number) => number)) => {
+    setFocusedIdxState((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      focusedIdxRef.current = next; // synchronous update
+      return next;
+    });
+  }, []);
   const [patching, setPatching] = useState(false);
   const [patchProgress, setPatchProgress] = useState<{ current: number; total: number; title: string } | null>(null);
   // v2.0 features state
@@ -148,8 +161,8 @@ export function App() {
   }, [refreshAll, toast]);
 
   // Controller support
-  const stateRef = useRef({ games, pageGame, addOpen, scanOpen, settingsOpen, updateDialogOpen, focusedIdx });
-  stateRef.current = { games, pageGame, addOpen, scanOpen, settingsOpen, updateDialogOpen, focusedIdx };
+  const stateRef = useRef({ games, pageGame, addOpen, scanOpen, settingsOpen, updateDialogOpen });
+  stateRef.current = { games, pageGame, addOpen, scanOpen, settingsOpen, updateDialogOpen };
   const onGamepad = useCallback((action: string) => {
     const s = stateRef.current;
     if (s.addOpen || s.scanOpen || s.settingsOpen || s.updateDialogOpen) {
@@ -158,11 +171,13 @@ export function App() {
     }
     if (s.pageGame) { if (action === "back") setPageGame(null); else if (action === "play" || action === "confirm") handleLaunch(s.pageGame); return; }
     if (s.games.length === 0) { if (action === "scan" || action === "confirm") setScanOpen(true); return; }
+    // Use focusedIdxRef.current (synchronous) instead of stateRef.current.focusedIdx (stale)
+    const idx = focusedIdxRef.current;
     if (action === "left") setFocusedIdx((i) => Math.max(0, i - 1));
     else if (action === "right") setFocusedIdx((i) => Math.min(s.games.length - 1, i + 1));
-    else if (action === "confirm") { const g = s.games[s.focusedIdx]; if (g) openPage(g.id); }
-    else if (action === "play") { const g = s.games[s.focusedIdx]; if (g) handleLaunch(g); }
-    else if (action === "details") { const g = s.games[s.focusedIdx]; if (g) openPage(g.id); }
+    else if (action === "confirm") { const g = s.games[idx]; if (g) openPage(g.id); }
+    else if (action === "play") { const g = s.games[idx]; if (g) handleLaunch(g); }
+    else if (action === "details") { const g = s.games[idx]; if (g) openPage(g.id); }
     else if (action === "menu") setSettingsOpen(true);
     else if (action === "scan") setScanOpen(true);
   }, [handleLaunch, openPage]);
