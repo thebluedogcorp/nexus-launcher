@@ -70,11 +70,14 @@ a{color:inherit;text-decoration:none}
 /* ============ CAROUSEL (PS5 portrait tiles) ============ */
 /* The carousel container clips horizontally but NOT vertically, so the
    focused tile (which scales up) is never cut off. */
-.carousel-wrap{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
-/* No scroll-snap (causes skipping/stuck). No mask on left/right edges
-   (crops the first/last card). Instead, generous horizontal padding. */
-.carousel{display:flex;gap:14px;overflow-x:auto;overflow-y:visible;padding:60px 40px 40px;scroll-behavior:auto;scrollbar-width:none;align-items:center;flex:1;contain:layout style}
-.carousel::-webkit-scrollbar{display:none}
+.carousel-wrap{flex:1;display:flex;flex-direction:column;min-height:0;overflow:visible}
+/* overflow-x: auto (scrollable) + overflow-y: visible (tiles don't clip).
+   Custom scrollbar styling. Wheel + drag both work for horizontal scroll. */
+.carousel{display:flex;gap:14px;overflow-x:auto;overflow-y:visible;padding:60px 40px 40px;scroll-behavior:auto;align-items:center;flex:1;contain:layout style;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.15) transparent}
+.carousel::-webkit-scrollbar{height:6px;display:block}
+.carousel::-webkit-scrollbar-track{background:transparent}
+.carousel::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.12);border-radius:999px}
+.carousel::-webkit-scrollbar-thumb:hover{background:rgba(74,222,128,0.4)}
 
 .tile{position:relative;flex-shrink:0;width:160px;aspect-ratio:3/4;border-radius:14px;overflow:hidden;cursor:pointer;transition:transform .3s cubic-bezier(.2,.8,.2,1),filter .3s,box-shadow .3s,border-color .3s;border:2px solid transparent;background:var(--surface);box-shadow:0 6px 20px -8px rgba(0,0,0,0.5);will-change:transform,filter;contain:layout style paint}
 .tile img,.tile .tile-proc{width:100%;height:100%;object-fit:cover;transition:transform .5s cubic-bezier(.2,.8,.2,1)}

@@ -259,6 +259,24 @@ export function App() {
   // (e.g. hover 7th → scroll → 9th lands under cursor → 9th focused → skip).
   const focusSourceRef = useRef<"mouse" | "nav">("mouse");
 
+  // Mouse wheel → horizontal scroll for the carousel.
+  // Most mice don't have a horizontal wheel, so we convert vertical wheel
+  // events to horizontal scroll. This lets mouse-only users scroll through
+  // all tiles without needing the keyboard.
+  useEffect(() => {
+    const carousel = document.querySelector(".carousel") as HTMLElement | null;
+    if (!carousel) return;
+    const onWheel = (e: WheelEvent) => {
+      // If the user is scrolling vertically (most common), convert to horizontal.
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        e.preventDefault();
+        carousel.scrollLeft += e.deltaY;
+      }
+    };
+    carousel.addEventListener("wheel", onWheel, { passive: false });
+    return () => carousel.removeEventListener("wheel", onWheel);
+  }, []);
+
   // Instantly scroll the focused tile to CENTER — but ONLY for keyboard/controller
   // navigation, NOT for mouse hover. Mouse users scroll with the wheel/drag.
   useEffect(() => {
