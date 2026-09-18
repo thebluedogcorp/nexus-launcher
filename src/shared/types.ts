@@ -56,6 +56,13 @@ export interface Game {
   installedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  // v2.0 — 50 features
+  completionStatus: "" | "playing" | "completed" | "backlog" | "abandoned" | "wishlist";
+  userRating: number | null;      // 1-5 user stars
+  notes: string | null;            // user notes
+  lastSessionAt: string | null;   // last play session timestamp
+  sessionMinutes: number;          // last session length in minutes
+  sortOrder: number;              // manual drag reorder
 }
 
 export interface DetectedGame {

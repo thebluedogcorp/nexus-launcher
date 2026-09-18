@@ -133,15 +133,51 @@ function migrate(conn: import("better-sqlite3").Database) {
   // Idempotent column additions for existing DBs created before v1.1.
   addColumnIfMissing(conn, "games", "bannerImage", "TEXT");
   addColumnIfMissing(conn, "games", "screenshots", "TEXT");
+  // v2.0 columns — 50 features schema
+  addColumnIfMissing(conn, "games", "completionStatus", "TEXT");     // playing, completed, backlog, abandoned, wishlist, ""
+  addColumnIfMissing(conn, "games", "userRating", "INTEGER");        // 1-5 user stars
+  addColumnIfMissing(conn, "games", "tags", "TEXT");                  // pipe-separated custom tags
+  addColumnIfMissing(conn, "games", "notes", "TEXT");                // user notes
+  addColumnIfMissing(conn, "games", "lastSessionAt", "TEXT");        // last play session timestamp
+  addColumnIfMissing(conn, "games", "sessionMinutes", "INTEGER DEFAULT 0"); // last session length
+  addColumnIfMissing(conn, "games", "sortOrder", "INTEGER DEFAULT 0");     // manual drag reorder
+
+  // Collections table — user-defined game groups
+  conn.exec(`
+    CREATE TABLE IF NOT EXISTS collections (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      color TEXT DEFAULT '#4ade80',
+      createdAt TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS collection_games (
+      collectionId INTEGER NOT NULL,
+      gameId INTEGER NOT NULL,
+      PRIMARY KEY (collectionId, gameId),
+      FOREIGN KEY (collectionId) REFERENCES collections(id) ON DELETE CASCADE,
+      FOREIGN KEY (gameId) REFERENCES games(id) ON DELETE CASCADE
+    );
+    CREATE TABLE IF NOT EXISTS play_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      gameId INTEGER NOT NULL,
+      startedAt TEXT NOT NULL,
+      endedAt TEXT,
+      minutes INTEGER DEFAULT 0,
+      FOREIGN KEY (gameId) REFERENCES games(id) ON DELETE CASCADE
+    );
+  `);
+  addColumnIfMissing(conn, "games", "completionStatus", "TEXT");
+  addColumnIfMissing(conn, "games", "userRating", "INTEGER");
+  addColumnIfMissing(conn, "games", "tags", "TEXT");
+  addColumnIfMissing(conn, "games", "notes", "TEXT");
+  addColumnIfMissing(conn, "games", "lastSessionAt", "TEXT");
+  addColumnIfMissing(conn, "games", "sessionMinutes", "INTEGER DEFAULT 0");
+  addColumnIfMissing(conn, "games", "sortOrder", "INTEGER DEFAULT 0");
 
   const row = conn.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as
     | { value?: string }
     | undefined;
-  if (!row?.value) {
-    conn.prepare("INSERT OR REPLACE INTO meta(key, value) VALUES('schemaVersion', '2')").run();
-  } else {
-    conn.prepare("INSERT OR REPLACE INTO meta(key, value) VALUES('schemaVersion', '2')").run();
-  }
+  conn.prepare("INSERT OR REPLACE INTO meta(key, value) VALUES('schemaVersion', '3')").run();
 }
 
 function addColumnIfMissing(
@@ -194,6 +230,12 @@ interface GameRow {
   installedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  completionStatus: string | null;
+  userRating: number | null;
+  notes: string | null;
+  lastSessionAt: string | null;
+  sessionMinutes: number;
+  sortOrder: number;
 }
 
 function rowToGame(r: GameRow): Game {
@@ -235,8 +277,15 @@ function rowToGame(r: GameRow): Game {
     installedAt: r.installedAt,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
+    completionStatus: (r.completionStatus || "") as Game["completionStatus"],
+    userRating: r.userRating ?? null,
+    notes: r.notes ?? null,
+    lastSessionAt: r.lastSessionAt,
+    sessionMinutes: r.sessionMinutes ?? 0,
+    sortOrder: r.sortOrder ?? 0,
   };
 }
+
 
 // ===== Games =====
 
@@ -394,6 +443,10 @@ export function updateGame(id: number, patch: Record<string, unknown>): Game | n
     xboxAppId: "xboxAppId",
     favorite: "favorite",
     hidden: "hidden",
+    completionStatus: "completionStatus",
+    userRating: "userRating",
+    notes: "notes",
+    sortOrder: "sortOrder",
   };
   const sets: string[] = [];
   const params: Record<string, unknown> = { id };
@@ -609,4 +662,199 @@ export function setAllSettings(s: Partial<LauncherSettings>): LauncherSettings {
   if (s.defaultSort !== undefined) setSetting("defaultSort", s.defaultSort);
   if (s.scanPaths !== undefined) setSetting("scanPaths", s.scanPaths);
   return getAllSettings();
+}
+
+// ===== v2.0 Features =====
+
+/** Export the entire library as JSON (backup). */
+export function exportLibrary(): string {
+  const conn = db();
+  const games = conn.prepare("SELECT * FROM games").all() as GameRow[];
+  const collections = conn.prepare("SELECT * FROM collections").all() as Array<{ id: number; name: string; color: string; createdAt: string }>;
+  const collectionGames = conn.prepare("SELECT * FROM collection_games").all() as Array<{ collectionId: number; gameId: number }>;
+  const sessions = conn.prepare("SELECT * FROM play_sessions").all() as Array<{ id: number; gameId: number; startedAt: string; endedAt: string | null; minutes: number }>;
+  return JSON.stringify({ version: 3, games: games.map(rowToGame), collections, collectionGames, sessions, exportedAt: new Date().toISOString() }, null, 2);
+}
+
+/** Import a library JSON backup (merge — doesn't delete existing games). */
+export function importLibrary(json: string): { imported: number; skipped: number } {
+  const data = JSON.parse(json) as { games?: Game[]; collections?: unknown[]; sessions?: unknown[] };
+  let imported = 0;
+  let skipped = 0;
+  if (!data.games) return { imported: 0, skipped: 0 };
+  for (const g of data.games) {
+    const existing = findExisting({ title: g.title, platform: g.platform, executable: g.executable ?? null, installDir: g.installDir ?? null, launchCommand: g.launchCommand ?? null, sizeBytes: g.sizeBytes ?? null } as DetectedGame);
+    if (existing) { skipped++; continue; }
+    createGame({
+      title: g.title,
+      platform: g.platform,
+      source: g.source,
+      executable: g.executable,
+      installDir: g.installDir,
+      launchCommand: g.launchCommand,
+      coverImage: g.coverImage,
+      bannerImage: g.bannerImage,
+      screenshots: g.screenshots,
+      description: g.description,
+      developer: g.developer,
+      publisher: g.publisher,
+      releaseDate: g.releaseDate,
+      rating: g.rating,
+      ratingCount: g.ratingCount,
+      genres: g.genres,
+      rawgId: g.rawgId,
+      sizeBytes: g.sizeBytes,
+      steamAppId: g.steamAppId,
+      epicAppName: g.epicAppName,
+      gogId: g.gogId,
+      battlenetUid: g.battlenetUid,
+      eaOfferId: g.eaOfferId,
+      ubisoftId: g.ubisoftId,
+      riotId: g.riotId,
+      xboxPackageFamilyName: g.xboxPackageFamilyName,
+      xboxAppId: g.xboxAppId,
+    });
+    imported++;
+  }
+  return { imported, skipped };
+}
+
+/** Check which games have missing install directories (uninstalled but still in library). */
+export function checkMissingGames(): Array<{ id: number; title: string; installDir: string | null; executable: string | null }> {
+  const conn = db();
+  const games = conn.prepare("SELECT id, title, installDir, executable FROM games").all() as Array<{ id: number; title: string; installDir: string | null; executable: string | null }>;
+  const missing: Array<{ id: number; title: string; installDir: string | null; executable: string | null }> = [];
+  for (const g of games) {
+    if (g.executable && !existsSync(g.executable)) {
+      missing.push(g);
+    } else if (g.installDir && !existsSync(g.installDir) && !g.executable) {
+      missing.push(g);
+    }
+  }
+  return missing;
+}
+
+/** Detailed stats for the stats dashboard. */
+export function getDetailedStats(): {
+  totalGames: number;
+  totalPlaytimeSec: number;
+  totalLaunches: number;
+  totalSizeBytes: number;
+  avgRating: number | null;
+  favorites: number;
+  hidden: number;
+  byPlatform: Record<string, number>;
+  byStatus: Record<string, number>;
+  byGenre: Record<string, number>;
+  topPlayed: Array<{ id: number; title: string; playtimeSec: number }>;
+  recentlyPlayed: Array<{ id: number; title: string; lastPlayedAt: string | null }>;
+  recentlyAdded: Array<{ id: number; title: string; createdAt: string }>;
+  largestGames: Array<{ id: number; title: string; sizeBytes: number | null }>;
+  neverPlayed: number;
+  completionRate: number;
+} {
+  const conn = db();
+  const rows = conn.prepare("SELECT * FROM games").all() as GameRow[];
+  const games = rows.map(rowToGame);
+  const byPlatform: Record<string, number> = {};
+  const byStatus: Record<string, number> = {};
+  const byGenre: Record<string, number> = {};
+  let totalPlaytime = 0;
+  let totalLaunches = 0;
+  let totalSize = 0;
+  let favorites = 0;
+  let hidden = 0;
+  let ratingSum = 0;
+  let ratingCount = 0;
+  let neverPlayed = 0;
+  let completed = 0;
+  for (const g of games) {
+    byPlatform[g.platform] = (byPlatform[g.platform] || 0) + 1;
+    const status = g.completionStatus || "unsorted";
+    byStatus[status] = (byStatus[status] || 0) + 1;
+    if (status === "completed") completed++;
+    for (const genre of g.genres) byGenre[genre] = (byGenre[genre] || 0) + 1;
+    totalPlaytime += g.playtimeSec;
+    totalLaunches += g.launchCount;
+    totalSize += g.sizeBytes ?? 0;
+    if (g.favorite) favorites++;
+    if (g.hidden) hidden++;
+    if (g.rating !== null) { ratingSum += g.rating; ratingCount++; }
+    if (g.playtimeSec === 0) neverPlayed++;
+  }
+  return {
+    totalGames: games.length,
+    totalPlaytimeSec: totalPlaytime,
+    totalLaunches,
+    totalSizeBytes: totalSize,
+    avgRating: ratingCount ? ratingSum / ratingCount : null,
+    favorites,
+    hidden,
+    byPlatform,
+    byStatus,
+    byGenre,
+    topPlayed: games.sort((a, b) => b.playtimeSec - a.playtimeSec).slice(0, 10).map((g) => ({ id: g.id, title: g.title, playtimeSec: g.playtimeSec })),
+    recentlyPlayed: games.filter((g) => g.lastPlayedAt).sort((a, b) => (b.lastPlayedAt ?? "").localeCompare(a.lastPlayedAt ?? "")).slice(0, 10).map((g) => ({ id: g.id, title: g.title, lastPlayedAt: g.lastPlayedAt })),
+    recentlyAdded: games.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? "")).slice(0, 10).map((g) => ({ id: g.id, title: g.title, createdAt: g.createdAt })),
+    largestGames: games.filter((g) => g.sizeBytes).sort((a, b) => (b.sizeBytes ?? 0) - (a.sizeBytes ?? 0)).slice(0, 10).map((g) => ({ id: g.id, title: g.title, sizeBytes: g.sizeBytes })),
+    neverPlayed,
+    completionRate: games.length > 0 ? (completed / games.length) * 100 : 0,
+  };
+}
+
+/** Record a play session. */
+export function recordSession(gameId: number, minutes: number): void {
+  const conn = db();
+  const now = new Date().toISOString().replace("T", " ").slice(0, 19);
+  conn.prepare("INSERT INTO play_sessions (gameId, startedAt, endedAt, minutes) VALUES (?, ?, ?, ?)").run(gameId, now, now, minutes);
+  conn.prepare("UPDATE games SET lastSessionAt = ?, sessionMinutes = ? WHERE id = ?").run(now, minutes, gameId);
+}
+
+// ===== Collections =====
+
+export interface Collection {
+  id: number;
+  name: string;
+  color: string;
+  gameCount: number;
+}
+
+export function listCollections(): Collection[] {
+  const conn = db();
+  const rows = conn.prepare(`
+    SELECT c.id, c.name, c.color, COUNT(cg.gameId) as gameCount
+    FROM collections c
+    LEFT JOIN collection_games cg ON c.id = cg.collectionId
+    GROUP BY c.id
+    ORDER BY c.name
+  `).all() as Array<{ id: number; name: string; color: string; gameCount: number }>;
+  return rows;
+}
+
+export function createCollection(name: string, color: string): Collection {
+  const conn = db();
+  const info = conn.prepare("INSERT INTO collections (name, color) VALUES (?, ?)").run(name, color || "#4ade80");
+  return { id: Number(info.lastInsertRowid), name, color: color || "#4ade80", gameCount: 0 };
+}
+
+export function addGameToCollection(collectionId: number, gameId: number): void {
+  db().prepare("INSERT OR IGNORE INTO collection_games (collectionId, gameId) VALUES (?, ?)").run(collectionId, gameId);
+}
+
+export function removeGameFromCollection(collectionId: number, gameId: number): void {
+  db().prepare("DELETE FROM collection_games WHERE collectionId = ? AND gameId = ?").run(collectionId, gameId);
+}
+
+export function deleteCollection(id: number): void {
+  db().prepare("DELETE FROM collections WHERE id = ?").run(id);
+}
+
+export function getGamesInCollection(collectionId: number): Game[] {
+  const conn = db();
+  const rows = conn.prepare(`
+    SELECT g.* FROM games g
+    JOIN collection_games cg ON g.id = cg.gameId
+    WHERE cg.collectionId = ?
+  `).all(collectionId) as GameRow[];
+  return rows.map(rowToGame);
 }

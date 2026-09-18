@@ -13,6 +13,17 @@ import {
   getStats,
   getAllSettings,
   setAllSettings,
+  exportLibrary,
+  importLibrary,
+  checkMissingGames,
+  getDetailedStats,
+  recordSession,
+  listCollections,
+  createCollection,
+  addGameToCollection,
+  removeGameFromCollection,
+  deleteCollection,
+  getGamesInCollection,
 } from "./db";
 import { runScan } from "./detectors";
 import { launchGame } from "./launchers";
@@ -211,6 +222,43 @@ export function registerIpc(): void {
       return { ok: false, message: e instanceof Error ? e.message : String(e) };
     }
   });
+
+  // ===== v2.0 Features =====
+
+  // Open a file/folder path in the OS file explorer
+  ipcMain.handle("shell:openPath", async (_e, path: string) => {
+    try {
+      const { shell } = await import("electron");
+      const result = await shell.openPath(path);
+      return { ok: !result, message: result || "Opened" };
+    } catch (e) {
+      return { ok: false, message: e instanceof Error ? e.message : String(e) };
+    }
+  });
+
+  // Export/import library
+  ipcMain.handle("games:export", () => exportLibrary());
+  ipcMain.handle("games:import", (_e, json: string) => importLibrary(json));
+
+  // Check missing games (install dir gone)
+  ipcMain.handle("games:checkMissing", () => checkMissingGames());
+
+  // Detailed stats for the dashboard
+  ipcMain.handle("games:detailedStats", () => getDetailedStats());
+
+  // Play session recording
+  ipcMain.handle("games:recordSession", (_e, gameId: number, minutes: number) => {
+    recordSession(gameId, minutes);
+    return true;
+  });
+
+  // Collections
+  ipcMain.handle("collections:list", () => listCollections());
+  ipcMain.handle("collections:create", (_e, name: string, color: string) => createCollection(name, color));
+  ipcMain.handle("collections:addGame", (_e, collectionId: number, gameId: number) => { addGameToCollection(collectionId, gameId); return true; });
+  ipcMain.handle("collections:removeGame", (_e, collectionId: number, gameId: number) => { removeGameFromCollection(collectionId, gameId); return true; });
+  ipcMain.handle("collections:delete", (_e, id: number) => { deleteCollection(id); return true; });
+  ipcMain.handle("collections:getGames", (_e, collectionId: number) => getGamesInCollection(collectionId));
 }
 
 /**

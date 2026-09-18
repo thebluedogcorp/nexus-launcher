@@ -34,6 +34,10 @@ export function App() {
   const [focusedIdx, setFocusedIdx] = useState(0);
   const [patching, setPatching] = useState(false);
   const [patchProgress, setPatchProgress] = useState<{ current: number; total: number; title: string } | null>(null);
+  // v2.0 features state
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; game: Game } | null>(null);
+  const [statsOpen, setStatsOpen] = useState(false);
+  const [editorGame, setEditorGame] = useState<Game | null>(null);
   const [updateAvailable, setUpdateAvailable] = useState<{ version?: string; releaseUrl?: string; downloadUrl?: string; downloadSize?: number } | null>(null);
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
 
@@ -164,6 +168,51 @@ export function App() {
   }, [handleLaunch, openPage]);
   const { connected: controllerConnected } = useGamepadController({ onAction: onGamepad });
 
+  // v2.0 feature handlers
+  const handleSetStatus = useCallback(async (g: Game, status: string) => {
+    await window.nexus.updateGame(g.id, { completionStatus: status });
+    await refreshAll();
+    if (pageGame?.id === g.id) setPageGame(await window.nexus.getGame(g.id));
+  }, [refreshAll, pageGame]);
+  const handleSetUserRating = useCallback(async (g: Game, rating: number) => {
+    await window.nexus.updateGame(g.id, { userRating: rating === g.userRating ? null : rating });
+    await refreshAll();
+    if (pageGame?.id === g.id) setPageGame(await window.nexus.getGame(g.id));
+  }, [refreshAll, pageGame]);
+  const handleOpenDir = useCallback(async (g: Game) => {
+    const path = g.installDir || g.executable;
+    if (!path) { toast("error", "No install directory", "This game has no known install path."); return; }
+    const res = await window.nexus.openPath(path);
+    if (!res.ok) toast("error", "Couldn't open directory", res.message);
+  }, [toast]);
+  const handleExport = useCallback(async () => {
+    const json = await window.nexus.exportLibrary();
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `nexus-library-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click(); URL.revokeObjectURL(url);
+    toast("success", "Library exported", "Downloaded as JSON backup.");
+  }, [toast]);
+  const handleImportFile = useCallback(async (file: File) => {
+    const text = await file.text();
+    const res = await window.nexus.importLibrary(text);
+    toast("success", `Imported ${res.imported} game${res.imported === 1 ? "" : "s"}`, res.skipped > 0 ? `${res.skipped} already existed.` : undefined);
+    await refreshAll();
+  }, [refreshAll, toast]);
+  const handleCheckMissing = useCallback(async () => {
+    const missing = await window.nexus.checkMissingGames();
+    if (missing.length === 0) toast("success", "All games installed", "No missing games found.");
+    else toast("info", `${missing.length} game${missing.length === 1 ? "" : "s"} missing`, missing.map((m: { title: string }) => m.title).slice(0, 3).join(", ") + (missing.length > 3 ? "…" : ""));
+  }, [toast]);
+  const handleEditGame = useCallback(async (g: Game, patch: Record<string, unknown>) => {
+    await window.nexus.updateGame(g.id, patch);
+    toast("success", "Game updated");
+    await refreshAll();
+    if (pageGame?.id === g.id) setPageGame(await window.nexus.getGame(g.id));
+    setEditorGame(null);
+  }, [refreshAll, toast, pageGame]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -224,6 +273,7 @@ export function App() {
         )}
         <button className="tb-icon" onClick={() => setScanOpen(true)} title="Scan (S)"><Icon.Scan size={16} /></button>
         <button className="tb-icon primary" onClick={() => setAddOpen(true)} title="Add (A)"><Icon.Plus size={15} /> Add</button>
+        <button className="tb-icon" onClick={() => setStatsOpen(true)} title="Stats dashboard"><Icon.TrendingUp size={16} /></button>
         <button className="tb-icon" onClick={() => setSettingsOpen(true)} title="Settings"><Icon.Settings size={16} /></button>
       </header>
 
@@ -269,7 +319,7 @@ export function App() {
             <div className="carousel-wrap">
               <div className="carousel">
                 {games.map((g, i) => (
-                  <div key={g.id} className={i === focusedIdx ? "tile focused" : "tile"} onMouseEnter={() => setFocusedIdx(i)} onClick={() => openPage(g.id)}>
+                  <div key={g.id} className={i === focusedIdx ? "tile focused" : "tile"} onMouseEnter={() => setFocusedIdx(i)} onClick={() => openPage(g.id)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, game: g }); }}>
                     {g.coverImage || g.bannerImage ? (
                       <img src={(g.coverImage || g.bannerImage) ?? undefined} alt={g.title} loading="lazy" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
                     ) : (
@@ -309,7 +359,21 @@ export function App() {
                     <button className="btn btn-primary" onClick={() => handleLaunch(focusedGame)}><Icon.Play size={17} /> Play</button>
                     <button className="btn btn-ghost" onClick={() => openPage(focusedGame.id)}><Icon.Info size={16} /> Details</button>
                     <button className="btn btn-icon" onClick={() => handleToggleFav(focusedGame)} title={focusedGame.favorite ? "Remove favorite" : "Add favorite"} style={focusedGame.favorite ? { background: "rgba(251,191,36,0.12)", borderColor: "rgba(251,191,36,0.36)", color: "var(--gold)" } : {}}><Icon.Star size={16} filled={focusedGame.favorite} /></button>
+                    <button className="btn btn-icon" onClick={() => handleOpenDir(focusedGame)} title="Open install directory"><Icon.Folder size={16} /></button>
+                    <button className="btn btn-icon" onClick={() => setEditorGame(focusedGame)} title="Edit game"><Icon.FileCog size={16} /></button>
                     {!patching && games.some((g) => !g.bannerImage) && <button className="btn btn-outline" onClick={handlePatchAll} title="Fetch artwork for all games"><Icon.Wand size={15} /> Enrich All</button>}
+                  </div>
+                  {/* Completion status pills */}
+                  <div className="status-pills">
+                    {(["playing", "completed", "backlog", "abandoned", "wishlist"] as const).map((s) => (
+                      <button key={s} className={`status-pill ${focusedGame.completionStatus === s ? `active ${s}` : ""}`} onClick={() => handleSetStatus(focusedGame, focusedGame.completionStatus === s ? "" : s)}>{s}</button>
+                    ))}
+                  </div>
+                  {/* User rating stars */}
+                  <div className="user-rating">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <button key={n} className={`star ${focusedGame.userRating && focusedGame.userRating >= n ? "filled" : ""}`} onClick={() => handleSetUserRating(focusedGame, n)}><Icon.Star size={16} filled={focusedGame.userRating ? focusedGame.userRating >= n : false} /></button>
+                    ))}
                   </div>
                 </div>
                 {/* Detail card */}
@@ -343,6 +407,32 @@ export function App() {
       {scanOpen && <ScanDialog onClose={() => setScanOpen(false)} onRunScan={handleRunScan} onImport={handleImport} onDeepScan={handleDeepScan} />}
       {settingsOpen && settings && <SettingsDialog initial={settings} onClose={() => setSettingsOpen(false)} onSave={handleSaveSettings} onCheckUpdates={handleCheckUpdates} />}
       {updateDialogOpen && updateAvailable && <UpdateDialog info={updateAvailable} onClose={() => setUpdateDialogOpen(false)} />}
+
+      {/* Context menu (right-click on tiles) */}
+      {ctxMenu && (
+        <div className="ctx-menu" style={{ left: ctxMenu.x, top: ctxMenu.y }} onClick={() => setCtxMenu(null)}>
+          <button className="ctx-item" onClick={() => { handleLaunch(ctxMenu.game); setCtxMenu(null); }}><Icon.Play size={15} /> Play</button>
+          <button className="ctx-item" onClick={() => { openPage(ctxMenu.game.id); setCtxMenu(null); }}><Icon.Info size={15} /> Details</button>
+          <div className="ctx-sep" />
+          <button className="ctx-item" onClick={() => { handleToggleFav(ctxMenu.game); setCtxMenu(null); }}><Icon.Star size={15} filled={ctxMenu.game.favorite} /> {ctxMenu.game.favorite ? "Unfavorite" : "Favorite"}</button>
+          <button className="ctx-item" onClick={() => { handleOpenDir(ctxMenu.game); setCtxMenu(null); }}><Icon.Folder size={15} /> Open Directory</button>
+          <button className="ctx-item" onClick={() => { handlePatch(ctxMenu.game); setCtxMenu(null); }}><Icon.Refresh size={15} /> Patch Metadata</button>
+          <button className="ctx-item" onClick={() => { setEditorGame(ctxMenu.game); setCtxMenu(null); }}><Icon.FileCog size={15} /> Edit Game</button>
+          <div className="ctx-sep" />
+          <button className="ctx-item" onClick={() => { handleSetStatus(ctxMenu.game, "playing"); setCtxMenu(null); }}><Icon.Play size={14} /> Mark as Playing</button>
+          <button className="ctx-item" onClick={() => { handleSetStatus(ctxMenu.game, "completed"); setCtxMenu(null); }}><Icon.CheckCircle size={14} /> Mark as Completed</button>
+          <button className="ctx-item" onClick={() => { handleSetStatus(ctxMenu.game, "backlog"); setCtxMenu(null); }}><Icon.Library size={14} /> Add to Backlog</button>
+          <div className="ctx-sep" />
+          <button className="ctx-item danger" onClick={() => { handleDelete(ctxMenu.game); setCtxMenu(null); }}><Icon.Trash size={15} /> Remove</button>
+        </div>
+      )}
+
+      {/* Game editor */}
+      {editorGame && <GameEditor game={editorGame} onSave={(patch) => handleEditGame(editorGame, patch)} onClose={() => setEditorGame(null)} />}
+
+      {/* Stats dashboard */}
+      {statsOpen && <StatsDashboard onClose={() => setStatsOpen(false)} onExport={handleExport} onImport={handleImportFile} onCheckMissing={handleCheckMissing} />}
+
       {controllerConnected && !pageGame && <div className="hints-bar"><span className="hint"><span className="k r">A</span> Select</span><span className="hint"><span className="k r">B</span> Back</span><span className="hint"><span className="k r">X</span> Play</span><span className="hint"><span className="k r">Y</span> Details</span><span className="hint"><span className="k">←</span><span className="k">→</span> Browse</span></div>}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
@@ -371,5 +461,131 @@ function DynamicBackground({ games, focusedIdx, focusedGame }: { games: Game[]; 
       </div>
       <div className="bg-overlay" />
     </>
+  );
+}
+
+/** Stats Dashboard modal — shows library analytics + tools (export/import/check-missing). */
+function StatsDashboard({ onClose, onExport, onImport, onCheckMissing }: {
+  onClose: () => void;
+  onExport: () => void;
+  onImport: (file: File) => void;
+  onCheckMissing: () => void;
+}) {
+  const [stats, setStats] = useState<Awaited<ReturnType<typeof window.nexus.getDetailedStats>> | null>(null);
+  useEffect(() => { window.nexus.getDetailedStats().then(setStats); }, []);
+  if (!stats) return <div className="modal-overlay" onClick={onClose}><div className="modal modal-wide" onClick={(e) => e.stopPropagation()}><div className="modal-body"><div className="shimmer" style={{ height: 200, borderRadius: 12 }} /></div></div></div>;
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className="modal-title"><Icon.TrendingUp size={18} /> Library Statistics</div>
+          <button className="modal-close" onClick={onClose}><Icon.Close size={16} /></button>
+        </div>
+        <div className="modal-body">
+          <div className="stats-grid">
+            <div className="stat-card"><div className="i"><Icon.Library size={18} /></div><div className="v">{stats.totalGames}</div><div className="l">Total Games</div></div>
+            <div className="stat-card"><div className="i"><Icon.Clock size={18} /></div><div className="v">{formatPlaytimeShort(stats.totalPlaytimeSec)}</div><div className="l">Playtime</div></div>
+            <div className="stat-card"><div className="i"><Icon.HardDrive size={18} /></div><div className="v">{formatSize(stats.totalSizeBytes)}</div><div className="l">Disk Used</div></div>
+            <div className="stat-card"><div className="i"><Icon.Star size={18} /></div><div className="v">{stats.avgRating ? stats.avgRating.toFixed(1) : "—"}</div><div className="l">Avg Rating</div></div>
+          </div>
+          <div className="stats-grid">
+            <div className="stat-card"><div className="i"><Icon.Play size={18} /></div><div className="v">{stats.totalLaunches}</div><div className="l">Total Launches</div></div>
+            <div className="stat-card"><div className="i"><Icon.Star size={18} /></div><div className="v">{stats.favorites}</div><div className="l">Favorites</div></div>
+            <div className="stat-card"><div className="i"><Icon.Gamepad size={18} /></div><div className="v">{stats.neverPlayed}</div><div className="l">Never Played</div></div>
+            <div className="stat-card"><div className="i"><Icon.CheckCircle size={18} /></div><div className="v">{stats.completionRate.toFixed(0)}%</div><div className="l">Completion</div></div>
+          </div>
+          {/* By platform */}
+          <div className="stats-section">
+            <div className="stats-section-title"><span style={{ width: 3, height: 13, borderRadius: 2, background: "#4ade80" }} /> By Platform</div>
+            {Object.entries(stats.byPlatform as Record<string, number>).sort((a: [string, number], b: [string, number]) => b[1] - a[1]).map(([k, v]: [string, number]) => (
+              <div key={k} className="stats-row">
+                <span className="name">{PLATFORM_LIST.find((p) => p.id === k)?.label ?? k}</span>
+                <div className="stats-bar"><div style={{ width: `${stats.totalGames > 0 ? (v / stats.totalGames) * 100 : 0}%` }} /></div>
+                <span className="val">{v}</span>
+              </div>
+            ))}
+          </div>
+          {/* By status */}
+          <div className="stats-section">
+            <div className="stats-section-title"><span style={{ width: 3, height: 13, borderRadius: 2, background: "#22d3ee" }} /> By Status</div>
+            {Object.entries(stats.byStatus as Record<string, number>).sort((a: [string, number], b: [string, number]) => b[1] - a[1]).map(([k, v]: [string, number]) => (
+              <div key={k} className="stats-row"><span className="name">{k}</span><span className="val">{v}</span></div>
+            ))}
+          </div>
+          {/* Top played */}
+          <div className="stats-section">
+            <div className="stats-section-title"><span style={{ width: 3, height: 13, borderRadius: 2, background: "#fbbf24" }} /> Top Played</div>
+            {stats.topPlayed.slice(0, 5).map((g: { id: number; title: string; playtimeSec: number }) => (
+              <div key={g.id} className="stats-row"><span className="name">{g.title}</span><span className="val">{formatPlaytimeShort(g.playtimeSec)}</span></div>
+            ))}
+          </div>
+          {/* Largest games */}
+          <div className="stats-section">
+            <div className="stats-section-title"><span style={{ width: 3, height: 13, borderRadius: 2, background: "#60a5fa" }} /> Largest Games</div>
+            {stats.largestGames.slice(0, 5).map((g: { id: number; title: string; sizeBytes: number | null }) => (
+              <div key={g.id} className="stats-row"><span className="name">{g.title}</span><span className="val">{formatSize(g.sizeBytes)}</span></div>
+            ))}
+          </div>
+          {/* Tools */}
+          <div className="stats-section">
+            <div className="stats-section-title"><span style={{ width: 3, height: 13, borderRadius: 2, background: "#a78bfa" }} /> Library Tools</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button className="btn btn-ghost btn-sm" onClick={onExport}><Icon.Download size={14} /> Export Library</button>
+              <label className="btn btn-ghost btn-sm" style={{ cursor: "pointer" }}>
+                <Icon.DownloadCloud size={14} /> Import Library
+                <input type="file" accept=".json" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) onImport(f); }} />
+              </label>
+              <button className="btn btn-ghost btn-sm" onClick={onCheckMissing}><Icon.Scan size={14} /> Check Missing Games</button>
+            </div>
+          </div>
+        </div>
+        <div className="modal-footer"><button className="btn btn-primary" onClick={onClose}>Close</button></div>
+      </div>
+    </div>
+  );
+}
+
+/** Game Editor modal — edit title, platform, paths, notes, tags. */
+function GameEditor({ game, onSave, onClose }: { game: Game; onSave: (patch: Record<string, unknown>) => void; onClose: () => void }) {
+  const [title, setTitle] = useState(game.title);
+  const [platform, setPlatform] = useState(game.platform);
+  const [executable, setExecutable] = useState(game.executable ?? "");
+  const [installDir, setInstallDir] = useState(game.installDir ?? "");
+  const [launchCommand, setLaunchCommand] = useState(game.launchCommand ?? "");
+  const [notes, setNotes] = useState(game.notes ?? "");
+  const [coverImage, setCoverImage] = useState(game.coverImage ?? "");
+  const [saving, setSaving] = useState(false);
+  const save = async () => {
+    setSaving(true);
+    onSave({ title, platform, executable: executable || null, installDir: installDir || null, launchCommand: launchCommand || null, notes: notes || null, coverImage: coverImage || null });
+  };
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className="modal-title"><Icon.FileCog size={18} /> Edit Game</div>
+          <button className="modal-close" onClick={onClose}><Icon.Close size={16} /></button>
+        </div>
+        <div className="modal-body">
+          <div className="editor-field"><label>Title</label><input value={title} onChange={(e) => setTitle(e.target.value)} /></div>
+          <div className="editor-row">
+            <div className="editor-field"><label>Platform</label>
+              <select value={platform} onChange={(e) => setPlatform(e.target.value as Game["platform"])}>
+                {PLATFORM_LIST.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+              </select>
+            </div>
+            <div className="editor-field"><label>Cover Image URL</label><input value={coverImage} onChange={(e) => setCoverImage(e.target.value)} placeholder="https://…" /></div>
+          </div>
+          <div className="editor-field"><label>Executable Path</label><input value={executable} onChange={(e) => setExecutable(e.target.value)} placeholder="C:\Games\game.exe" /></div>
+          <div className="editor-field"><label>Install Directory</label><input value={installDir} onChange={(e) => setInstallDir(e.target.value)} placeholder="C:\Games\MyGame" /></div>
+          <div className="editor-field"><label>Launch Command</label><input value={launchCommand} onChange={(e) => setLaunchCommand(e.target.value)} placeholder="steam://run/123456" /></div>
+          <div className="editor-field"><label>Notes</label><textarea className="notes-area" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Your personal notes about this game…" /></div>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? <Icon.Spinner size={15} /> : <Icon.Check size={15} />} Save Changes</button>
+        </div>
+      </div>
+    </div>
   );
 }

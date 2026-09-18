@@ -86,6 +86,29 @@ const api = {
   },
   openExternal: (url: string) =>
     ipcRenderer.invoke("shell:openExternal", url) as Promise<{ ok: boolean; message?: string }>,
+  openPath: (path: string) =>
+    ipcRenderer.invoke("shell:openPath", path) as Promise<{ ok: boolean; message?: string }>,
+  // v2.0 Features
+  exportLibrary: () => ipcRenderer.invoke("games:export") as Promise<string>,
+  importLibrary: (json: string) => ipcRenderer.invoke("games:import", json) as Promise<{ imported: number; skipped: number }>,
+  checkMissingGames: () => ipcRenderer.invoke("games:checkMissing") as Promise<Array<{ id: number; title: string; installDir: string | null; executable: string | null }>>,
+  getDetailedStats: () => ipcRenderer.invoke("games:detailedStats") as Promise<{
+    totalGames: number; totalPlaytimeSec: number; totalLaunches: number; totalSizeBytes: number;
+    avgRating: number | null; favorites: number; hidden: number;
+    byPlatform: Record<string, number>; byStatus: Record<string, number>; byGenre: Record<string, number>;
+    topPlayed: Array<{ id: number; title: string; playtimeSec: number }>;
+    recentlyPlayed: Array<{ id: number; title: string; lastPlayedAt: string | null }>;
+    recentlyAdded: Array<{ id: number; title: string; createdAt: string }>;
+    largestGames: Array<{ id: number; title: string; sizeBytes: number | null }>;
+    neverPlayed: number; completionRate: number;
+  }>,
+  recordSession: (gameId: number, minutes: number) => ipcRenderer.invoke("games:recordSession", gameId, minutes) as Promise<boolean>,
+  // Collections
+  listCollections: () => ipcRenderer.invoke("collections:list") as Promise<Array<{ id: number; name: string; color: string; gameCount: number }>>,
+  createCollection: (name: string, color: string) => ipcRenderer.invoke("collections:create", name, color) as Promise<{ id: number; name: string; color: string; gameCount: number }>,
+  addGameToCollection: (collectionId: number, gameId: number) => ipcRenderer.invoke("collections:addGame", collectionId, gameId) as Promise<boolean>,
+  removeGameFromCollection: (collectionId: number, gameId: number) => ipcRenderer.invoke("collections:removeGame", collectionId, gameId) as Promise<boolean>,
+  deleteCollection: (id: number) => ipcRenderer.invoke("collections:delete", id) as Promise<boolean>,
 
   // Scan
   runScan: (platforms?: Game["platform"][]) =>
