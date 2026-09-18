@@ -1,6 +1,6 @@
 {
   "name": "nexus-launcher",
-  "version": "2.7.0",
+  "version": "3.0.0",
   "description": "NEXUS — Universal Game Launcher for Windows. Detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox, patches rich metadata via RAWG, and launches games natively.",
   "author": "NEXUS",
   "license": "MIT",
