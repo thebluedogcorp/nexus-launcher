@@ -196,11 +196,119 @@ export function GamePage({ game, onClose, onLaunch, onPatch, onDelete, onToggleF
           // ===== EDIT MODE =====
           <div>
             <div className="gp-section-title"><span className="bar" /> Customize Game — Edit Everything</div>
-            <p style={{ fontSize: 13, color: "var(--nx-text-dim)", marginBottom: 20, lineHeight: 1.6 }}>
+            <p style={{ fontSize: 13, color: "var(--nx-text-dim)", marginBottom: 16, lineHeight: 1.6 }}>
               Like Steam's "Properties" but more powerful. Change the title, logo, banner, description, developer, publisher,
               release date, genres, platform, launch command, executable path, install directory, notes, completion status,
               user rating, and disk size. Everything you change here overrides the auto-detected values.
             </p>
+
+            {/* JSON Import / Export */}
+            <div style={{
+              display: "flex", alignItems: "center", gap: 10, marginBottom: 20, padding: "14px 16px",
+              background: "rgba(0,168,225,0.05)", border: "1px solid rgba(0,168,225,0.15)", borderRadius: 11,
+            }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: "#fff" }}>Import / Export Metadata as JSON</div>
+                <div style={{ fontSize: 11, color: "var(--nx-text-dim)", marginTop: 2, lineHeight: 1.5 }}>
+                  Import a .json file to fill all fields at once, or export the current values to share/back up.
+                  Perfect for games without metadata — create a JSON file once, import it on any machine.
+                </div>
+              </div>
+              <label className="btn btn-outline btn-sm" style={{ cursor: "pointer", flexShrink: 0 }}>
+                <Icon.DownloadCloud size={14} /> Import JSON
+                <input type="file" accept=".json,application/json" style={{ display: "none" }} onChange={async (e) => {
+                  const f = e.target.files?.[0]; if (!f) return;
+                  try {
+                    const text = await f.text();
+                    const data = JSON.parse(text) as Record<string, unknown>;
+                    // Apply each field if present in the JSON
+                    if (typeof data.title === "string") setEditTitle(data.title);
+                    if (typeof data.platform === "string") setEditPlatform(data.platform as PlatformId);
+                    if (typeof data.coverImage === "string") setEditCoverImage(data.coverImage);
+                    if (typeof data.bannerImage === "string") setEditBannerImage(data.bannerImage);
+                    if (typeof data.description === "string") setEditDescription(data.description);
+                    if (typeof data.developer === "string") setEditDeveloper(data.developer);
+                    if (typeof data.publisher === "string") setEditPublisher(data.publisher);
+                    if (typeof data.releaseDate === "string") setEditReleaseDate(data.releaseDate);
+                    if (Array.isArray(data.genres)) setEditGenres(data.genres.join(", "));
+                    else if (typeof data.genres === "string") setEditGenres(data.genres);
+                    if (typeof data.executable === "string") setEditExecutable(data.executable);
+                    if (typeof data.installDir === "string") setEditInstallDir(data.installDir);
+                    if (typeof data.launchCommand === "string") setEditLaunchCommand(data.launchCommand);
+                    if (typeof data.notes === "string") setEditNotes(data.notes);
+                    if (typeof data.completionStatus === "string") setEditStatus(data.completionStatus);
+                    if (typeof data.userRating === "number") setEditUserRating(data.userRating);
+                    if (typeof data.sizeBytes === "number") setEditSize(String(data.sizeBytes));
+                  } catch { /* ignore parse errors */ }
+                  e.target.value = "";
+                }} />
+              </label>
+              <button className="btn btn-ghost btn-sm" style={{ flexShrink: 0 }} onClick={() => {
+                const data: Record<string, unknown> = {
+                  title: editTitle,
+                  platform: editPlatform,
+                  coverImage: editCoverImage || null,
+                  bannerImage: editBannerImage || null,
+                  description: editDescription || null,
+                  developer: editDeveloper || null,
+                  publisher: editPublisher || null,
+                  releaseDate: editReleaseDate || null,
+                  genres: editGenres.split(",").map((s) => s.trim()).filter(Boolean),
+                  executable: editExecutable || null,
+                  installDir: editInstallDir || null,
+                  launchCommand: editLaunchCommand || null,
+                  notes: editNotes || null,
+                  completionStatus: editStatus || null,
+                  userRating: editUserRating || null,
+                  sizeBytes: editSize ? Number(editSize) : null,
+                };
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `${editTitle.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.nexus.json`;
+                a.click(); URL.revokeObjectURL(url);
+              }}>
+                <Icon.Download size={14} /> Export JSON
+              </button>
+            </div>
+
+            {/* JSON format reference (collapsible) */}
+            <details style={{ marginBottom: 20 }}>
+              <summary style={{ cursor: "pointer", fontSize: 12, color: "var(--nx-text-dim)", fontWeight: 600, padding: "8px 0" }}>
+                📋 JSON Format Reference (click to expand)
+              </summary>
+              <pre style={{
+                marginTop: 8, padding: 14, borderRadius: 10,
+                background: "rgba(0,0,0,0.3)", border: "1px solid var(--nx-border)",
+                fontSize: 11, lineHeight: 1.6, color: "var(--nx-text-dim)",
+                fontFamily: '"Cascadia Code", Consolas, monospace',
+                overflowX: "auto", whiteSpace: "pre",
+              }}>{`{
+  "title": "My Custom Game",
+  "platform": "manual",
+  "coverImage": "https://example.com/poster.jpg",
+  "bannerImage": "https://example.com/banner.jpg",
+  "description": "A description of the game...",
+  "developer": "Studio Name",
+  "publisher": "Publisher Name",
+  "releaseDate": "2024-01-15",
+  "genres": ["Action", "RPG", "Open World"],
+  "executable": "C:\\\\Games\\\\game.exe",
+  "installDir": "C:\\\\Games\\\\MyGame",
+  "launchCommand": "steam://run/123456",
+  "notes": "Personal notes, mods, settings...",
+  "completionStatus": "playing",
+  "userRating": 5,
+  "sizeBytes": 50000000000
+}`}</pre>
+              <p style={{ fontSize: 11, color: "var(--nx-text-faint)", marginTop: 8, lineHeight: 1.6 }}>
+                All fields are <strong>optional</strong> — only include the ones you want to set. Unspecified fields won't be cleared.
+                <br />Valid platforms: <code>steam, epic, gog, xbox, ubisoft, battlenet, ea, riot, manual, custom</code>
+                <br />Valid completionStatus: <code>playing, completed, backlog, abandoned, wishlist</code> (or empty string)
+                <br />userRating: <code>1</code> to <code>5</code> (or <code>null</code> to clear)
+              </p>
+            </details>
 
             {/* Title + Platform */}
             <div className="editor-row">
