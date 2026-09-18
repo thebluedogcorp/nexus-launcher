@@ -50,24 +50,25 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v1.4.0"
-          $title = "NEXUS v1.4.0 — Professional redesign"
+          $tag = "v1.5.0"
+          $title = "NEXUS v1.5.0 — Premium glassmorphism + fixed auto-update"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
-          **v1.4.0 — Professional redesign:**
-          - Consolidated to a single clean left sidebar (no more redundant dock + top nav duplication). Clear hierarchy: Browse / Platforms / footer status + actions.
-          - Larger cinematic tiles (280px, 3:4), smoother focus scaling + brightness transitions.
-          - Refined stage header with eyebrow label, large title, and inline stats (games / playtime / disk).
-          - Polished info panel: bigger title, tighter metadata row, cleaner stats + actions.
-          - Premium typography, tighter letter-spacing, consistent 11px radius system, heavier backdrop blur on glass surfaces.
-          - Kept all v1.3.0 functionality: zero-setup, auto-patch everything on startup, in-app auto-update.
+          **v1.5.0 — Premium glassmorphism + fixed auto-update:**
+          - **FIXED the auto-update 404.** The repo is now public so anonymous GitHub API calls work. The updater also tries /releases (list) then /releases/latest then the HTML page as a fallback chain.
+          - **Inter font** loaded via Google Fonts — premium typography with tighter letter-spacing and OpenType features.
+          - **Refined glassmorphism** matching the references: 32px backdrop blur on the sidebar, 28px on the info panel, 14-16px on chips/buttons. Soft 1px borders, layered shadows.
+          - **PS5 cover-flow carousel**: focused tile lifts + brightens with an emerald glow ring; non-focused tiles dim to 55% brightness with a subtle blur.
+          - **Xbox-style glass info panel** with the focused game's title, metadata strip, 3-stat block (Launches/Playtime/Size), and Play + Details actions.
+          - Larger tiles (280px), 20px border-radius, softer shadows.
+          - Update dialog now handles the no-direct-URL case by opening the release page in the browser.
 
           Auto-detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox, patches rich metadata via the RAWG + Steam APIs, and launches games natively.
 
           **Downloads:**
-          - \`NEXUS-Setup-1.4.0.exe\` — NSIS installer (recommended, supports auto-update). Creates desktop + Start Menu shortcuts.
-          - \`NEXUS-Portable-1.4.0.exe\` — single-file portable build, no install required.
+          - \`NEXUS-Setup-1.5.0.exe\` — NSIS installer (recommended, supports auto-update). Creates desktop + Start Menu shortcuts.
+          - \`NEXUS-Portable-1.5.0.exe\` — single-file portable build, no install required.
 
           Minimum: Windows 10 64-bit.
           "@

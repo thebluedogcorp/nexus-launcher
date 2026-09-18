@@ -84,6 +84,8 @@ const api = {
     ipcRenderer.on("updater:progress", listener);
     return () => ipcRenderer.removeListener("updater:progress", listener);
   },
+  openExternal: (url: string) =>
+    ipcRenderer.invoke("shell:openExternal", url) as Promise<{ ok: boolean; message?: string }>,
 
   // Scan
   runScan: (platforms?: Game["platform"][]) =>

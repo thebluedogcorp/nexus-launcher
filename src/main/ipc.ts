@@ -172,6 +172,18 @@ export function registerIpc(): void {
 
   // ===== Utilities =====
   ipcMain.handle("platform:info", () => null);
+
+  // Open a URL in the user's default browser (used by the updater fallback
+  // when the release assets aren't directly fetchable, e.g. private repo).
+  ipcMain.handle("shell:openExternal", async (_e, url: string) => {
+    try {
+      const { shell } = await import("electron");
+      await shell.openExternal(url);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, message: e instanceof Error ? e.message : String(e) };
+    }
+  });
 }
 
 /**

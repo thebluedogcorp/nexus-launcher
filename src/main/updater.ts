@@ -35,35 +35,45 @@ export interface DownloadProgress {
 }
 
 const REPO = "thebluedogcorp/nexus-launcher";
-const API = `https://api.github.com/repos/${REPO}/releases/latest`;
+// Use the LIST endpoint (/releases) — the /releases/latest endpoint returns
+// 404 for private repos when called without auth, and also for repos whose
+// latest release is marked prerelease. The list endpoint is more permissive.
+const API_LIST = `https://api.github.com/repos/${REPO}/releases?per_page=10`;
+const RELEASES_PAGE = `https://github.com/${REPO}/releases/latest`;
+
+interface LatestRelease {
+  tag_name: string;
+  html_url: string;
+  assets: Array<{
+    name: string;
+    browser_download_url: string;
+    size: number;
+    content_type: string;
+  }>;
+  prerelease: boolean;
+  draft: boolean;
+}
 
 /** Check the latest GitHub release against the installed version. */
 export async function checkForUpdatesAndNotify(): Promise<UpdateResult> {
   try {
     const currentVersion = getCurrentVersion();
-    const res = await fetch(API, {
-      headers: { Accept: "application/vnd.github.v3+json" },
-    });
-    if (!res.ok) return { ok: false, message: `GitHub API ${res.status}` };
-    const json = (await res.json()) as {
-      tag_name?: string;
-      html_url?: string;
-      assets?: Array<{
-        name: string;
-        browser_download_url: string;
-        size: number;
-        content_type: string;
-      }>;
-    };
-    if (!json.tag_name) return { ok: false, message: "No release tag found." };
-    const latest = json.tag_name.replace(/^v/, "");
+    const release = await fetchLatestRelease();
+    if (!release) {
+      return {
+        ok: false,
+        message: `Couldn't reach GitHub Releases. Open the releases page manually.`,
+        releaseUrl: RELEASES_PAGE,
+      };
+    }
+    const latest = release.tag_name.replace(/^v/, "");
     const updateAvailable = compareVersions(latest, currentVersion) > 0;
 
     // Prefer the NSIS setup installer (it self-updates on future runs).
-    const setupAsset = json.assets?.find(
-      (a) => /NEXUS-Setup.*\.exe$/i.test(a.name) && a.content_type.includes("msdownload"),
+    const setupAsset = release.assets.find(
+      (a) => /NEXUS-Setup.*\.exe$/i.test(a.name),
     );
-    const portableAsset = json.assets?.find(
+    const portableAsset = release.assets.find(
       (a) => /NEXUS-Portable.*\.exe$/i.test(a.name),
     );
     const asset = setupAsset ?? portableAsset;
@@ -75,13 +85,92 @@ export async function checkForUpdatesAndNotify(): Promise<UpdateResult> {
         : `You're on the latest version (${currentVersion}).`,
       updateAvailable,
       version: latest,
-      releaseUrl: json.html_url,
+      releaseUrl: release.html_url,
       downloadUrl: asset?.browser_download_url,
       downloadSize: asset?.size,
     };
   } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message : String(e) };
+    return { ok: false, message: e instanceof Error ? e.message : String(e), releaseUrl: RELEASES_PAGE };
   }
+}
+
+/**
+ * Fetch the latest non-prerelease, non-draft release.
+ * Tries the list endpoint (more permissive), falls back to the latest endpoint,
+ * then to scraping the releases HTML page (works without API auth).
+ */
+async function fetchLatestRelease(): Promise<LatestRelease | null> {
+  // 1. List endpoint — returns all releases, we pick the newest non-prerelease.
+  try {
+    const res = await fetch(API_LIST, {
+      headers: { Accept: "application/vnd.github.v3+json", "User-Agent": "NEXUS-Launcher-Updater" },
+    });
+    if (res.ok) {
+      const json = (await res.json()) as LatestRelease[];
+      const stable = json.find((r) => !r.prerelease && !r.draft);
+      if (stable) return stable;
+      // If every release is somehow prerelease, take the first.
+      if (json.length > 0) return json[0];
+    }
+  } catch {
+    // fall through
+  }
+
+  // 2. Latest endpoint — works for public repos with a stable latest release.
+  try {
+    const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
+      headers: { Accept: "application/vnd.github.v3+json", "User-Agent": "NEXUS-Launcher-Updater" },
+    });
+    if (res.ok) {
+      return (await res.json()) as LatestRelease;
+    }
+  } catch {
+    // fall through
+  }
+
+  // 3. HTML fallback — scrape the releases page for the latest tag.
+  // This works without API auth (the HTML page is publicly readable for
+  // public repos, and for private repos the user will be prompted to sign in
+  // when they click the download link).
+  try {
+    const res = await fetch(RELEASES_PAGE, {
+      headers: { "User-Agent": "NEXUS-Launcher-Updater" },
+      redirect: "follow",
+    });
+    if (res.ok) {
+      const html = await res.text();
+      // The page URL after redirect contains the tag, e.g.
+      // https://github.com/thebluedogcorp/nexus-launcher/releases/tag/v1.4.0
+      const finalUrl = res.url || "";
+      const tagMatch = finalUrl.match(/\/releases\/tag\/(v?[\d.]+)/);
+      if (tagMatch) {
+        const tag = tagMatch[1].startsWith("v") ? tagMatch[1] : `v${tagMatch[1]}`;
+        return {
+          tag_name: tag,
+          html_url: finalUrl,
+          assets: [],
+          prerelease: false,
+          draft: false,
+        };
+      }
+      // Also try scraping the version from the HTML body.
+      const bodyMatch = html.match(/\/releases\/tag\/(v?[\d.]+)/);
+      if (bodyMatch) {
+        const tag = bodyMatch[1].startsWith("v") ? bodyMatch[1] : `v${bodyMatch[1]}`;
+        return {
+          tag_name: tag,
+          html_url: `https://github.com/${REPO}/releases/tag/${tag}`,
+          assets: [],
+          prerelease: false,
+          draft: false,
+        };
+      }
+    }
+  } catch {
+    // fall through
+  }
+
+  return null;
 }
 
 /**

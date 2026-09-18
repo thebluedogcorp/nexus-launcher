@@ -40,28 +40,37 @@ export function UpdateDialog({ info, onClose }: Props) {
   }, []);
 
   const startDownload = async () => {
-    if (!info.downloadUrl) {
-      setPhase("error");
-      setError("No download URL available. Open the release page in your browser instead.");
+    // If we have a direct asset URL, stream the installer + launch it.
+    if (info.downloadUrl) {
+      setPhase("downloading");
+      setProgress({ bytesDownloaded: 0, totalBytes: info.downloadSize ?? 0, percent: 0 });
+      try {
+        const res = await window.nexus.downloadAndInstallUpdate(info.downloadUrl, info.downloadSize);
+        if (res.ok) {
+          setPhase("installing");
+          setTimeout(() => setPhase("done"), 1500);
+        } else {
+          setPhase("error");
+          setError(res.message);
+        }
+      } catch (e) {
+        setPhase("error");
+        setError(e instanceof Error ? e.message : String(e));
+      }
       return;
     }
-    setPhase("downloading");
-    setProgress({ bytesDownloaded: 0, totalBytes: info.downloadSize ?? 0, percent: 0 });
-    try {
-      const res = await window.nexus.downloadAndInstallUpdate(info.downloadUrl, info.downloadSize);
-      if (res.ok) {
-        setPhase("installing");
-        // The main process will launch the installer and quit the app.
-        // Show a brief "launching" state before the window closes.
-        setTimeout(() => setPhase("done"), 1500);
-      } else {
-        setPhase("error");
-        setError(res.message);
-      }
-    } catch (e) {
-      setPhase("error");
-      setError(e instanceof Error ? e.message : String(e));
+
+    // No direct asset URL (e.g. the GitHub API returned 404 because the repo
+    // is private and the call was unauthenticated). Open the release page in
+    // the user's default browser so they can download manually.
+    if (info.releaseUrl) {
+      await window.nexus.openExternal(info.releaseUrl);
+      onClose();
+      return;
     }
+
+    setPhase("error");
+    setError("No download URL available and no release page to open.");
   };
 
   const sizeLabel = info.downloadSize ? formatBytes(info.downloadSize) : "—";
@@ -96,7 +105,9 @@ export function UpdateDialog({ info, onClose }: Props) {
                     NEXUS {info.version} is available
                   </div>
                   <div style={{ fontSize: 12, color: "var(--nx-text-dim)", marginTop: 4 }}>
-                    Download size: {sizeLabel} · Installs automatically when complete
+                    {info.downloadUrl
+                      ? `Download size: ${sizeLabel} · Installs automatically when complete`
+                      : "Opens the GitHub release page in your browser"}
                   </div>
                 </div>
               </div>
@@ -105,8 +116,9 @@ export function UpdateDialog({ info, onClose }: Props) {
                 background: "rgba(255,255,255,0.03)", border: "1px solid var(--nx-border)",
                 fontSize: 12, color: "var(--nx-text-dim)", lineHeight: 1.6,
               }}>
-                NEXUS will download the latest installer and launch it. Your library and settings are preserved across updates.
-                The app will close briefly during installation and reopen automatically.
+                {info.downloadUrl
+                  ? "NEXUS will download the latest installer and launch it. Your library and settings are preserved across updates. The app will close briefly during installation and reopen automatically."
+                  : "Your library and settings are preserved across updates. Download the new NEXUS-Setup exe from GitHub and run it — it will replace this version."}
               </div>
             </>
           )}
@@ -183,17 +195,17 @@ export function UpdateDialog({ info, onClose }: Props) {
                 </a>
               )}
               <button className="btn btn-ghost" onClick={onClose}>Later</button>
-              <button className="btn btn-primary" onClick={startDownload} disabled={!info.downloadUrl}>
-                <Icon.DownloadCloud size={15} /> Download &amp; Install
+              <button className="btn btn-primary" onClick={startDownload}>
+                <Icon.DownloadCloud size={15} /> {info.downloadUrl ? "Download & Install" : "Open in Browser"}
               </button>
             </>
           )}
           {phase === "error" && (
             <>
               {info.releaseUrl && (
-                <a href={info.releaseUrl} target="_blank" rel="noopener noreferrer" className="btn btn-outline">
+                <button className="btn btn-outline" onClick={() => window.nexus.openExternal(info.releaseUrl!)}>
                   <Icon.ExternalLink size={14} /> Open release page
-                </a>
+                </button>
               )}
               <button className="btn btn-primary" onClick={onClose}>Close</button>
             </>
