@@ -169,8 +169,8 @@ export function App() {
     if (s.games.length === 0) { if (action === "scan" || action === "confirm") setScanOpen(true); return; }
     // Use focusedIdxRef.current (synchronous) instead of stateRef.current.focusedIdx (stale)
     const idx = focusedIdxRef.current;
-    if (action === "left") setFocusedIdx((i) => Math.max(0, i - 1));
-    else if (action === "right") setFocusedIdx((i) => Math.min(s.games.length - 1, i + 1));
+    if (action === "left") { focusSourceRef.current = "nav"; setFocusedIdx((i) => Math.max(0, i - 1)); }
+    else if (action === "right") { focusSourceRef.current = "nav"; setFocusedIdx((i) => Math.min(s.games.length - 1, i + 1)); }
     else if (action === "confirm") { const g = s.games[idx]; if (g) openPage(g.id); }
     else if (action === "play") { const g = s.games[idx]; if (g) handleLaunch(g); }
     else if (action === "details") { const g = s.games[idx]; if (g) openPage(g.id); }
@@ -243,8 +243,8 @@ export function App() {
 
       if (pageGame) { if (e.key === "Escape") setPageGame(null); return; }
       if (e.key === "/" || ((e.ctrlKey || e.metaKey) && e.key === "k")) { e.preventDefault(); const el = document.querySelector(".tb-search input") as HTMLInputElement; el?.focus(); }
-      else if (e.key === "ArrowLeft") setFocusedIdx((i) => Math.max(0, i - 1));
-      else if (e.key === "ArrowRight") setFocusedIdx((i) => Math.min(games.length - 1, i + 1));
+      else if (e.key === "ArrowLeft") { focusSourceRef.current = "nav"; setFocusedIdx((i) => Math.max(0, i - 1)); }
+      else if (e.key === "ArrowRight") { focusSourceRef.current = "nav"; setFocusedIdx((i) => Math.min(games.length - 1, i + 1)); }
       else if (e.key === "Enter") { const g = games[focusedIdx]; if (g) openPage(g.id); }
       else if (e.key === "s") setScanOpen(true);
       else if (e.key === "a") setAddOpen(true);
@@ -253,18 +253,22 @@ export function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [pageGame, games, focusedIdx, openPage]);
 
-  // Instantly scroll the focused tile to the CENTER of the carousel.
-  // No animation — the CSS transitions on tiles (scale/filter) provide the
-  // visual smoothness. Animating the scroll causes drift when commands stack
-  // during continuous gamepad navigation. Instant = deterministic.
+  // Track whether the last focus change was from mouse or keyboard/controller.
+  // Mouse hover should NOT trigger auto-scroll — the instant scroll repositions
+  // tiles under the cursor, causing cascading onMouseEnter on the WRONG tile
+  // (e.g. hover 7th → scroll → 9th lands under cursor → 9th focused → skip).
+  const focusSourceRef = useRef<"mouse" | "nav">("mouse");
+
+  // Instantly scroll the focused tile to CENTER — but ONLY for keyboard/controller
+  // navigation, NOT for mouse hover. Mouse users scroll with the wheel/drag.
   useEffect(() => {
+    if (focusSourceRef.current === "mouse") return; // skip auto-scroll on hover
     const carousel = document.querySelector(".carousel") as HTMLElement | null;
     const tile = document.querySelector(".tile.focused") as HTMLElement | null;
     if (!carousel || !tile) return;
     const tileCenter = tile.offsetLeft + tile.offsetWidth / 2;
     const carouselCenter = carousel.clientWidth / 2;
-    const targetScroll = Math.max(0, tileCenter - carouselCenter);
-    carousel.scrollLeft = targetScroll; // instant, no animation
+    carousel.scrollLeft = Math.max(0, tileCenter - carouselCenter);
   }, [focusedIdx]);
 
   const focusedGame = games[focusedIdx] ?? null;
@@ -351,7 +355,7 @@ export function App() {
             <div className="carousel-wrap">
               <div className="carousel">
                 {games.map((g, i) => (
-                  <div key={g.id} className={i === focusedIdx ? "tile focused" : "tile"} onMouseEnter={() => setFocusedIdx(i)} onClick={() => openPage(g.id)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, game: g }); }}>
+                  <div key={g.id} className={i === focusedIdx ? "tile focused" : "tile"} onMouseEnter={() => { focusSourceRef.current = "mouse"; setFocusedIdx(i); }} onClick={() => openPage(g.id)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, game: g }); }}>
                     {g.coverImage || g.bannerImage ? (
                       <img src={(g.coverImage || g.bannerImage) ?? undefined} alt={g.title} loading="lazy" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
                     ) : (
