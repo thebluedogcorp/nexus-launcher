@@ -50,27 +50,25 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v1.6.0"
-          $title = "NEXUS v1.6.0 — True PS5 UI clone"
+          $tag = "v1.7.0"
+          $title = "NEXUS v1.7.0 — PS5 Home UI + controller support"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
-          **v1.6.0 — True PS5 UI clone:**
-          - **No sidebar.** Removed the entire left sidebar — PS5 has no sidebar.
-          - **Top nav bar (PS5 style):** brand left, centered pill nav (Home / Favorites / Library) with live counts, icon cluster right (search, scan, add, settings).
-          - **Square (1:1) tiles** in a horizontal carousel — was portrait 3:4. The selected tile scales to 1.25x + lifts, with the PS5 signature **blue glow border** (#00a8e1); non-focused tiles dim to 50% brightness + desaturate + scale 0.92 (PS5 cover-flow depth).
-          - **Info panel below the carousel (PS5 style):** centered 38px title, metadata strip, 3-stat block (Time Played / Launches / Size — or Last Played), Play / Details / Favorite pill buttons.
-          - **Full-bleed cinematic background** of the focused game with PS5-style overlay (darkest top + bottom, lighter center where the focused tile sits).
-          - PS5 blue accent (#00a8e1) replaces emerald as the primary selection color.
-          - Pill-shaped buttons (border-radius 999px) throughout.
-          - Platform filter row only appears when you click Library (otherwise hidden — no clutter).
-          - Expandable search (icon expands into an input).
+          **v1.7.0 — PS5 Home UI + controller support:**
+          - **Controller support.** Full Xbox/PlayStation controller navigation via the Web Gamepad API: D-pad / left stick to browse tiles, A = select, B = back, X = play, Y = details, Start = settings, Back = scan. A controller hints bar appears at the bottom when a gamepad is connected.
+          - **PS5 Home layout** matching the reference: portrait (3:4) tiles in the upper-middle, selected tile scales to 1.5x with a **white border** + glow (PS5 signature), non-focused tiles dim to 45% brightness + desaturate.
+          - **Bottom-left info zone:** large 42px title + tagline (platform / developer / year / rating / playtime) + Play button + Details + Favorite.
+          - **Bottom-right detail card (glass):** cover art + 'Full Game' label + rating + 3-stat block (Played / Launches / Size).
+          - **Top bar:** brand + Games/Media tabs left, icon cluster right (search / scan / add / settings / **live clock** / user avatar with online dot).
+          - Heavy PS5-style gradient overlay (lighter center-left where the title sits, dark edges).
+          - White primary buttons (PS5 aesthetic) instead of blue/green.
 
           Auto-detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox, patches rich metadata via the RAWG + Steam APIs, and launches games natively.
 
           **Downloads:**
-          - \`NEXUS-Setup-1.6.0.exe\` — NSIS installer (recommended, supports auto-update). Creates desktop + Start Menu shortcuts.
-          - \`NEXUS-Portable-1.6.0.exe\` — single-file portable build, no install required.
+          - \`NEXUS-Setup-1.7.0.exe\` — NSIS installer (recommended, supports auto-update). Creates desktop + Start Menu shortcuts.
+          - \`NEXUS-Portable-1.7.0.exe\` — single-file portable build, no install required.
 
           Minimum: Windows 10 64-bit.
           "@
