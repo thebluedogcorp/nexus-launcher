@@ -50,25 +50,24 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v1.7.0"
-          $title = "NEXUS v1.7.0 — PS5 Home UI + controller support"
+          $tag = "v1.8.0"
+          $title = "NEXUS v1.8.0 — UI fixes + real posters + deep filesystem scan + new features"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
-          **v1.7.0 — PS5 Home UI + controller support:**
-          - **Controller support.** Full Xbox/PlayStation controller navigation via the Web Gamepad API: D-pad / left stick to browse tiles, A = select, B = back, X = play, Y = details, Start = settings, Back = scan. A controller hints bar appears at the bottom when a gamepad is connected.
-          - **PS5 Home layout** matching the reference: portrait (3:4) tiles in the upper-middle, selected tile scales to 1.5x with a **white border** + glow (PS5 signature), non-focused tiles dim to 45% brightness + desaturate.
-          - **Bottom-left info zone:** large 42px title + tagline (platform / developer / year / rating / playtime) + Play button + Details + Favorite.
-          - **Bottom-right detail card (glass):** cover art + 'Full Game' label + rating + 3-stat block (Played / Launches / Size).
-          - **Top bar:** brand + Games/Media tabs left, icon cluster right (search / scan / add / settings / **live clock** / user avatar with online dot).
-          - Heavy PS5-style gradient overlay (lighter center-left where the title sits, dark edges).
-          - White primary buttons (PS5 aesthetic) instead of blue/green.
+          **v1.8.0 — UI fixes + real posters + deep filesystem scan + new features:**
+          - **FIXED tile clipping.** The focused tile no longer gets cut off — carousel now uses overflow-y: visible with extra vertical padding so the scaled tile shows fully.
+          - **FIXED gradient hiding elements.** Reduced the bottom gradient darkness from 92% to 70% so the bottom info zone stays readable.
+          - **REAL portrait posters.** Steam's library_600x900 portrait capsule is now used as the cover image (true poster art), with the wide header_image as the banner background.
+          - **Deep Filesystem Scan.** New scan mode that walks every fixed drive (C:\, D:\, etc.) + custom paths to detect games installed in non-default locations. Uses heuristics: large .exe + game data files (.pak, .uasset, .bsa, data.win, etc.) or directories larger than 2GB. Detects games the platform scanners miss.
+          - **New filter row.** Sort dropdown (Recently Played / Name A-Z / Most Played / Top Rated) + All/Favorites/platform quick-filter pills with live counts.
+          - Larger tiles (150px), smoother focus transitions, refined PS5 depth effect.
 
           Auto-detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox, patches rich metadata via the RAWG + Steam APIs, and launches games natively.
 
           **Downloads:**
-          - \`NEXUS-Setup-1.7.0.exe\` — NSIS installer (recommended, supports auto-update). Creates desktop + Start Menu shortcuts.
-          - \`NEXUS-Portable-1.7.0.exe\` — single-file portable build, no install required.
+          - \`NEXUS-Setup-1.8.0.exe\` — NSIS installer (recommended, supports auto-update). Creates desktop + Start Menu shortcuts.
+          - \`NEXUS-Portable-1.8.0.exe\` — single-file portable build, no install required.
 
           Minimum: Windows 10 64-bit.
           "@

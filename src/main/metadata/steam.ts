@@ -16,8 +16,9 @@ export interface SteamMetadata {
   publisher?: string;
   releaseDate?: string;
   genres: string[];
-  headerImage?: string;       // 460x215 banner
+  headerImage?: string;       // 460x215 wide banner
   capsuleImage?: string;      // 231x87 small banner
+  libraryCapsule?: string;    // 600x900 PORTRAIT poster (Steam library capsule)
   screenshots: string[];
   metacritic?: number;
   type?: string;
@@ -62,6 +63,12 @@ export async function fetchSteamApp(appId: number | string): Promise<SteamMetada
       d.release_date && typeof d.release_date === "object" && "date" in (d.release_date as Record<string, unknown>)
         ? String((d.release_date as Record<string, unknown>).date)
         : undefined;
+    // Portrait poster: Steam serves a predictable library capsule image.
+    // Try the 600x900 portrait capsule (the tall poster Steam shows in its library).
+    const libraryCapsule =
+      (typeof d.library_capsule === "string" ? String(d.library_capsule) : undefined) ||
+      (typeof d.library_capsule_2x === "string" ? String(d.library_capsule_2x) : undefined) ||
+      `https://cdn.cloudflare.steamstatic.com/steam/apps/${id}/library_600x900_2x.jpg`;
     return {
       steamAppId: id,
       title: String(d.name ?? ""),
@@ -73,6 +80,7 @@ export async function fetchSteamApp(appId: number | string): Promise<SteamMetada
       genres,
       headerImage: d.header_image ? String(d.header_image) : undefined,
       capsuleImage: d.capsule_image ? String(d.capsule_image) : undefined,
+      libraryCapsule,
       screenshots: screenshots.slice(0, 8),
       metacritic:
         d.metacritic && typeof d.metacritic === "object" && "score" in (d.metacritic as Record<string, unknown>)

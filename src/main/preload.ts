@@ -97,6 +97,13 @@ const api = {
   },
   importDetected: (items: DetectedGame[]) =>
     ipcRenderer.invoke("scan:import", items) as Promise<Game[]>,
+  scanFilesystem: (customPaths: string[]) =>
+    ipcRenderer.invoke("scan:filesystem", customPaths) as Promise<{
+      detected: DetectedGame[];
+      totalFound: number;
+      skipped: number;
+      errors: { path: string; message: string }[];
+    }>,
 
   // Metadata
   searchMetadata: (q: string) =>

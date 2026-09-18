@@ -127,6 +127,33 @@ export function registerIpc(): void {
     return imported;
   });
 
+  // ===== Filesystem deep scan (custom-location games) =====
+  ipcMain.handle("scan:filesystem", async (_e, customPaths: string[]) => {
+    try {
+      const { scanFilesystem } = await import("./detectors/filesystem");
+      const result = await scanFilesystem(customPaths, (path) => {
+        for (const win of BrowserWindow.getAllWindows()) {
+          win.webContents.send("scan:progress", { platform: "filesystem", label: `Scanning ${path}…` });
+        }
+      });
+      // Filter out games already detected by platform detectors (dedupe by title).
+      const existing = listGames({ showHidden: true });
+      const existingTitles = new Set(existing.map((g) => g.title.toLowerCase()));
+      const existingPaths = new Set(existing.map((g) => g.installDir?.toLowerCase()).filter(Boolean));
+      const newGames = result.detected.filter(
+        (g) => !existingTitles.has(g.title.toLowerCase()) && !existingPaths.has((g.installDir ?? "").toLowerCase()),
+      );
+      return {
+        detected: newGames,
+        totalFound: result.detected.length,
+        skipped: result.detected.length - newGames.length,
+        errors: result.errors,
+      };
+    } catch (e) {
+      return { detected: [], totalFound: 0, skipped: 0, errors: [{ path: "", message: e instanceof Error ? e.message : String(e) }] };
+    }
+  });
+
   // ===== Metadata =====
   ipcMain.handle("metadata:search", (_e, q: string) => searchRawg(q, 8));
 

@@ -30,6 +30,13 @@ interface Filters {
 
 const DEFAULT_FILTERS: Filters = { platform: "all", favOnly: false, query: "", sort: "recent" };
 
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: "recent", label: "Recently Played" },
+  { value: "name", label: "Name A–Z" },
+  { value: "playtime", label: "Most Played" },
+  { value: "rating", label: "Top Rated" },
+];
+
 export function App() {
   const [games, setGames] = useState<Game[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -169,6 +176,7 @@ export function App() {
   }, [refreshAll, toast]);
 
   const handleRunScan = useCallback(async (platforms: PlatformId[]) => window.nexus.runScan(platforms), []);
+  const handleDeepScan = useCallback(async (customPaths: string[]) => window.nexus.scanFilesystem(customPaths), []);
   const handleImport = useCallback(async (items: DetectedGame[]) => {
     const imported = await window.nexus.importDetected(items);
     toast("success", `Imported ${imported.length} game${imported.length === 1 ? "" : "s"}`, "Artwork fetched automatically.");
@@ -305,6 +313,67 @@ export function App() {
         </div>
       </header>
 
+      {/* ===== FILTER ROW: sort + platform quick-filters + fav toggle ===== */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 8, padding: "8px 32px",
+        flexShrink: 0, overflowX: "auto", scrollbarWidth: "none",
+      }}>
+        <select
+          value={filters.sort}
+          onChange={(e) => setFilters((f) => ({ ...f, sort: e.target.value as SortKey }))}
+          style={{
+            height: 30, padding: "0 10px", borderRadius: 999, fontSize: 11.5, fontWeight: 600,
+            border: "1px solid var(--nx-border-2)", background: "rgba(20,20,26,0.6)",
+            backdropFilter: "blur(14px)", color: "var(--nx-text-dim)", outline: "none", cursor: "pointer",
+            flexShrink: 0,
+          }}
+        >
+          {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        <button
+          onClick={() => setFilters((f) => ({ ...f, platform: "all", favOnly: false }))}
+          style={{
+            padding: "5px 12px", borderRadius: 999, fontSize: 11, fontWeight: 600,
+            border: `1px solid ${filters.platform === "all" && !filters.favOnly ? "rgba(255,255,255,0.3)" : "var(--nx-border)"}`,
+            background: filters.platform === "all" && !filters.favOnly ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.03)",
+            color: filters.platform === "all" && !filters.favOnly ? "#fff" : "var(--nx-text-dim)",
+            transition: "all .15s", whiteSpace: "nowrap", flexShrink: 0,
+          }}
+        >All</button>
+        <button
+          onClick={() => setFilters((f) => ({ ...f, favOnly: !f.favOnly }))}
+          style={{
+            padding: "5px 12px", borderRadius: 999, fontSize: 11, fontWeight: 600,
+            border: `1px solid ${filters.favOnly ? "rgba(245,197,66,0.4)" : "var(--nx-border)"}`,
+            background: filters.favOnly ? "rgba(245,197,66,0.1)" : "rgba(255,255,255,0.03)",
+            color: filters.favOnly ? "var(--nx-gold)" : "var(--nx-text-dim)",
+            transition: "all .15s", whiteSpace: "nowrap", flexShrink: 0,
+            display: "inline-flex", alignItems: "center", gap: 5,
+          }}
+        >
+          <Icon.Star size={12} filled={filters.favOnly} /> Favorites
+        </button>
+        <div style={{ width: 1, height: 18, background: "var(--nx-border)", margin: "0 4px", flexShrink: 0 }} />
+        {PLATFORM_LIST.filter((p) => p.id !== "custom").map((p) => (
+          <button
+            key={p.id}
+            onClick={() => setFilters((f) => ({ ...f, platform: p.id, favOnly: false }))}
+            style={{
+              padding: "5px 12px", borderRadius: 999, fontSize: 11, fontWeight: 600,
+              border: `1px solid ${filters.platform === p.id ? `${p.accent}55` : "var(--nx-border)"}`,
+              background: filters.platform === p.id ? `${p.accent}1a` : "rgba(255,255,255,0.03)",
+              color: filters.platform === p.id ? p.accent : "var(--nx-text-dim)",
+              transition: "all .15s", whiteSpace: "nowrap", flexShrink: 0,
+              display: "inline-flex", alignItems: "center", gap: 6,
+            }}
+          >
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: p.accent }} />
+            {p.label.split(" ")[0]}
+            {stats?.byPlatform?.[p.id] ? <span style={{ opacity: 0.6 }}>{stats.byPlatform[p.id]}</span> : null}
+          </button>
+        ))}
+      </div>
+
       {/* ===== STAGE: carousel + bottom info zone ===== */}
       <main className="stage">
         {patching && patchProgress && (
@@ -424,7 +493,7 @@ export function App() {
 
       {/* Dialogs */}
       {addOpen && <AddGameDialog onClose={() => setAddOpen(false)} onAdd={handleAdd} />}
-      {scanOpen && <ScanDialog onClose={() => setScanOpen(false)} onRunScan={handleRunScan} onImport={handleImport} />}
+      {scanOpen && <ScanDialog onClose={() => setScanOpen(false)} onRunScan={handleRunScan} onImport={handleImport} onDeepScan={handleDeepScan} />}
       {settingsOpen && settings && (
         <SettingsDialog initial={settings} onClose={() => setSettingsOpen(false)} onSave={handleSaveSettings} onCheckUpdates={handleCheckUpdates} />
       )}

@@ -70,7 +70,8 @@ export async function fetchAggregated(
               rating: s.metacritic ? s.metacritic / 20 : undefined, // 0..100 -> 0..5
               ratingCount: undefined,
               genres: s.genres,
-              coverImage: s.headerImage,
+              // coverImage = PORTRAIT poster (library capsule), bannerImage = wide header.
+              coverImage: s.libraryCapsule || s.headerImage,
               bannerImage: s.headerImage,
               screenshots: s.screenshots,
             }
@@ -87,8 +88,15 @@ export async function fetchAggregated(
   if (!merged) return null;
 
   if (steam) {
+    // Prefer Steam's PORTRAIT library capsule as the cover (poster), since
+    // that's what tiles display. Fall back to the existing cover if Steam
+    // doesn't have a capsule.
+    if (steam.coverImage && steam.coverImage.includes("library_600x900")) {
+      merged.coverImage = steam.coverImage;
+    } else if (!merged.coverImage && steam.coverImage) {
+      merged.coverImage = steam.coverImage;
+    }
     if (!merged.bannerImage && steam.bannerImage) merged.bannerImage = steam.bannerImage;
-    if (!merged.coverImage && steam.coverImage) merged.coverImage = steam.coverImage;
     if (!merged.screenshots || merged.screenshots.length === 0) {
       merged.screenshots = steam.screenshots ?? [];
     } else if (steam.screenshots && steam.screenshots.length) {
