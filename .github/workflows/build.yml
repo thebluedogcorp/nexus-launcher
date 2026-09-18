@@ -50,24 +50,23 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v1.1.0"
-          $title = "NEXUS v1.1.0 — Premium UI redesign + RAWG artwork"
+          $tag = "v1.2.0"
+          $title = "NEXUS v1.2.0 — PS5-style immersive UI + multi-source metadata + auto-update"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
-          **v1.1.0 — Premium UI redesign (Epic Games / Steam style):**
-          - New auto-rotating hero spotlight carousel featuring your top games with full-bleed banners
-          - Cards redesigned with 16:9 banner images, hover-to-play, gold rating chips
-          - Detail dialog now shows a RAWG screenshot gallery with a lightbox viewer
-          - Built-in default RAWG API key — metadata + artwork work out of the box (no setup)
-          - "Enrich All" button: fetches banners + screenshots for every game missing artwork in one click
-          - Polished gradients, glassmorphism, smooth animations throughout
+          **v1.2.0 — PS5-style immersive redesign + multi-source metadata + auto-update:**
+          - Completely redesigned UI: dynamic full-bleed background that cross-fades to the selected game, horizontal focus carousel with scale + blur on non-focused tiles, inline metadata panel, floating glass bottom dock, minimal top text nav
+          - Every game now has its own FULL PAGE (not a modal): cinematic parallax hero banner, description, screenshot gallery with lightbox, metadata grid, install paths, remove action
+          - Multi-source automatic metadata patching: RAWG (primary) + Steam Store API (rich screenshot galleries, no key) + PCGamingWiki fallback — automatically enriches every imported game in the background
+          - Auto-update: the NSIS installer now checks GitHub Releases on launch and shows an 'Update available' badge (electron-updater + GitHub Releases API fallback)
+          - Smooth animations, glassmorphism, parallax depth throughout
 
-          Auto-detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox, patches rich metadata via the RAWG API, and launches games natively.
+          Auto-detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox, patches rich metadata via the RAWG + Steam APIs, and launches games natively.
 
           **Downloads:**
-          - \`NEXUS-Setup-1.1.0.exe\` — NSIS installer (recommended). Creates desktop + Start Menu shortcuts.
-          - \`NEXUS-Portable-1.1.0.exe\` — single-file portable build, no install required.
+          - \`NEXUS-Setup-1.2.0.exe\` — NSIS installer (recommended, supports auto-update). Creates desktop + Start Menu shortcuts.
+          - \`NEXUS-Portable-1.2.0.exe\` — single-file portable build, no install required.
 
           Minimum: Windows 10 64-bit.
           "@

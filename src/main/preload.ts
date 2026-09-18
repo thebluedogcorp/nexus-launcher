@@ -46,6 +46,31 @@ const api = {
     ipcRenderer.invoke("games:patchMetadata", id, query) as Promise<Game | null>,
   patchAllMetadata: () =>
     ipcRenderer.invoke("games:patchAll") as Promise<{ patched: number; attempted: number }>,
+  onPatchProgress: (cb: (p: { gameId: number; title: string; current: number; total: number }) => void) => {
+    const listener = (_e: unknown, p: { gameId: number; title: string; current: number; total: number }) => cb(p);
+    ipcRenderer.on("patch:progress", listener);
+    return () => ipcRenderer.removeListener("patch:progress", listener);
+  },
+  onPatchGameUpdated: (cb: (p: { game: Game }) => void) => {
+    const listener = (_e: unknown, p: { game: Game }) => cb(p);
+    ipcRenderer.on("patch:gameUpdated", listener);
+    return () => ipcRenderer.removeListener("patch:gameUpdated", listener);
+  },
+  onPatchDone: (cb: (p: { patched: number; attempted: number }) => void) => {
+    const listener = (_e: unknown, p: { patched: number; attempted: number }) => cb(p);
+    ipcRenderer.on("patch:done", listener);
+    return () => ipcRenderer.removeListener("patch:done", listener);
+  },
+
+  // Auto-update
+  checkForUpdates: () =>
+    ipcRenderer.invoke("updater:check") as Promise<{
+      ok: boolean;
+      message: string;
+      updateAvailable?: boolean;
+      version?: string;
+      releaseUrl?: string;
+    }>,
 
   // Scan
   runScan: (platforms?: Game["platform"][]) =>

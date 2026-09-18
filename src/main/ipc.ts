@@ -16,7 +16,8 @@ import {
 } from "./db";
 import { runScan } from "./detectors";
 import { launchGame } from "./launchers";
-import { searchRawg, bestMatchForTitle } from "./metadata/rawg";
+import { searchRawg } from "./metadata/rawg";
+import { fetchAggregated } from "./metadata/aggregator";
 import type {
   DetectedGame,
   Game,
@@ -34,7 +35,7 @@ export function registerIpc(): void {
     // Optionally auto-patch metadata on creation.
     let meta: MetadataResult | null = null;
     if (input.autoPatch !== false && input.title) {
-      meta = await bestMatchForTitle(input.title);
+      meta = await fetchAggregated(input.title, input.steamAppId ?? null, null);
     }
     return createGame({
       title: input.title,
@@ -78,7 +79,7 @@ export function registerIpc(): void {
       const game = getGame(id);
       if (!game) return null;
       const title = query?.trim() || game.title;
-      const meta = await bestMatchForTitle(title);
+      const meta = await fetchAggregated(title, game.steamAppId, game.rawgId);
       if (!meta) return null;
       return updateGame(id, {
         coverImage: meta.coverImage ?? game.coverImage,
@@ -116,42 +117,27 @@ export function registerIpc(): void {
     },
   );
 
-  ipcMain.handle("scan:import", (_e, items: DetectedGame[]) => importDetected(items));
+  ipcMain.handle("scan:import", async (_e, items: DetectedGame[]) => {
+    const imported = importDetected(items);
+    // AUTOMATIC PATCHING: kick off background metadata enrichment for the
+    // freshly imported games so they get artwork without a manual step.
+    if (imported.length > 0) {
+      void patchGamesInBackground(imported);
+    }
+    return imported;
+  });
 
   // ===== Metadata =====
   ipcMain.handle("metadata:search", (_e, q: string) => searchRawg(q, 8));
 
   // Patch metadata for every game that's missing a banner image (best-effort,
-  // sequential to avoid hammering RAWG rate limits).
+  // sequential to avoid hammering RAWG rate limits). Uses the multi-source
+  // aggregator (RAWG -> Steam -> PCGamingWiki).
   ipcMain.handle("games:patchAll", async () => {
     const all = listGames({ showHidden: true });
     const needPatch = all.filter((g) => !g.bannerImage);
-    let patched = 0;
-    for (const g of needPatch.slice(0, 60)) {
-      try {
-        const meta = await bestMatchForTitle(g.title);
-        if (!meta) continue;
-        const updated = updateGame(g.id, {
-          coverImage: meta.coverImage ?? g.coverImage,
-          bannerImage: meta.bannerImage ?? g.bannerImage,
-          screenshots: meta.screenshots && meta.screenshots.length ? meta.screenshots : g.screenshots,
-          description: meta.description ?? g.description,
-          developer: meta.developer ?? g.developer,
-          publisher: meta.publisher ?? g.publisher,
-          releaseDate: meta.releaseDate ?? g.releaseDate,
-          rating: meta.rating ?? g.rating,
-          ratingCount: meta.ratingCount ?? g.ratingCount,
-          genres: meta.genres.length ? meta.genres : g.genres,
-          rawgId: meta.rawgId ?? g.rawgId,
-        });
-        if (updated?.bannerImage) patched++;
-        // Small delay to respect RAWG's rate limit (~20 req/s, but be gentle).
-        await new Promise((r) => setTimeout(r, 150));
-      } catch {
-        // skip this one
-      }
-    }
-    return { patched, attempted: needPatch.length };
+    const result = await patchGamesInBackground(needPatch.slice(0, 60));
+    return { patched: result.patched, attempted: needPatch.length };
   });
 
   // ===== Stats & settings =====
@@ -159,8 +145,75 @@ export function registerIpc(): void {
   ipcMain.handle("settings:get", () => getAllSettings());
   ipcMain.handle("settings:set", (_e, s) => setAllSettings(s));
 
+  // ===== Auto-update =====
+  ipcMain.handle("updater:check", async () => {
+    try {
+      const { checkForUpdatesAndNotify } = await import("./updater");
+      return await checkForUpdatesAndNotify();
+    } catch (e) {
+      return { ok: false, message: e instanceof Error ? e.message : String(e) };
+    }
+  });
+
   // ===== Utilities =====
   ipcMain.handle("platform:info", () => null);
+}
+
+/**
+ * Background metadata enrichment — iterates games sequentially, fetches
+ * artwork + details from the multi-source aggregator, and writes the merged
+ * result back. Broadcasts progress to every renderer window so the UI can
+ * show a live counter. Resilient: one game failing never aborts the rest.
+ */
+async function patchGamesInBackground(
+  games: Game[],
+): Promise<{ patched: number; attempted: number }> {
+  let patched = 0;
+  for (let i = 0; i < games.length; i++) {
+    const g = games[i];
+    // Broadcast progress so the renderer can show a live counter.
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.webContents.send("patch:progress", {
+        gameId: g.id,
+        title: g.title,
+        current: i + 1,
+        total: games.length,
+      });
+    }
+    try {
+      const meta = await fetchAggregated(g.title, g.steamAppId, g.rawgId);
+      if (!meta) {
+        await new Promise((r) => setTimeout(r, 120));
+        continue;
+      }
+      const updated = updateGame(g.id, {
+        coverImage: meta.coverImage ?? g.coverImage,
+        bannerImage: meta.bannerImage ?? g.bannerImage,
+        screenshots: meta.screenshots && meta.screenshots.length ? meta.screenshots : g.screenshots,
+        description: meta.description ?? g.description,
+        developer: meta.developer ?? g.developer,
+        publisher: meta.publisher ?? g.publisher,
+        releaseDate: meta.releaseDate ?? g.releaseDate,
+        rating: meta.rating ?? g.rating,
+        ratingCount: meta.ratingCount ?? g.ratingCount,
+        genres: meta.genres.length ? meta.genres : g.genres,
+        rawgId: meta.rawgId && meta.rawgId !== 0 ? meta.rawgId : g.rawgId,
+      });
+      if (updated?.bannerImage) patched++;
+      // Notify the renderer that this game's row changed.
+      for (const win of BrowserWindow.getAllWindows()) {
+        win.webContents.send("patch:gameUpdated", { game: updated });
+      }
+      // Gentle delay to respect rate limits.
+      await new Promise((r) => setTimeout(r, 150));
+    } catch {
+      // skip this game; continue with the rest
+    }
+  }
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send("patch:done", { patched, attempted: games.length });
+  }
+  return { patched, attempted: games.length };
 }
 
 // Re-export types so the preload can share them.
