@@ -357,7 +357,7 @@ export function GamePage({ game, onClose, onLaunch, onPatch, onDelete, onToggleF
 
             {/* Paths */}
             <div className="editor-field">
-              <label>Executable Path (.exe or .lnk shortcut)</label>
+              <label>Executable Path (.exe, .lnk, or .url)</label>
               <div style={{ display: "flex", gap: 8 }}>
                 <input value={editExecutable} onChange={(e) => setEditExecutable(e.target.value)} placeholder="C:\Games\game.exe or C:\shortcut.lnk" style={{ flex: 1 }} />
                 <button className="btn btn-ghost btn-sm" style={{ cursor: "pointer", flexShrink: 0, height: 38, borderRadius: 8 }} onClick={async () => {
@@ -368,7 +368,7 @@ export function GamePage({ game, onClose, onLaunch, onPatch, onDelete, onToggleF
                 </button>
               </div>
               <div style={{ fontSize: 11, color: "var(--nx-text-faint)", marginTop: 5 }}>
-                Supports .exe and .lnk shortcut files. Shortcuts are resolved automatically on launch.
+                Supports .exe, .lnk shortcuts, and .url files. All are resolved automatically on launch.
               </div>
             </div>
             <div className="editor-field">

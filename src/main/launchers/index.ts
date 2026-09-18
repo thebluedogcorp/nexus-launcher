@@ -141,17 +141,48 @@ export async function launchGame(game: Game): Promise<LaunchResult> {
     }
   }
 
-  // 2. Direct executable or .lnk shortcut (manual / custom games).
+  // 2. Direct executable, .lnk shortcut, or .url file (manual / custom games).
   if (game.executable) {
     const exePath = game.executable;
-    const isShortcut = exePath.toLowerCase().endsWith(".lnk");
+    const lower = exePath.toLowerCase();
 
-    // If it's a .lnk shortcut, resolve it to the real target first.
-    if (isShortcut) {
+    // 2a. .url file — parse the INI-format text file for the URL= line.
+    //     Steam and some stores create .url shortcut files that contain a
+    //     protocol URI (e.g. steam://run/1245620) or a web URL.
+    if (lower.endsWith(".url")) {
+      const url = resolveUrlFile(exePath);
+      if (url) {
+        try {
+          // If the URL is a protocol URI (steam://, epic://, etc.), open it
+          // via shell.openExternal which invokes the OS handler.
+          // If it's a web URL (https://), same thing — opens the default browser.
+          await shell.openExternal(url);
+          return { ok: true, message: `Launched via .url: ${url}`, startedAt };
+        } catch (e) {
+          return {
+            ok: false,
+            message: `Failed to open .url target: ${
+              e instanceof Error ? e.message : String(e)
+            }`,
+            startedAt,
+          };
+        }
+      }
+      // If URL parsing failed, fall through to shell.openPath.
+      try {
+        const result = await shell.openPath(exePath);
+        if (!result) return { ok: true, message: `Opened .url file.`, startedAt };
+        return { ok: false, message: `Could not open .url: ${result}`, startedAt };
+      } catch (e) {
+        return { ok: false, message: `Failed to open .url: ${e instanceof Error ? e.message : String(e)}`, startedAt };
+      }
+    }
+
+    // 2b. .lnk shortcut — resolve to real target + spawn.
+    if (lower.endsWith(".lnk")) {
       const target = await resolveShortcut(exePath);
       if (target && target.targetPath) {
         try {
-          // Spawn the resolved target with its working directory + arguments.
           const args = target.arguments ? target.arguments.split(/\s+/).filter(Boolean) : [];
           spawn(target.targetPath, args, {
             cwd: target.workingDir || undefined,
@@ -194,6 +225,25 @@ export async function launchGame(game: Game): Promise<LaunchResult> {
       }
     }
 
+    // 2c. .bat / .cmd batch file — spawn via cmd.exe.
+    if (lower.endsWith(".bat") || lower.endsWith(".cmd")) {
+      try {
+        spawn("cmd.exe", ["/c", exePath], {
+          cwd: game.installDir ?? dirname(exePath),
+          detached: true,
+          stdio: "ignore",
+          windowsHide: false,
+        }).unref();
+        return { ok: true, message: `Launched batch: ${exePath}`, startedAt };
+      } catch (e) {
+        return {
+          ok: false,
+          message: `Failed to start batch: ${e instanceof Error ? e.message : String(e)}`,
+          startedAt,
+        };
+      }
+    }
+
     // 3. Direct .exe — spawn it directly.
     try {
       spawn(exePath, {
@@ -214,8 +264,7 @@ export async function launchGame(game: Game): Promise<LaunchResult> {
     }
   }
 
-  // 4. If we have an installDir but no executable, try opening the directory
-  //    (the user can find the exe manually).
+  // 4. If we have an installDir but no executable, try opening the directory.
   if (game.installDir) {
     try {
       await shell.openPath(game.installDir);
@@ -230,6 +279,31 @@ export async function launchGame(game: Game): Promise<LaunchResult> {
     message: "No launch command or executable available for this game.",
     startedAt,
   };
+}
+
+/**
+ * Parse a Windows .url file (Internet Shortcut) and extract the URL= line.
+ * .url files are simple INI-format text:
+ *   [InternetShortcut]
+ *   URL=steam://run/1245620
+ *   IconFile=...
+ *   IconIndex=0
+ *
+ * Returns the URL string, or null if the file can't be read / has no URL.
+ */
+function resolveUrlFile(urlPath: string): string | null {
+  try {
+    if (!existsSync(urlPath)) return null;
+    const content = readFileSync(urlPath, "utf-8");
+    // Look for URL= line (case-insensitive, handles BOM + whitespace).
+    const match = content.match(/^URL\s*=\s*(.+)$/im);
+    if (match) {
+      return match[1].trim();
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 function looksLikeUri(s: string): boolean {

@@ -171,7 +171,7 @@ export function AddGameDialog({ onClose, onAdd }: Props) {
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div className="field" style={{ marginBottom: 0 }}>
-              <label className="field-label">Executable Path (.exe or .lnk shortcut)</label>
+              <label className="field-label">Executable Path (.exe, .lnk, or .url)</label>
               <div style={{ display: "flex", gap: 8 }}>
                 <input className="field-input" style={{ fontFamily: "Cascadia Code, Consolas, monospace", fontSize: 12 }} value={executable} onChange={(e) => setExecutable(e.target.value)} placeholder="C:\Games\game.exe or C:\shortcut.lnk" />
                 <button className="btn btn-ghost btn-sm" style={{ flexShrink: 0, height: 40, borderRadius: 9 }} onClick={async () => {
@@ -183,7 +183,7 @@ export function AddGameDialog({ onClose, onAdd }: Props) {
               </div>
               <div className="field-hint">
                 <Icon.Info size={12} />
-                <span>You can select a .exe <strong>or</strong> a .lnk shortcut file. Shortcuts are resolved automatically when launching — great for games where the store hides the real .exe (Epic, EA App, Xbox Game Pass).</span>
+                <span>You can select a .exe, .lnk shortcut, or .url file. All are resolved automatically when launching — great for Steam shortcuts (.url) and games where the store hides the real .exe (Epic, EA App, Xbox Game Pass).</span>
               </div>
             </div>
             <div className="field" style={{ marginBottom: 0 }}>
