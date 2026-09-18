@@ -212,6 +212,13 @@ export function App() {
     if (pageGame?.id === g.id) setPageGame(await window.nexus.getGame(g.id));
     setEditorGame(null);
   }, [refreshAll, toast, pageGame]);
+  // Same as handleEditGame but keeps the page open (used by GamePage inline edit)
+  const handleUpdateFromPage = useCallback(async (g: Game, patch: Record<string, unknown>) => {
+    await window.nexus.updateGame(g.id, patch);
+    toast("success", "Updated", "Game details saved.");
+    await refreshAll();
+    if (pageGame?.id === g.id) setPageGame(await window.nexus.getGame(g.id));
+  }, [refreshAll, toast, pageGame]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -241,7 +248,7 @@ export function App() {
   if (pageGame) {
     return (
       <>
-        <GamePage game={pageGame} onClose={() => setPageGame(null)} onLaunch={handleLaunch} onPatch={handlePatch} onDelete={handleDelete} onToggleFav={handleToggleFav} />
+        <GamePage game={pageGame} onClose={() => setPageGame(null)} onLaunch={handleLaunch} onPatch={handlePatch} onDelete={handleDelete} onToggleFav={handleToggleFav} onUpdate={handleUpdateFromPage} onOpenDir={handleOpenDir} />
         {controllerConnected && <div className="hints-bar"><span className="hint"><span className="k r">B</span> Back</span><span className="hint"><span className="k r">A</span>/<span className="k r">X</span> Play</span></div>}
         <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       </>
