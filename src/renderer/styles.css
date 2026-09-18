@@ -73,10 +73,10 @@ a{color:inherit;text-decoration:none}
 .carousel-wrap{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 /* No scroll-snap (causes skipping/stuck). No mask on left/right edges
    (crops the first/last card). Instead, generous horizontal padding. */
-.carousel{display:flex;gap:14px;overflow-x:auto;overflow-y:visible;padding:60px 40px 40px;scroll-behavior:smooth;scrollbar-width:none;align-items:center;flex:1}
+.carousel{display:flex;gap:14px;overflow-x:auto;overflow-y:visible;padding:60px 40px 40px;scroll-behavior:auto;scrollbar-width:none;align-items:center;flex:1;contain:layout style}
 .carousel::-webkit-scrollbar{display:none}
 
-.tile{position:relative;flex-shrink:0;width:160px;aspect-ratio:3/4;border-radius:14px;overflow:hidden;cursor:pointer;transition:transform .4s cubic-bezier(.2,.8,.2,1),filter .4s,box-shadow .4s,border-color .3s;border:2px solid transparent;background:var(--surface);box-shadow:0 6px 20px -8px rgba(0,0,0,0.5)}
+.tile{position:relative;flex-shrink:0;width:160px;aspect-ratio:3/4;border-radius:14px;overflow:hidden;cursor:pointer;transition:transform .3s cubic-bezier(.2,.8,.2,1),filter .3s,box-shadow .3s,border-color .3s;border:2px solid transparent;background:var(--surface);box-shadow:0 6px 20px -8px rgba(0,0,0,0.5);will-change:transform,filter;contain:layout style paint}
 .tile img,.tile .tile-proc{width:100%;height:100%;object-fit:cover;transition:transform .5s cubic-bezier(.2,.8,.2,1)}
 .tile:hover img,.tile:hover .tile-proc{transform:scale(1.05)}
 

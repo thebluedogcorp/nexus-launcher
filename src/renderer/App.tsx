@@ -243,16 +243,44 @@ export function App() {
   }, [pageGame, games, focusedIdx, openPage]);
 
   // Smooth-scroll the focused tile into the CENTER of the carousel viewport.
-  // This replaces scrollIntoView (which used scroll-snap and caused skipping).
+  // Uses requestAnimationFrame + manual easing to avoid the native
+  // scrollTo({behavior:"smooth"}) drift/skip issue that happens when
+  // multiple scroll commands stack up during continuous gamepad navigation.
+  const scrollRef = useRef<{ raf: number | null; target: number }>({ raf: null, target: 0 });
   useEffect(() => {
     const carousel = document.querySelector(".carousel") as HTMLElement | null;
     const tile = document.querySelector(".tile.focused") as HTMLElement | null;
     if (!carousel || !tile) return;
-    // Calculate the scroll position that centers the tile in the carousel.
     const tileCenter = tile.offsetLeft + tile.offsetWidth / 2;
     const carouselCenter = carousel.clientWidth / 2;
-    const targetScroll = tileCenter - carouselCenter;
-    carousel.scrollTo({ left: targetScroll, behavior: "smooth" });
+    const targetScroll = Math.max(0, tileCenter - carouselCenter);
+    scrollRef.current.target = targetScroll;
+
+    // Cancel any in-flight animation
+    if (scrollRef.current.raf != null) cancelAnimationFrame(scrollRef.current.raf);
+
+    const animate = () => {
+      const carousel = document.querySelector(".carousel") as HTMLElement | null;
+      if (!carousel) return;
+      const current = carousel.scrollLeft;
+      const target = scrollRef.current.target;
+      const diff = target - current;
+      // If we're close enough (within 1px), snap to target and stop.
+      if (Math.abs(diff) < 1) {
+        carousel.scrollLeft = target;
+        scrollRef.current.raf = null;
+        return;
+      }
+      // Ease: move 20% of the remaining distance each frame.
+      // This is fast enough to feel responsive but smooth enough to not skip.
+      carousel.scrollLeft = current + diff * 0.2;
+      scrollRef.current.raf = requestAnimationFrame(animate);
+    };
+    scrollRef.current.raf = requestAnimationFrame(animate);
+
+    return () => {
+      if (scrollRef.current.raf != null) cancelAnimationFrame(scrollRef.current.raf);
+    };
   }, [focusedIdx]);
 
   const focusedGame = games[focusedIdx] ?? null;

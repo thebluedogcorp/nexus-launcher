@@ -16,8 +16,9 @@ export interface ControllerState {
   connected: boolean;
 }
 
-const DEADZONE = 0.4;
-const REPEAT_DELAY = 150; // ms between continuous navigations when stick is held
+const DEADZONE = 0.45;      // must exceed this to start navigation
+const RELEASE_ZONE = 0.2;   // must drop below this to release (hysteresis)
+const REPEAT_DELAY = 250;   // ms between continuous navigations when stick is held
 
 interface Callbacks {
   onAction: (action: GamepadAction) => void;
@@ -80,19 +81,42 @@ export function useGamepadController({ onAction }: Callbacks): ControllerState {
         if (buttons[9] && !prev.buttons[9]) fire("menu");
         if (buttons[8] && !prev.buttons[8]) fire("scan");
 
-        // --- Analog stick (CONTINUOUS with repeat delay) ---
+        // --- Analog stick (CONTINUOUS with repeat delay + hysteresis) ---
+        // Hysteresis: the stick must exceed DEADZONE to START a direction,
+        // but must drop below RELEASE_ZONE to STOP. This prevents drift when
+        // the stick is barely off-center (common with worn controllers).
         const lx = axes[0] ?? 0;
         const ly = axes[1] ?? 0;
-        let currentDir: string | null = null;
-        if (lx < -DEADZONE) currentDir = "left";
-        else if (lx > DEADZONE) currentDir = "right";
-        else if (ly < -DEADZONE) currentDir = "up";
-        else if (ly > DEADZONE) currentDir = "down";
+        const sr = stickRepeatRef.current;
+        let currentDir: string | null = sr.dir; // keep current direction by default
+
+        if (sr.dir) {
+          // Currently navigating — check if we should RELEASE.
+          // Release if the magnitude drops below RELEASE_ZONE.
+          const mag = Math.sqrt(lx * lx + ly * ly);
+          if (mag < RELEASE_ZONE) {
+            currentDir = null;
+          } else {
+            // Still navigating — re-evaluate direction based on dominant axis.
+            // This allows diagonal → horizontal transitions without releasing.
+            if (Math.abs(lx) > Math.abs(ly)) {
+              currentDir = lx < 0 ? "left" : "right";
+            } else {
+              currentDir = ly < 0 ? "up" : "down";
+            }
+          }
+        } else {
+          // Not currently navigating — check if we should START.
+          if (lx < -DEADZONE) currentDir = "left";
+          else if (lx > DEADZONE) currentDir = "right";
+          else if (ly < -DEADZONE) currentDir = "up";
+          else if (ly > DEADZONE) currentDir = "down";
+          else currentDir = null;
+        }
 
         if (currentDir) {
-          const sr = stickRepeatRef.current;
           if (sr.dir !== currentDir) {
-            // Direction changed — fire immediately.
+            // Direction changed (or started) — fire immediately.
             sr.dir = currentDir;
             sr.lastFire = now;
             fire(currentDir as GamepadAction);
@@ -102,7 +126,7 @@ export function useGamepadController({ onAction }: Callbacks): ControllerState {
             fire(currentDir as GamepadAction);
           }
         } else {
-          // Stick released.
+          // Stick released (below RELEASE_ZONE).
           stickRepeatRef.current.dir = null;
         }
 

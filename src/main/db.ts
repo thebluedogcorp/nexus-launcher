@@ -297,7 +297,23 @@ export interface ListOptions {
   sort?: "recent" | "name" | "playtime" | "rating";
 }
 
+// In-memory cache for listGames results — avoids re-querying SQLite on every
+// filter change. Invalidated on any write operation.
+let _listCache: { key: string; data: Game[] } | null = null;
+
+function listCacheKey(opts: ListOptions): string {
+  return JSON.stringify(opts);
+}
+
+function invalidateListCache(): void {
+  _listCache = null;
+}
+
 export function listGames(opts: ListOptions = {}): Game[] {
+  const cacheKey = listCacheKey(opts);
+  if (_listCache && _listCache.key === cacheKey) {
+    return _listCache.data;
+  }
   const conn = db();
   const where: string[] = [];
   const params: Record<string, unknown> = {};
@@ -325,7 +341,9 @@ export function listGames(opts: ListOptions = {}): Game[] {
           : "lastPlayedAt DESC NULLS LAST";
   const sql = `SELECT * FROM games ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY ${order}`;
   const rows = conn.prepare(sql).all(params) as GameRow[];
-  return rows.map(rowToGame);
+  const data = rows.map(rowToGame);
+  _listCache = { key: cacheKey, data };
+  return data;
 }
 
 export function getGame(id: number): Game | null {
@@ -410,6 +428,7 @@ export function createGame(input: {
     xboxPackageFamilyName: input.xboxPackageFamilyName ?? null,
     xboxAppId: input.xboxAppId ?? null,
   });
+  invalidateListCache();
   return getGame(Number(info.lastInsertRowid))!;
 }
 
@@ -465,11 +484,13 @@ export function updateGame(id: number, patch: Record<string, unknown>): Game | n
   if (sets.length === 0) return getGame(id);
   sets.push("updatedAt = datetime('now')");
   conn.prepare(`UPDATE games SET ${sets.join(", ")} WHERE id = @id`).run(params);
+  invalidateListCache();
   return getGame(id);
 }
 
 export function deleteGame(id: number): void {
   db().prepare("DELETE FROM games WHERE id = ?").run(id);
+  invalidateListCache();
 }
 
 export function recordLaunch(id: number, minutes: number): Game | null {
@@ -483,6 +504,7 @@ export function recordLaunch(id: number, minutes: number): Game | null {
         updatedAt = datetime('now')
     WHERE id = @id
   `).run({ id, seconds });
+  invalidateListCache();
   return getGame(id);
 }
 
@@ -564,6 +586,7 @@ export function importDetected(items: DetectedGame[]): Game[] {
     });
     out.push(created);
   }
+  invalidateListCache();
   return out;
 }
 
