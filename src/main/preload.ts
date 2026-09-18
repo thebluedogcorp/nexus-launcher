@@ -70,7 +70,20 @@ const api = {
       updateAvailable?: boolean;
       version?: string;
       releaseUrl?: string;
+      downloadUrl?: string;
+      downloadSize?: number;
     }>,
+  downloadAndInstallUpdate: (downloadUrl: string, expectedSize?: number) =>
+    ipcRenderer.invoke("updater:downloadAndInstall", downloadUrl, expectedSize) as Promise<{
+      ok: boolean;
+      message: string;
+      installerPath?: string;
+    }>,
+  onUpdateProgress: (cb: (p: { bytesDownloaded: number; totalBytes: number; percent: number }) => void) => {
+    const listener = (_e: unknown, p: { bytesDownloaded: number; totalBytes: number; percent: number }) => cb(p);
+    ipcRenderer.on("updater:progress", listener);
+    return () => ipcRenderer.removeListener("updater:progress", listener);
+  },
 
   // Scan
   runScan: (platforms?: Game["platform"][]) =>

@@ -7,10 +7,18 @@ interface Props {
   initial: LauncherSettings;
   onClose: () => void;
   onSave: (s: Partial<LauncherSettings>) => Promise<LauncherSettings>;
+  onCheckUpdates: () => void;
 }
 
-export function SettingsDialog({ initial, onClose, onSave }: Props) {
-  const [rawgKey, setRawgKey] = useState(initial.rawgApiKey);
+/**
+ * NEXUS Settings — zero-setup by design.
+ *
+ * No API key field: metadata is fetched automatically using a built-in default
+ * key, so the launcher works perfectly the moment it's installed. Power users
+ * who want to override the key can drop a `rawgApiKey` line in the DB by hand,
+ * but there's no UI for it to avoid confusing normal users.
+ */
+export function SettingsDialog({ initial, onClose, onSave, onCheckUpdates }: Props) {
   const [autoScan, setAutoScan] = useState(initial.autoScanOnStart);
   const [defaultSort, setDefaultSort] = useState<SortKey>(initial.defaultSort);
   const [scanPaths, setScanPaths] = useState(initial.scanPaths);
@@ -20,7 +28,6 @@ export function SettingsDialog({ initial, onClose, onSave }: Props) {
     setSaving(true);
     try {
       await onSave({
-        rawgApiKey: rawgKey.trim(),
         autoScanOnStart: autoScan,
         defaultSort,
         scanPaths,
@@ -43,21 +50,24 @@ export function SettingsDialog({ initial, onClose, onSave }: Props) {
         </div>
 
         <div className="modal-body">
-          <div className="field">
-            <label className="field-label"><Icon.Key size={12} /> RAWG API Key</label>
-            <input
-              type="password"
-              className="field-input"
-              style={{ fontFamily: "Cascadia Code, Consolas, monospace", fontSize: 12 }}
-              value={rawgKey}
-              onChange={(e) => setRawgKey(e.target.value)}
-              placeholder="Paste your RAWG API key (optional)"
-            />
-            <div className="field-hint">
-              <Icon.Info size={12} />
-              <span>Required for live metadata patching. Get a free key at{" "}
-                <a href="https://rawg.io/apidocs" target="_blank" rel="noopener noreferrer" style={{ color: "var(--nx-accent)" }}>rawg.io/apidocs</a>.
-              </span>
+          {/* Zero-setup banner — reassures the user everything just works. */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 13, padding: 14,
+            background: "linear-gradient(135deg, rgba(52,211,153,0.1), rgba(52,211,153,0.02))",
+            border: "1px solid rgba(52,211,153,0.25)", borderRadius: 11, marginBottom: 20,
+          }}>
+            <div style={{
+              width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+              background: "rgba(52,211,153,0.15)", display: "flex", alignItems: "center", justifyContent: "center",
+              color: "var(--nx-accent)",
+            }}>
+              <Icon.Shield size={20} />
+            </div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Everything just works</div>
+              <div style={{ fontSize: 11, color: "var(--nx-text-dim)", marginTop: 2, lineHeight: 1.5 }}>
+                NEXUS auto-detects your games and fetches cover art, screenshots, and details automatically. No API keys, no setup.
+              </div>
             </div>
           </div>
 
@@ -94,8 +104,29 @@ export function SettingsDialog({ initial, onClose, onSave }: Props) {
             />
             <div className="field-hint">
               <Icon.Info size={12} />
-              <span>One path per line. NEXUS will also probe these locations during a scan.</span>
+              <span>Optional. One path per line. NEXUS also probes these locations during a scan.</span>
             </div>
+          </div>
+
+          {/* Check for updates */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 13, marginTop: 20, padding: 14,
+            border: "1px solid var(--nx-border)", borderRadius: 11,
+          }}>
+            <div style={{
+              width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+              background: "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center",
+              color: "var(--nx-text-dim)",
+            }}>
+              <Icon.DownloadCloud size={20} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--nx-text)" }}>Check for updates</div>
+              <div style={{ fontSize: 11, color: "var(--nx-text-dim)", marginTop: 2 }}>Download and install the latest version from GitHub.</div>
+            </div>
+            <button className="btn btn-outline btn-sm" onClick={onCheckUpdates}>
+              <Icon.Refresh size={14} /> Check
+            </button>
           </div>
         </div>
 

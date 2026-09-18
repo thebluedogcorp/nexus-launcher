@@ -155,6 +155,21 @@ export function registerIpc(): void {
     }
   });
 
+  ipcMain.handle("updater:downloadAndInstall", async (_e, downloadUrl: string, expectedSize?: number) => {
+    try {
+      const { downloadAndInstallUpdate, launchInstallerAndQuit } = await import("./updater");
+      const result = await downloadAndInstallUpdate(downloadUrl, expectedSize);
+      if (result.ok && result.installerPath) {
+        // Launch the installer and quit so it can replace the app files.
+        launchInstallerAndQuit(result.installerPath);
+        return { ok: true, message: result.message, installerPath: result.installerPath };
+      }
+      return result;
+    } catch (e) {
+      return { ok: false, message: e instanceof Error ? e.message : String(e) };
+    }
+  });
+
   // ===== Utilities =====
   ipcMain.handle("platform:info", () => null);
 }
@@ -215,6 +230,10 @@ async function patchGamesInBackground(
   }
   return { patched, attempted: games.length };
 }
+
+// Exported alias so the main process entry can kick off the startup auto-patch
+// without duplicating the logic.
+export const patchGamesInBackgroundExport = patchGamesInBackground;
 
 // Re-export types so the preload can share them.
 export type { Game, ScanSummary };

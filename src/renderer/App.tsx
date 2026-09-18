@@ -14,6 +14,7 @@ import { GamePage } from "./components/GamePage";
 import { AddGameDialog } from "./components/AddGameDialog";
 import { ScanDialog } from "./components/ScanDialog";
 import { SettingsDialog } from "./components/SettingsDialog";
+import { UpdateDialog } from "./components/UpdateDialog";
 import { ToastContainer, type Toast } from "./components/Toast";
 import {
   formatPlaytime, formatPlaytimeShort, formatSize, platformColor, platformLabel,
@@ -54,7 +55,14 @@ export function App() {
   const [focusedIdx, setFocusedIdx] = useState(0);
   const [patching, setPatching] = useState(false);
   const [patchProgress, setPatchProgress] = useState<{ current: number; total: number; title: string } | null>(null);
-  const [updateAvailable, setUpdateAvailable] = useState<{ version?: string; releaseUrl?: string } | null>(null);
+  const [updateAvailable, setUpdateAvailable] = useState<{
+    version?: string;
+    releaseUrl?: string;
+    downloadUrl?: string;
+    downloadSize?: number;
+  } | null>(null);
+  const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
 
   const toast = useCallback((type: Toast["type"], title: string, desc?: string) => {
     setToasts((prev) => [...prev, { id: Date.now() + Math.random(), type, title, desc }]);
@@ -113,7 +121,12 @@ export function App() {
         try {
           const upd = await window.nexus.checkForUpdates();
           if (upd.ok && upd.updateAvailable) {
-            setUpdateAvailable({ version: upd.version, releaseUrl: upd.releaseUrl });
+            setUpdateAvailable({
+              version: upd.version,
+              releaseUrl: upd.releaseUrl,
+              downloadUrl: upd.downloadUrl,
+              downloadSize: upd.downloadSize,
+            });
           }
         } catch {
           // ignore
@@ -249,6 +262,31 @@ export function App() {
     }
   }, [refreshAll, toast]);
 
+  const handleCheckUpdates = useCallback(async () => {
+    setCheckingUpdate(true);
+    toast("info", "Checking for updates…", "Querying GitHub Releases.");
+    try {
+      const upd = await window.nexus.checkForUpdates();
+      if (upd.ok && upd.updateAvailable) {
+        setUpdateAvailable({
+          version: upd.version,
+          releaseUrl: upd.releaseUrl,
+          downloadUrl: upd.downloadUrl,
+          downloadSize: upd.downloadSize,
+        });
+        setUpdateDialogOpen(true);
+      } else if (upd.ok) {
+        toast("success", "You're up to date", upd.message);
+      } else {
+        toast("error", "Update check failed", upd.message);
+      }
+    } catch (e) {
+      toast("error", "Update check failed", e instanceof Error ? e.message : String(e));
+    } finally {
+      setCheckingUpdate(false);
+    }
+  }, [toast]);
+
   // The focused tile drives the dynamic background.
   const focusedGame = games[focusedIdx] ?? null;
 
@@ -313,15 +351,13 @@ export function App() {
         </div>
         <div className="top-actions">
           {updateAvailable && (
-            <a
+            <button
               className="update-badge"
-              href={updateAvailable.releaseUrl || "https://github.com/thebluedogcorp/nexus-launcher/releases/latest"}
-              target="_blank"
-              rel="noopener noreferrer"
-              title={`NEXUS ${updateAvailable.version} is available`}
+              onClick={() => setUpdateDialogOpen(true)}
+              title={`NEXUS ${updateAvailable.version} is available — click to install`}
             >
               <Icon.DownloadCloud size={14} /> Update available
-            </a>
+            </button>
           )}
           <button className="btn btn-ghost btn-icon" onClick={() => setScanOpen(true)} title="Scan system">
             <Icon.Scan size={17} />
@@ -444,7 +480,18 @@ export function App() {
       {addOpen && <AddGameDialog onClose={() => setAddOpen(false)} onAdd={handleAdd} />}
       {scanOpen && <ScanDialog onClose={() => setScanOpen(false)} onRunScan={handleRunScan} onImport={handleImport} />}
       {settingsOpen && settings && (
-        <SettingsDialog initial={settings} onClose={() => setSettingsOpen(false)} onSave={handleSaveSettings} />
+        <SettingsDialog
+          initial={settings}
+          onClose={() => setSettingsOpen(false)}
+          onSave={handleSaveSettings}
+          onCheckUpdates={handleCheckUpdates}
+        />
+      )}
+      {updateDialogOpen && updateAvailable && (
+        <UpdateDialog
+          info={updateAvailable}
+          onClose={() => setUpdateDialogOpen(false)}
+        />
       )}
 
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />

@@ -136,6 +136,34 @@ app.whenReady().then(() => {
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+
+  // ===== AUTOMATIC metadata enrichment on startup =====
+  // Every game missing a banner image gets its artwork + details fetched in
+  // the background (RAWG -> Steam). The renderer listens to patch:progress /
+  // patch:gameUpdated / patch:done events and updates tiles live as artwork
+  // arrives. This is fire-and-forget; failures never block the UI.
+  try {
+    // Lazy imports so a DB/native-module error above doesn't cascade.
+    Promise.all([import("./db"), import("./ipc")]).then(([{ listGames }]) => {
+      try {
+        const all = listGames({ showHidden: true });
+        const needPatch = all.filter((g) => !g.bannerImage);
+        if (needPatch.length > 0) {
+          // patchGamesInBackground is defined in ipc.ts and broadcasts events
+          // to every renderer window. We invoke it via the exported helper.
+          import("./ipc").then(({ patchGamesInBackgroundExport }) => {
+            if (typeof patchGamesInBackgroundExport === "function") {
+              void patchGamesInBackgroundExport(needPatch);
+            }
+          });
+        }
+      } catch {
+        // ignore — enrichment is best-effort
+      }
+    });
+  } catch {
+    // ignore
+  }
 });
 
 app.on("window-all-closed", () => {
