@@ -171,8 +171,26 @@ export function AddGameDialog({ onClose, onAdd }: Props) {
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div className="field" style={{ marginBottom: 0 }}>
-              <label className="field-label">Executable Path</label>
-              <input className="field-input" style={{ fontFamily: "Cascadia Code, Consolas, monospace", fontSize: 12 }} value={executable} onChange={(e) => setExecutable(e.target.value)} placeholder="C:\\Games\\game.exe" />
+              <label className="field-label">Executable Path (.exe or .lnk shortcut)</label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input className="field-input" style={{ fontFamily: "Cascadia Code, Consolas, monospace", fontSize: 12 }} value={executable} onChange={(e) => setExecutable(e.target.value)} placeholder="C:\Games\game.exe or C:\shortcut.lnk" />
+                <label className="btn btn-ghost btn-sm" style={{ cursor: "pointer", flexShrink: 0, height: 40, borderRadius: 9 }}>
+                  <Icon.Folder size={14} /> Browse
+                  <input type="file" accept=".exe,.lnk,.bat,.cmd,.url" style={{ display: "none" }} onChange={(e) => {
+                    const f = e.target.files?.[0]; if (!f) return;
+                    // Electron gives us the real path via webUtils.getPathForFile
+                    try {
+                      const path = (window as unknown as { webUtils?: { getPathForFile: (f: File) => string } }).webUtils?.getPathForFile?.(f) || (f as unknown as { path?: string }).path || "";
+                      if (path) setExecutable(path);
+                    } catch { /* ignore */ }
+                    e.target.value = "";
+                  }} />
+                </label>
+              </div>
+              <div className="field-hint">
+                <Icon.Info size={12} />
+                <span>You can select a .exe <strong>or</strong> a .lnk shortcut file. Shortcuts are resolved automatically when launching — great for games where the store hides the real .exe (Epic, EA App, Xbox Game Pass).</span>
+              </div>
             </div>
             <div className="field" style={{ marginBottom: 0 }}>
               <label className="field-label">Install Directory</label>
