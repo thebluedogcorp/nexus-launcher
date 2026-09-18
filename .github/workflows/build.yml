@@ -50,22 +50,24 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v1.3.0"
-          $title = "NEXUS v1.3.0 — Zero-setup + real in-app updater + auto-patch everything"
+          $tag = "v1.4.0"
+          $title = "NEXUS v1.4.0 — Professional redesign"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
-          **v1.3.0 — Zero-setup + real in-app updater + auto-patch everything:**
-          - **Zero setup.** Removed the RAWG API key field from Settings entirely — the built-in key works automatically. Install and it just works.
-          - **Auto-patch everything on startup.** Every game missing artwork (not just newly imported ones) is enriched automatically in the background on launch — no manual patching ever needed.
-          - **Real in-app updater.** Click 'Update available' (or Settings → Check) and NEXUS downloads the latest installer from GitHub with a live progress bar, then launches it to replace the app and restarts automatically. No browser, no manual download.
-          - More PS5-immersive UI polish.
+          **v1.4.0 — Professional redesign:**
+          - Consolidated to a single clean left sidebar (no more redundant dock + top nav duplication). Clear hierarchy: Browse / Platforms / footer status + actions.
+          - Larger cinematic tiles (280px, 3:4), smoother focus scaling + brightness transitions.
+          - Refined stage header with eyebrow label, large title, and inline stats (games / playtime / disk).
+          - Polished info panel: bigger title, tighter metadata row, cleaner stats + actions.
+          - Premium typography, tighter letter-spacing, consistent 11px radius system, heavier backdrop blur on glass surfaces.
+          - Kept all v1.3.0 functionality: zero-setup, auto-patch everything on startup, in-app auto-update.
 
           Auto-detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox, patches rich metadata via the RAWG + Steam APIs, and launches games natively.
 
           **Downloads:**
-          - \`NEXUS-Setup-1.3.0.exe\` — NSIS installer (recommended, supports auto-update). Creates desktop + Start Menu shortcuts.
-          - \`NEXUS-Portable-1.3.0.exe\` — single-file portable build, no install required.
+          - \`NEXUS-Setup-1.4.0.exe\` — NSIS installer (recommended, supports auto-update). Creates desktop + Start Menu shortcuts.
+          - \`NEXUS-Portable-1.4.0.exe\` — single-file portable build, no install required.
 
           Minimum: Windows 10 64-bit.
           "@
