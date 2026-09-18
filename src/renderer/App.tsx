@@ -16,6 +16,7 @@ import { GameDetailDialog } from "./components/GameDetailDialog";
 import { AddGameDialog } from "./components/AddGameDialog";
 import { ScanDialog } from "./components/ScanDialog";
 import { SettingsDialog } from "./components/SettingsDialog";
+import { HeroCarousel } from "./components/HeroCarousel";
 import { ToastContainer, type Toast } from "./components/Toast";
 import {
   formatPlaytime, formatPlaytimeShort, formatSize, platformColor, platformLabel,
@@ -195,6 +196,29 @@ export function App() {
     return next;
   }, [toast]);
 
+  const [patching, setPatching] = useState(false);
+  const [patchProgress, setPatchProgress] = useState<{ patched: number; attempted: number } | null>(null);
+
+  const handlePatchAll = useCallback(async () => {
+    setPatching(true);
+    setPatchProgress(null);
+    toast("info", "Fetching artwork for all games…", "Pulling banners + screenshots from RAWG.");
+    try {
+      const res = await window.nexus.patchAllMetadata();
+      setPatchProgress(res);
+      if (res.patched > 0) {
+        toast("success", `Enriched ${res.patched} game${res.patched === 1 ? "" : "s"}`, "Cover art + details + screenshots added.");
+      } else {
+        toast("info", "Everything's already enriched", "All your games have artwork.");
+      }
+      await refreshAll();
+    } catch (e) {
+      toast("error", "Bulk patch failed", e instanceof Error ? e.message : String(e));
+    } finally {
+      setPatching(false);
+    }
+  }, [refreshAll, toast]);
+
   const heading = useMemo(() => {
     if (filters.favOnly) return "Favorites";
     if (filters.query) return `Results for "${filters.query}"`;
@@ -246,25 +270,44 @@ export function App() {
         />
         <div className="main">
           <div className="main-scroll">
-            <div className="hero">
-              <div className="hero-eyebrow">Universal Game Launcher</div>
-              <h1 className="hero-title">{heading}</h1>
-              <p className="hero-sub">
-                Auto-detects every game installed across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox,
-                patches rich metadata via RAWG, and launches games natively through each store's protocol handler.
-              </p>
-              <StatsGrid stats={stats} />
-            </div>
+            {/* Hero carousel — only on the default "all games" view with no query. */}
+            {!filters.favOnly && !filters.query && filters.platform === "all" && !loading && games.length > 0 && (
+              <HeroCarousel games={games} onPlay={handleLaunch} onOpen={openDetail} />
+            )}
+
+            {/* Patch-all enrichment banner — shown when some games lack artwork. */}
+            {!loading && games.length > 0 && games.some((g) => !g.bannerImage) && (
+              <div className="patch-banner">
+                <Icon.Sparkles size={22} />
+                <div className="info">
+                  <div className="title">
+                    {patching
+                      ? `Enriching library… ${patchProgress ? `(${patchProgress.patched}/${patchProgress.attempted})` : ""}`
+                      : "Enrich your library with cover art + screenshots"}
+                  </div>
+                  <div className="sub">
+                    {patching
+                      ? "Fetching banners and details from RAWG. This runs in the background."
+                      : "Some games are missing artwork. Pull banners, descriptions and screenshot galleries from RAWG in one click."}
+                  </div>
+                </div>
+                {!patching && (
+                  <button className="btn btn-outline btn-sm" onClick={handlePatchAll}>
+                    <Icon.Wand size={14} /> Enrich All
+                  </button>
+                )}
+                {patching && <Icon.Spinner size={18} />}
+              </div>
+            )}
 
             <div className="toolbar">
               <div className="toolbar-info">
-                {stats?.totalGames ?? 0} games
+                <strong>{stats?.totalGames ?? 0}</strong> games
                 {stats ? ` · ${formatPlaytimeShort(stats.totalPlaytimeSec)} played` : ""}
               </div>
               <div className="toolbar-actions">
                 <select
-                  className="field-input"
-                  style={{ height: 30, width: 150, fontSize: 12 }}
+                  className="sort-select"
                   value={filters.sort}
                   onChange={(e) => setFilters((f) => ({ ...f, sort: e.target.value as SortKey }))}
                 >
@@ -286,11 +329,11 @@ export function App() {
             <div className="grid-wrap">
               {loading ? (
                 <div className="grid">
-                  {Array.from({ length: 12 }).map((_, i) => (
-                    <div key={i} style={{ overflow: "hidden", borderRadius: 12, border: "1px solid var(--nx-border)", background: "var(--nx-surface)" }}>
-                      <div className="shimmer" style={{ aspectRatio: "3 / 4" }} />
+                  {Array.from({ length: 10 }).map((_, i) => (
+                    <div key={i} style={{ overflow: "hidden", borderRadius: 14, border: "1px solid var(--nx-border)", background: "var(--nx-surface)" }}>
+                      <div className="shimmer" style={{ aspectRatio: "16 / 9" }} />
                       <div style={{ padding: 12 }}>
-                        <div className="shimmer" style={{ height: 12, width: "70%", borderRadius: 4 }} />
+                        <div className="shimmer" style={{ height: 13, width: "70%", borderRadius: 4 }} />
                         <div className="shimmer" style={{ height: 10, width: "40%", borderRadius: 4, marginTop: 8 }} />
                       </div>
                     </div>

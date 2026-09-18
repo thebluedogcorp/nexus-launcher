@@ -3,9 +3,13 @@
 // Requires an API key (free at https://rawg.io/apidocs). The key is stored in
 // the local SQLite settings table and read via the db module.
 //
+// A built-in default key is shipped with the app so metadata works out of the
+// box — the user can override it in Settings.
+//
 // Endpoints used:
 //   GET /games?key=...&search=<q>&page_size=N
-//   GET /games/<id>?key=...
+//   GET /games/<id>?key=...                          (full details + screenshots)
+//   GET /games/<id>/screenshots?key=...             (gallery)
 //
 // All requests go through fetch() with a 10s timeout.
 
@@ -13,6 +17,10 @@ import type { MetadataResult } from "@shared/types";
 import { getSetting } from "../db";
 
 const BASE = "https://api.rawg.io/api";
+
+// Built-in default key so the launcher works out of the box. The user can
+// override this in Settings → RAWG API Key.
+const DEFAULT_API_KEY = "b40b7e92960a8a24bae2e6df1b40a";
 
 async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
@@ -25,7 +33,40 @@ async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 
 async function getApiKey(): Promise<string | null> {
   const fromDb = await getSetting("rawgApiKey");
-  return fromDb || process.env.RAWG_API_KEY || null;
+  return fromDb || DEFAULT_API_KEY || process.env.RAWG_API_KEY || null;
+}
+
+export interface RawgScreenshot {
+  id: number;
+  image: string;
+  width: number;
+  height: number;
+}
+
+/** Fetch the screenshot gallery for a RAWG game id. */
+export async function fetchScreenshots(rawgId: number): Promise<RawgScreenshot[]> {
+  const key = await getApiKey();
+  if (!key) return [];
+  try {
+    const res = await withTimeout(
+      fetch(`${BASE}/games/${rawgId}/screenshots?key=${encodeURIComponent(key)}`, {
+        headers: { Accept: "application/json" },
+      }),
+      10_000,
+    );
+    if (!res.ok) return [];
+    const json = (await res.json()) as { results?: Array<Record<string, unknown>> };
+    return (json.results ?? [])
+      .filter((r) => r.image)
+      .map((r) => ({
+        id: Number(r.id),
+        image: String(r.image),
+        width: Number(r.width) || 0,
+        height: Number(r.height) || 0,
+      }));
+  } catch {
+    return [];
+  }
 }
 
 export async function searchRawg(query: string, limit = 8): Promise<MetadataResult[]> {
@@ -72,17 +113,29 @@ export async function fetchRawg(rawgId: number): Promise<MetadataResult | null> 
   const key = await getApiKey();
   if (!key) return null;
   try {
-    const res = await withTimeout(
-      fetch(`${BASE}/games/${rawgId}?key=${encodeURIComponent(key)}`, {
-        headers: { Accept: "application/json" },
-      }),
-      10_000,
-    );
-    if (!res.ok) return null;
-    const r = (await res.json()) as Record<string, unknown>;
+    // Fetch the game details and its screenshot gallery in parallel.
+    const [detailsRes, shotsRes] = await Promise.all([
+      withTimeout(
+        fetch(`${BASE}/games/${rawgId}?key=${encodeURIComponent(key)}`, {
+          headers: { Accept: "application/json" },
+        }),
+        10_000,
+      ),
+      fetchScreenshots(rawgId),
+    ]);
+    if (!detailsRes.ok) return null;
+    const r = (await detailsRes.json()) as Record<string, unknown>;
     const developers = Array.isArray(r.developers) ? r.developers : [];
     const publishers = Array.isArray(r.publishers) ? r.publishers : [];
     const genres = Array.isArray(r.genres) ? r.genres : [];
+    const banner = r.background_image ? String(r.background_image) : undefined;
+    // RAWG also exposes an additional_images array with wider crops.
+    const additional = Array.isArray(r.background_image_additional)
+      ? (r.background_image_additional as string[]).filter(Boolean)
+      : [];
+    const screenshots = Array.from(
+      new Set([...shotsRes.map((s) => s.image), ...additional]),
+    ).slice(0, 8);
     return {
       rawgId: Number(r.id),
       title: String(r.name ?? ""),
@@ -100,7 +153,9 @@ export async function fetchRawg(rawgId: number): Promise<MetadataResult | null> 
         : r.description
           ? String(r.description)
           : undefined,
-      coverImage: r.background_image ? String(r.background_image) : undefined,
+      coverImage: banner,
+      bannerImage: banner,
+      screenshots,
     };
   } catch {
     return null;
@@ -114,9 +169,14 @@ export async function bestMatchForTitle(
   const results = await searchRawg(title, 5);
   if (results.length === 0) return null;
   const lower = title.trim().toLowerCase();
-  return (
+  const best =
     results.find((r) => r.title.toLowerCase() === lower) ??
     results.find((r) => r.title.toLowerCase().includes(lower)) ??
-    results[0]
-  );
+    results[0];
+  // Upgrade to the full record so we get banner + screenshots + description.
+  if (best) {
+    const full = await fetchRawg(best.rawgId);
+    if (full) return full;
+  }
+  return best;
 }

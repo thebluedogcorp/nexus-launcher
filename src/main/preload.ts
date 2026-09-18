@@ -44,6 +44,8 @@ const api = {
     }>,
   patchMetadata: (id: number, query?: string) =>
     ipcRenderer.invoke("games:patchMetadata", id, query) as Promise<Game | null>,
+  patchAllMetadata: () =>
+    ipcRenderer.invoke("games:patchAll") as Promise<{ patched: number; attempted: number }>,
 
   // Scan
   runScan: (platforms?: Game["platform"][]) =>

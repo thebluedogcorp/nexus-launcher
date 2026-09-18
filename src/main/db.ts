@@ -83,6 +83,8 @@ function migrate(conn: import("better-sqlite3").Database) {
       installDir             TEXT,
       launchCommand         TEXT,
       coverImage            TEXT,
+      bannerImage           TEXT,
+      screenshots           TEXT,
       description           TEXT,
       developer             TEXT,
       publisher             TEXT,
@@ -128,11 +130,29 @@ function migrate(conn: import("better-sqlite3").Database) {
     CREATE INDEX IF NOT EXISTS idx_games_riotId ON games(riotId);
     CREATE INDEX IF NOT EXISTS idx_games_xboxPFN ON games(xboxPackageFamilyName);
   `);
+  // Idempotent column additions for existing DBs created before v1.1.
+  addColumnIfMissing(conn, "games", "bannerImage", "TEXT");
+  addColumnIfMissing(conn, "games", "screenshots", "TEXT");
+
   const row = conn.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as
     | { value?: string }
     | undefined;
   if (!row?.value) {
-    conn.prepare("INSERT OR REPLACE INTO meta(key, value) VALUES('schemaVersion', '1')").run();
+    conn.prepare("INSERT OR REPLACE INTO meta(key, value) VALUES('schemaVersion', '2')").run();
+  } else {
+    conn.prepare("INSERT OR REPLACE INTO meta(key, value) VALUES('schemaVersion', '2')").run();
+  }
+}
+
+function addColumnIfMissing(
+  conn: import("better-sqlite3").Database,
+  table: string,
+  column: string,
+  type: string,
+): void {
+  const cols = conn.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  if (!cols.some((c) => c.name === column)) {
+    conn.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type};`);
   }
 }
 
@@ -145,6 +165,8 @@ interface GameRow {
   installDir: string | null;
   launchCommand: string | null;
   coverImage: string | null;
+  bannerImage: string | null;
+  screenshots: string | null;
   description: string | null;
   developer: string | null;
   publisher: string | null;
@@ -184,6 +206,8 @@ function rowToGame(r: GameRow): Game {
     installDir: r.installDir,
     launchCommand: r.launchCommand,
     coverImage: r.coverImage,
+    bannerImage: r.bannerImage,
+    screenshots: r.screenshots ? r.screenshots.split("|").filter(Boolean) : [],
     description: r.description,
     developer: r.developer,
     publisher: r.publisher,
@@ -270,6 +294,8 @@ export function createGame(input: {
   installDir?: string | null;
   launchCommand?: string | null;
   coverImage?: string | null;
+  bannerImage?: string | null;
+  screenshots?: string[];
   description?: string | null;
   developer?: string | null;
   publisher?: string | null;
@@ -294,13 +320,13 @@ export function createGame(input: {
   const stmt = conn.prepare(`
     INSERT INTO games (
       title, platform, source, executable, installDir, launchCommand,
-      coverImage, description, developer, publisher, releaseDate, rating, ratingCount,
+      coverImage, bannerImage, screenshots, description, developer, publisher, releaseDate, rating, ratingCount,
       genres, rawgId, sizeBytes,
       steamAppId, epicAppName, gogId, battlenetUid, eaOfferId, ubisoftId, riotId,
       xboxPackageFamilyName, xboxAppId, installedAt
     ) VALUES (
       @title, @platform, @source, @executable, @installDir, @launchCommand,
-      @coverImage, @description, @developer, @publisher, @releaseDate, @rating, @ratingCount,
+      @coverImage, @bannerImage, @screenshots, @description, @developer, @publisher, @releaseDate, @rating, @ratingCount,
       @genres, @rawgId, @sizeBytes,
       @steamAppId, @epicAppName, @gogId, @battlenetUid, @eaOfferId, @ubisoftId, @riotId,
       @xboxPackageFamilyName, @xboxAppId, datetime('now')
@@ -314,6 +340,8 @@ export function createGame(input: {
     installDir: input.installDir ?? null,
     launchCommand: input.launchCommand ?? null,
     coverImage: input.coverImage ?? null,
+    bannerImage: input.bannerImage ?? null,
+    screenshots: input.screenshots?.length ? input.screenshots.join("|") : null,
     description: input.description ?? null,
     developer: input.developer ?? null,
     publisher: input.publisher ?? null,
@@ -345,6 +373,8 @@ export function updateGame(id: number, patch: Record<string, unknown>): Game | n
     installDir: "installDir",
     launchCommand: "launchCommand",
     coverImage: "coverImage",
+    bannerImage: "bannerImage",
+    screenshots: "screenshots",
     description: "description",
     developer: "developer",
     publisher: "publisher",
@@ -372,7 +402,7 @@ export function updateGame(id: number, patch: Record<string, unknown>): Game | n
     if (!col) continue;
     if (col === "favorite" || col === "hidden") {
       params[col] = v ? 1 : 0;
-    } else if (col === "genres" || col === "tags") {
+    } else if (col === "genres" || col === "tags" || col === "screenshots") {
       params[col] = Array.isArray(v) ? v.join("|") : v;
     } else {
       params[col] = v;

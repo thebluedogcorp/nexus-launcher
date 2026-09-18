@@ -43,6 +43,8 @@ export function registerIpc(): void {
       installDir: input.installDir ?? null,
       launchCommand: input.launchCommand ?? null,
       coverImage: meta?.coverImage ?? null,
+      bannerImage: meta?.bannerImage ?? null,
+      screenshots: meta?.screenshots ?? [],
       description: meta?.description ?? null,
       developer: meta?.developer ?? null,
       publisher: meta?.publisher ?? null,
@@ -80,6 +82,8 @@ export function registerIpc(): void {
       if (!meta) return null;
       return updateGame(id, {
         coverImage: meta.coverImage ?? game.coverImage,
+        bannerImage: meta.bannerImage ?? game.bannerImage,
+        screenshots: meta.screenshots && meta.screenshots.length ? meta.screenshots : game.screenshots,
         description: meta.description ?? game.description,
         developer: meta.developer ?? game.developer,
         publisher: meta.publisher ?? game.publisher,
@@ -116,6 +120,39 @@ export function registerIpc(): void {
 
   // ===== Metadata =====
   ipcMain.handle("metadata:search", (_e, q: string) => searchRawg(q, 8));
+
+  // Patch metadata for every game that's missing a banner image (best-effort,
+  // sequential to avoid hammering RAWG rate limits).
+  ipcMain.handle("games:patchAll", async () => {
+    const all = listGames({ showHidden: true });
+    const needPatch = all.filter((g) => !g.bannerImage);
+    let patched = 0;
+    for (const g of needPatch.slice(0, 60)) {
+      try {
+        const meta = await bestMatchForTitle(g.title);
+        if (!meta) continue;
+        const updated = updateGame(g.id, {
+          coverImage: meta.coverImage ?? g.coverImage,
+          bannerImage: meta.bannerImage ?? g.bannerImage,
+          screenshots: meta.screenshots && meta.screenshots.length ? meta.screenshots : g.screenshots,
+          description: meta.description ?? g.description,
+          developer: meta.developer ?? g.developer,
+          publisher: meta.publisher ?? g.publisher,
+          releaseDate: meta.releaseDate ?? g.releaseDate,
+          rating: meta.rating ?? g.rating,
+          ratingCount: meta.ratingCount ?? g.ratingCount,
+          genres: meta.genres.length ? meta.genres : g.genres,
+          rawgId: meta.rawgId ?? g.rawgId,
+        });
+        if (updated?.bannerImage) patched++;
+        // Small delay to respect RAWG's rate limit (~20 req/s, but be gentle).
+        await new Promise((r) => setTimeout(r, 150));
+      } catch {
+        // skip this one
+      }
+    }
+    return { patched, attempted: needPatch.length };
+  });
 
   // ===== Stats & settings =====
   ipcMain.handle("stats:get", () => getStats());

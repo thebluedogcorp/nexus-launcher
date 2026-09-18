@@ -25,6 +25,8 @@ export interface Game {
   launchCommand: string | null;
   // RAWG / metadata
   coverImage: string | null;
+  bannerImage: string | null;       // wide hero image (RAWG background_image)
+  screenshots: string[];            // RAWG screenshot gallery
   description: string | null;
   developer: string | null;
   publisher: string | null;
@@ -92,6 +94,8 @@ export interface MetadataResult {
   genres: string[];
   description?: string;
   coverImage?: string;
+  bannerImage?: string;       // wide hero image
+  screenshots?: string[];      // gallery
 }
 
 export interface Stats {
