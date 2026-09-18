@@ -46,6 +46,22 @@ export function useGamepadController({ onAction }: Callbacks): ControllerState {
 
   const fire = useCallback((action: GamepadAction) => {
     onActionRef.current(action);
+    // Haptic feedback — dual rumble on supported controllers
+    const pads = navigator.getGamepads?.() ?? [];
+    const pad = pads.find((g) => g?.connected);
+    if (pad) {
+      try {
+        const actuator = pad.vibrationActuator as { playEffect?: (type: string, params: { duration: number; weakMagnitude: number; strongMagnitude: number }) => Promise<unknown> } | undefined;
+        if (actuator?.playEffect) {
+          const strong = action === "confirm" || action === "play" || action === "back";
+          actuator.playEffect("dual-rumble", {
+            duration: strong ? 120 : 50,
+            weakMagnitude: strong ? 0.5 : 0.2,
+            strongMagnitude: strong ? 0.7 : 0.25,
+          }).catch(() => {});
+        }
+      } catch { /* haptics not supported */ }
+    }
   }, []);
 
   useEffect(() => {

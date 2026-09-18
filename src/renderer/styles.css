@@ -68,26 +68,24 @@ a{color:inherit;text-decoration:none}
 .enrich-banner .s{font-size:10.5px;color:var(--text-dim);margin-top:1px}
 
 /* ============ CAROUSEL (PS5 portrait tiles) ============ */
-/* The carousel container clips horizontally but NOT vertically, so the
-   focused tile (which scales up) is never cut off. */
-.carousel-wrap{flex:1;display:flex;flex-direction:row;min-height:0;overflow:visible;position:relative;align-items:stretch}
+/* Fixed-height carousel — tiles locked in place, no vertical drift.
+   Top padding is small (tiles near top), bottom has room for dashboard. */
+.carousel-wrap{flex:0 0 auto;display:flex;flex-direction:row;height:280px;overflow:visible;position:relative;align-items:center}
 /* Left/right arrow buttons for mouse navigation */
-.carousel-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:10;width:44px;height:64px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.7);background:rgba(14,14,20,0.6);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,0.1);transition:all .2s cubic-bezier(.2,.8,.2,1);cursor:pointer;opacity:0}
-.carousel-arrow:hover{background:rgba(255,255,255,0.12);color:#fff;transform:translateY(-50%) scale(1.08);opacity:1}
-.carousel-arrow.left{left:8px}
-.carousel-arrow.right{right:8px}
-.carousel-wrap:hover .carousel-arrow{opacity:0.85}
-.carousel-arrow.hidden{display:none}
-/* CSS smooth scroll — the browser handles the animation natively (GPU). */
-.carousel{display:flex;gap:14px;overflow-x:auto;overflow-y:visible;padding:60px 40px 40px;scroll-behavior:smooth;align-items:center;flex:1;contain:layout style;scrollbar-width:none}
+.carousel-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:10;width:40px;height:56px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.6);background:rgba(14,14,20,.6);backdrop-filter:blur(14px);border:1px solid var(--border);transition:all .2s;cursor:pointer;opacity:0}
+.carousel-arrow:hover{background:rgba(255,255,255,.12);color:#fff;opacity:1}
+.carousel-arrow.left{left:4px}.carousel-arrow.right{right:4px}
+.carousel-wrap:hover .carousel-arrow{opacity:.7}
+/* CSS smooth scroll — GPU-accelerated. Fixed align-items:center + fixed height = no drift. */
+.carousel{display:flex;gap:12px;overflow-x:auto;overflow-y:visible;padding:36px 36px 8px;scroll-behavior:smooth;align-items:center;flex:1;contain:layout style;scrollbar-width:none}
 .carousel::-webkit-scrollbar{display:none}
 
-.tile{position:relative;flex-shrink:0;width:160px;aspect-ratio:3/4;border-radius:14px;overflow:hidden;cursor:pointer;transition:transform .3s cubic-bezier(.2,.8,.2,1),filter .3s,box-shadow .3s,border-color .3s;border:2px solid transparent;background:var(--surface);box-shadow:0 6px 20px -8px rgba(0,0,0,0.5);will-change:transform,filter;contain:layout style paint}
+.tile{position:relative;flex-shrink:0;width:150px;height:200px;border-radius:12px;overflow:hidden;cursor:pointer;transition:transform .3s cubic-bezier(.2,.8,.2,1),filter .3s,box-shadow .3s,border-color .25s;border:2px solid transparent;background:var(--surface);will-change:transform,filter;contain:layout style paint}
 .tile img,.tile .tile-proc{width:100%;height:100%;object-fit:cover;transition:transform .5s cubic-bezier(.2,.8,.2,1)}
 .tile:hover img,.tile:hover .tile-proc{transform:scale(1.05)}
 
 /* Selected tile: scales up + white border + glow (PS5 signature) */
-.tile.focused{transform:scale(1.35);border-color:var(--accent);box-shadow:0 0 0 1px rgba(255,255,255,0.15),0 0 28px rgba(255,255,255,0.15),0 20px 44px -12px rgba(0,0,0,0.8);z-index:4}
+.tile.focused{transform:scale(1.25);transform-origin:center center;border-color:#fff;box-shadow:0 0 0 1px rgba(255,255,255,.1),0 0 24px rgba(255,255,255,.12),0 18px 40px -10px rgba(0,0,0,.8);z-index:4}
 .tile.focused img,.tile.focused .tile-proc{transform:scale(1)}
 /* Non-focused: dimmed + slightly smaller (PS5 depth) */
 .tile:not(.focused){filter:brightness(0.52) saturate(0.7);transform:scale(0.92)}
@@ -350,3 +348,22 @@ textarea.field-input{height:auto;padding:11px 13px;resize:vertical;font-family:"
 .gp-focus.suggest-item{outline:2px solid rgba(255,255,255,0.3)!important;outline-offset:-2px}
 .gp-focus.tb-select{outline:2px solid rgba(255,255,255,0.5)!important;outline-offset:2px}
 .gp-focus .field-input,.gp-focus.field-input{outline:2px solid rgba(255,255,255,0.5)!important;outline-offset:2px}
+
+/* ============ BOTTOM DASHBOARD ============ */
+.dashboard{flex:1;display:flex;gap:16px;padding:16px 28px 12px;min-height:0;overflow:hidden}
+.dash-col{flex:1;display:flex;flex-direction:column;gap:12px;min-width:0}
+.dash-card{background:rgba(14,14,20,.5);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:12px;padding:14px;overflow:hidden}
+.dash-card-title{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.dash-stat-row{display:flex;align-items:center;justify-content:space-between;padding:5px 0}
+.dash-stat-row .name{font-size:12px;color:var(--dim)}
+.dash-stat-row .val{font-size:13px;font-weight:700;color:#fff;font-variant-numeric:tabular-nums}
+.dash-bar{height:3px;border-radius:999px;background:rgba(255,255,255,.05);overflow:hidden;margin-top:3px;flex:1;max-width:80px}
+.dash-bar>div{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--accent),#22d3ee)}
+.dash-recent{display:flex;align-items:center;gap:8px;padding:4px 0}
+.dash-recent .title{font-size:11.5px;color:var(--dim);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dash-recent .time{font-size:10px;color:var(--faint);flex-shrink:0}
+.dash-quick{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.dash-quick-btn{display:flex;align-items:center;gap:8px;padding:10px;border-radius:9px;border:1px solid var(--border);background:rgba(255,255,255,.02);transition:all .12s;cursor:pointer}
+.dash-quick-btn:hover{background:rgba(255,255,255,.06)}
+.dash-quick-btn .icon{color:var(--accent);flex-shrink:0}
+.dash-quick-btn .label{font-size:11.5px;font-weight:600;color:var(--dim)}

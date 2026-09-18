@@ -617,6 +617,49 @@ export function App() {
             )}
           </>
         )}
+
+        {/* Bottom Dashboard */}
+        {stats && !loading && games.length > 0 && (
+          <div className="dashboard">
+            {/* Left: Library stats */}
+            <div className="dash-col" style={{ maxWidth: 220 }}>
+              <div className="dash-card">
+                <div className="dash-card-title"><Icon.TrendingUp size={13} /> Library</div>
+                <div className="dash-stat-row"><span className="name">Games</span><span className="val">{stats.totalGames}</span></div>
+                <div className="dash-stat-row"><span className="name">Played</span><span className="val">{formatPlaytimeShort(stats.totalPlaytimeSec)}</span></div>
+                <div className="dash-stat-row"><span className="name">Launches</span><span className="val">{stats.totalLaunches}</span></div>
+                <div className="dash-stat-row"><span className="name">Disk</span><span className="val">{formatSize(stats.totalSizeBytes)}</span></div>
+                <div className="dash-stat-row"><span className="name">Favorites</span><span className="val">{stats.favorites}</span></div>
+                {stats.avgRating && <div className="dash-stat-row"><span className="name">Avg ★</span><span className="val">{stats.avgRating.toFixed(1)}</span></div>}
+              </div>
+            </div>
+            {/* Center: Platform breakdown */}
+            <div className="dash-col">
+              <div className="dash-card" style={{ flex: 1 }}>
+                <div className="dash-card-title"><Icon.Library size={13} /> By Platform</div>
+                {Object.entries(stats.byPlatform).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, v]) => (
+                  <div key={k} className="dash-stat-row">
+                    <span className="name">{PLATFORM_LIST.find((p) => p.id === k)?.label ?? k}</span>
+                    <div className="dash-bar"><div style={{ width: `${stats.totalGames > 0 ? (v / stats.totalGames) * 100 : 0}%` }} /></div>
+                    <span className="val">{v}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Right: Quick actions */}
+            <div className="dash-col" style={{ maxWidth: 220 }}>
+              <div className="dash-card">
+                <div className="dash-card-title"><Icon.Gamepad size={13} /> Quick Actions</div>
+                <div className="dash-quick">
+                  <button className="dash-quick-btn" onClick={() => setScanOpen(true)}><span className="icon"><Icon.Scan size={16} /></span><span className="label">Scan</span></button>
+                  <button className="dash-quick-btn" onClick={() => setAddOpen(true)}><span className="icon"><Icon.Plus size={16} /></span><span className="label">Add</span></button>
+                  <button className="dash-quick-btn" onClick={() => setStatsOpen(true)}><span className="icon"><Icon.TrendingUp size={16} /></span><span className="label">Stats</span></button>
+                  <button className="dash-quick-btn" onClick={() => setSettingsOpen(true)}><span className="icon"><Icon.Settings size={16} /></span><span className="label">Settings</span></button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Dialogs */}
