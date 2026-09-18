@@ -50,12 +50,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v1.8.0"
-          $title = "NEXUS v1.8.0 — UI fixes + real posters + deep filesystem scan + new features"
+          $tag = "v1.9.0"
+          $title = "NEXUS v1.9.0 — PS5 look, fixed and polished"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
-          **v1.8.0 — UI fixes + real posters + deep filesystem scan + new features:**
+          **v1.9.0 — PS5 look, fixed and polished:**
           - **FIXED tile clipping.** The focused tile no longer gets cut off — carousel now uses overflow-y: visible with extra vertical padding so the scaled tile shows fully.
           - **FIXED gradient hiding elements.** Reduced the bottom gradient darkness from 92% to 70% so the bottom info zone stays readable.
           - **REAL portrait posters.** Steam's library_600x900 portrait capsule is now used as the cover image (true poster art), with the wide header_image as the banner background.
