@@ -5,7 +5,7 @@ import { Icon } from "./components/Icons";
 import { GamePage } from "./components/GamePage";
 import { AddGameDialog } from "./components/AddGameDialog";
 import { ScanDialog } from "./components/ScanDialog";
-import { SettingsDialog } from "./components/SettingsDialog";
+import { SettingsPage } from "./components/SettingsPage";
 import { UpdateDialog } from "./components/UpdateDialog";
 import { ToastContainer, type Toast } from "./components/Toast";
 import { useGamepadController } from "./lib/useGamepad";
@@ -633,17 +633,27 @@ export function App() {
                 {stats.avgRating && <div className="dash-stat-row"><span className="name">Avg ★</span><span className="val">{stats.avgRating.toFixed(1)}</span></div>}
               </div>
             </div>
-            {/* Center: Platform breakdown */}
+            {/* Center: Game facts / news / trivia about focused game */}
             <div className="dash-col">
-              <div className="dash-card" style={{ flex: 1 }}>
-                <div className="dash-card-title"><Icon.Library size={13} /> By Platform</div>
-                {Object.entries(stats.byPlatform).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, v]) => (
-                  <div key={k} className="dash-stat-row">
-                    <span className="name">{PLATFORM_LIST.find((p) => p.id === k)?.label ?? k}</span>
-                    <div className="dash-bar"><div style={{ width: `${stats.totalGames > 0 ? (v / stats.totalGames) * 100 : 0}%` }} /></div>
-                    <span className="val">{v}</span>
-                  </div>
-                ))}
+              <div className="dash-card" style={{ flex: 1, overflow: "hidden" }}>
+                <div className="dash-card-title"><Icon.Sparkles size={13} /> {focusedGame ? focusedGame.title : "Spotlight"}</div>
+                {focusedGame ? (
+                  <>
+                    {focusedGame.description ? (
+                      <p style={{ fontSize: 11.5, color: "var(--dim)", lineHeight: 1.6, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical" }}>
+                        {focusedGame.description.replace(/<[^>]+>/g, "").replace(/&[a-z]+;/gi, "").trim()}
+                      </p>
+                    ) : <p style={{ fontSize: 11.5, color: "var(--faint)" }}>No description available. Click Patch to fetch from RAWG.</p>}
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+                      {focusedGame.genres.slice(0, 4).map((g) => <span key={g} className="genre-tag">{g}</span>)}
+                    </div>
+                    {focusedGame.developer && <div className="dash-stat-row" style={{ marginTop: 8 }}><span className="name">Developer</span><span className="val">{focusedGame.developer}</span></div>}
+                    {focusedGame.releaseDate && <div className="dash-stat-row"><span className="name">Released</span><span className="val">{focusedGame.releaseDate.slice(0, 10)}</span></div>}
+                    {focusedGame.rating !== null && <div className="dash-stat-row"><span className="name">RAWG Rating</span><span className="val"><Icon.Star size={10} filled /> {focusedGame.rating.toFixed(1)}</span></div>}
+                    {focusedGame.ratingCount !== null && focusedGame.ratingCount > 0 && <div className="dash-stat-row"><span className="name">Votes</span><span className="val">{focusedGame.ratingCount.toLocaleString()}</span></div>}
+                    {focusedGame.rawgId && <a href={`https://rawg.io/games/${focusedGame.rawgId}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "var(--accent)", marginTop: 6, display: "inline-flex", alignItems: "center", gap: 4 }}><Icon.ExternalLink size={11} /> View on RAWG</a>}
+                  </>
+                ) : <p style={{ fontSize: 11.5, color: "var(--faint)" }}>Select a game to see details.</p>}
               </div>
             </div>
             {/* Right: Quick actions */}
@@ -665,7 +675,7 @@ export function App() {
       {/* Dialogs */}
       {addOpen && <AddGameDialog onClose={() => setAddOpen(false)} onAdd={handleAdd} />}
       {scanOpen && <ScanDialog onClose={() => setScanOpen(false)} onRunScan={handleRunScan} onImport={handleImport} onDeepScan={handleDeepScan} />}
-      {settingsOpen && settings && <SettingsDialog initial={settings} onClose={() => setSettingsOpen(false)} onSave={handleSaveSettings} onCheckUpdates={handleCheckUpdates} />}
+      {settingsOpen && settings && <SettingsPage initial={settings} onClose={() => setSettingsOpen(false)} onSave={handleSaveSettings} onCheckUpdates={handleCheckUpdates} />}
       {updateDialogOpen && updateAvailable && <UpdateDialog info={updateAvailable} onClose={() => setUpdateDialogOpen(false)} />}
 
       {/* Context menu (right-click on tiles) */}
