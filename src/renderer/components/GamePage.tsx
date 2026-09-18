@@ -360,23 +360,29 @@ export function GamePage({ game, onClose, onLaunch, onPatch, onDelete, onToggleF
               <label>Executable Path (.exe or .lnk shortcut)</label>
               <div style={{ display: "flex", gap: 8 }}>
                 <input value={editExecutable} onChange={(e) => setEditExecutable(e.target.value)} placeholder="C:\Games\game.exe or C:\shortcut.lnk" style={{ flex: 1 }} />
-                <label className="btn btn-ghost btn-sm" style={{ cursor: "pointer", flexShrink: 0, height: 38, borderRadius: 8 }}>
+                <button className="btn btn-ghost btn-sm" style={{ cursor: "pointer", flexShrink: 0, height: 38, borderRadius: 8 }} onClick={async () => {
+                  const res = await window.nexus.pickFile({ title: "Select game executable or shortcut" });
+                  if (res.ok && res.path) setEditExecutable(res.path);
+                }}>
                   <Icon.Folder size={14} /> Browse
-                  <input type="file" accept=".exe,.lnk,.bat,.cmd,.url" style={{ display: "none" }} onChange={(e) => {
-                    const f = e.target.files?.[0]; if (!f) return;
-                    try {
-                      const path = (window as unknown as { webUtils?: { getPathForFile: (f: File) => string } }).webUtils?.getPathForFile?.(f) || (f as unknown as { path?: string }).path || "";
-                      if (path) setEditExecutable(path);
-                    } catch { /* ignore */ }
-                    e.target.value = "";
-                  }} />
-                </label>
+                </button>
               </div>
               <div style={{ fontSize: 11, color: "var(--nx-text-faint)", marginTop: 5 }}>
                 Supports .exe and .lnk shortcut files. Shortcuts are resolved automatically on launch.
               </div>
             </div>
-            <div className="editor-field"><label>Install Directory</label><input value={editInstallDir} onChange={(e) => setEditInstallDir(e.target.value)} placeholder="C:\Games\MyGame" /></div>
+            <div className="editor-field">
+              <label>Install Directory</label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input value={editInstallDir} onChange={(e) => setEditInstallDir(e.target.value)} placeholder="C:\Games\MyGame" style={{ flex: 1 }} />
+                <button className="btn btn-ghost btn-sm" style={{ cursor: "pointer", flexShrink: 0, height: 38, borderRadius: 8 }} onClick={async () => {
+                  const res = await window.nexus.pickFolder({ title: "Select install directory" });
+                  if (res.ok && res.path) setEditInstallDir(res.path);
+                }}>
+                  <Icon.Folder size={14} /> Browse
+                </button>
+              </div>
+            </div>
             <div className="editor-field"><label>Launch Command (URI or shell command)</label><input value={editLaunchCommand} onChange={(e) => setEditLaunchCommand(e.target.value)} placeholder="steam://run/1245620" /></div>
 
             {/* Completion status + User rating + Size */}

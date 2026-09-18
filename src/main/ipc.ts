@@ -236,6 +236,47 @@ export function registerIpc(): void {
     }
   });
 
+  // Native file picker — returns the real filesystem path (unlike <input type="file">
+  // which loses the path in Electron 32+). Used by Add Game + GamePage edit mode.
+  ipcMain.handle("dialog:pickFile", async (_e, opts?: { title?: string; filters?: Array<{ name: string; extensions: string[] }> }) => {
+    try {
+      const { dialog } = await import("electron");
+      const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+      const result = await dialog.showOpenDialog(win!, {
+        title: opts?.title ?? "Select a file",
+        properties: ["openFile"],
+        filters: opts?.filters ?? [
+          { name: "Executables & Shortcuts", extensions: ["exe", "lnk", "bat", "cmd", "url"] },
+          { name: "All Files", extensions: ["*"] },
+        ],
+      });
+      if (result.canceled || result.filePaths.length === 0) {
+        return { ok: false, path: null };
+      }
+      return { ok: true, path: result.filePaths[0] };
+    } catch (e) {
+      return { ok: false, path: null, error: e instanceof Error ? e.message : String(e) };
+    }
+  });
+
+  // Native folder picker — for install directory selection
+  ipcMain.handle("dialog:pickFolder", async (_e, opts?: { title?: string }) => {
+    try {
+      const { dialog } = await import("electron");
+      const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+      const result = await dialog.showOpenDialog(win!, {
+        title: opts?.title ?? "Select a folder",
+        properties: ["openDirectory"],
+      });
+      if (result.canceled || result.filePaths.length === 0) {
+        return { ok: false, path: null };
+      }
+      return { ok: true, path: result.filePaths[0] };
+    } catch (e) {
+      return { ok: false, path: null, error: e instanceof Error ? e.message : String(e) };
+    }
+  });
+
   // Export/import library
   ipcMain.handle("games:export", () => exportLibrary());
   ipcMain.handle("games:import", (_e, json: string) => importLibrary(json));

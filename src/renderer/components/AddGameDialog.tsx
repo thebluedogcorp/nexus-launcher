@@ -174,18 +174,12 @@ export function AddGameDialog({ onClose, onAdd }: Props) {
               <label className="field-label">Executable Path (.exe or .lnk shortcut)</label>
               <div style={{ display: "flex", gap: 8 }}>
                 <input className="field-input" style={{ fontFamily: "Cascadia Code, Consolas, monospace", fontSize: 12 }} value={executable} onChange={(e) => setExecutable(e.target.value)} placeholder="C:\Games\game.exe or C:\shortcut.lnk" />
-                <label className="btn btn-ghost btn-sm" style={{ cursor: "pointer", flexShrink: 0, height: 40, borderRadius: 9 }}>
+                <button className="btn btn-ghost btn-sm" style={{ flexShrink: 0, height: 40, borderRadius: 9 }} onClick={async () => {
+                  const res = await window.nexus.pickFile({ title: "Select game executable or shortcut" });
+                  if (res.ok && res.path) setExecutable(res.path);
+                }}>
                   <Icon.Folder size={14} /> Browse
-                  <input type="file" accept=".exe,.lnk,.bat,.cmd,.url" style={{ display: "none" }} onChange={(e) => {
-                    const f = e.target.files?.[0]; if (!f) return;
-                    // Electron gives us the real path via webUtils.getPathForFile
-                    try {
-                      const path = (window as unknown as { webUtils?: { getPathForFile: (f: File) => string } }).webUtils?.getPathForFile?.(f) || (f as unknown as { path?: string }).path || "";
-                      if (path) setExecutable(path);
-                    } catch { /* ignore */ }
-                    e.target.value = "";
-                  }} />
-                </label>
+                </button>
               </div>
               <div className="field-hint">
                 <Icon.Info size={12} />
@@ -194,7 +188,15 @@ export function AddGameDialog({ onClose, onAdd }: Props) {
             </div>
             <div className="field" style={{ marginBottom: 0 }}>
               <label className="field-label">Install Directory</label>
-              <input className="field-input" style={{ fontFamily: "Cascadia Code, Consolas, monospace", fontSize: 12 }} value={installDir} onChange={(e) => setInstallDir(e.target.value)} placeholder="C:\\Games\\MyGame" />
+              <div style={{ display: "flex", gap: 8 }}>
+                <input className="field-input" style={{ fontFamily: "Cascadia Code, Consolas, monospace", fontSize: 12 }} value={installDir} onChange={(e) => setInstallDir(e.target.value)} placeholder="C:\Games\MyGame" />
+                <button className="btn btn-ghost btn-sm" style={{ flexShrink: 0, height: 40, borderRadius: 9 }} onClick={async () => {
+                  const res = await window.nexus.pickFolder({ title: "Select install directory" });
+                  if (res.ok && res.path) setInstallDir(res.path);
+                }}>
+                  <Icon.Folder size={14} /> Browse
+                </button>
+              </div>
             </div>
           </div>
 

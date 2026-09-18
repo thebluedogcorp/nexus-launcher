@@ -88,6 +88,11 @@ const api = {
     ipcRenderer.invoke("shell:openExternal", url) as Promise<{ ok: boolean; message?: string }>,
   openPath: (path: string) =>
     ipcRenderer.invoke("shell:openPath", path) as Promise<{ ok: boolean; message?: string }>,
+  // Native file/folder pickers (return real filesystem paths)
+  pickFile: (opts?: { title?: string; filters?: Array<{ name: string; extensions: string[] }> }) =>
+    ipcRenderer.invoke("dialog:pickFile", opts) as Promise<{ ok: boolean; path: string | null; error?: string }>,
+  pickFolder: (opts?: { title?: string }) =>
+    ipcRenderer.invoke("dialog:pickFolder", opts) as Promise<{ ok: boolean; path: string | null; error?: string }>,
   // v2.0 Features
   exportLibrary: () => ipcRenderer.invoke("games:export") as Promise<string>,
   importLibrary: (json: string) => ipcRenderer.invoke("games:import", json) as Promise<{ imported: number; skipped: number }>,
