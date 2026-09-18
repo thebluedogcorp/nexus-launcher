@@ -369,8 +369,35 @@ export function App() {
           </div>
         ) : (
           <>
-            {/* Carousel — overflow-y: visible so the focused tile never clips */}
-            <div className="carousel-wrap">
+            {/* Carousel with arrow buttons for mouse navigation */}
+            <div className="carousel-wrap" onMouseMove={(e) => {
+              // Edge-hover auto-scroll: mouse near left/right edge → scroll that direction
+              const carousel = e.currentTarget.querySelector(".carousel") as HTMLElement;
+              if (!carousel) return;
+              const rect = carousel.getBoundingClientRect();
+              const x = e.clientX - rect.left;
+              const edgeZone = 80; // px from edge
+              const scrollSpeed = 6;
+              if (x < edgeZone && carousel.scrollLeft > 0) {
+                carousel.scrollLeft -= scrollSpeed;
+              } else if (x > rect.width - edgeZone && carousel.scrollLeft < carousel.scrollWidth - carousel.clientWidth) {
+                carousel.scrollLeft += scrollSpeed;
+              }
+            }}>
+              {/* Left arrow */}
+              <button className="carousel-arrow left" onClick={() => {
+                const carousel = document.querySelector(".carousel") as HTMLElement;
+                if (carousel) carousel.scrollLeft -= 300;
+              }}>
+                <span style={{ display: "inline-flex", transform: "rotate(180deg)" }}><Icon.Chevron size={22} /></span>
+              </button>
+              {/* Right arrow */}
+              <button className="carousel-arrow right" onClick={() => {
+                const carousel = document.querySelector(".carousel") as HTMLElement;
+                if (carousel) carousel.scrollLeft += 300;
+              }}>
+                <Icon.Chevron size={22} />
+              </button>
               <div className="carousel">
                 {games.map((g, i) => (
                   <div key={g.id} className={i === focusedIdx ? "tile focused" : "tile"} onMouseEnter={() => { focusSourceRef.current = "mouse"; setFocusedIdx(i); }} onClick={() => openPage(g.id)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, game: g }); }}>
