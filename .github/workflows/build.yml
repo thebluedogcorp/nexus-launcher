@@ -60,15 +60,15 @@ jobs:
           - **Hydra-style Catalogue page.** The Store tab is now a 2-column layout: a games list on the left (200×103 cover + title + genres + repack badges + hover "+" quick-add button) and a filter sidebar on the right with collapsible Genres + Download sources sections, each with per-category colored orbs (genres purple, sources orange).
           - **Active filter chips** at the top of the catalogue show every active filter as a colored pill with a clear (×) button. Sort dropdown: Popularity / Newest / Oldest / Title A-Z / Title Z-A / Highest rating / Lowest rating.
           - **Game detail dialog redesigned with Hydra hero panel.** Full-bleed hero image, translucent sticky 64px hero panel with Download/Play/Pause + favorite + options buttons, and a 3px progress bar at the bottom of the panel that fills as the download progresses. Body has a collapsible description (Show more/less) and a 280px right metadata sidebar with Stats + Details + Languages sections.
-          - **Repacks modal (Hydra-style "Open download options").** Triggered by clicking Download in the hero panel. Has a free-text "Filter repacks" input + a collapsible "Filter by source" drawer with checkboxes per repacker (Official / GOG / FitGirl / OnlineFix / Xatab / DODI). Each repack row shows: colored availability orb (green online / amber partial / red offline) + title + "New" badge (if created in last 14 days) + "Last downloaded" badge + `{fileSize} - {sourceName} - {uploadDate}` line + live progress bar with speed.
+          - **Repacks modal (Hydra-style "Open download options").** Triggered by clicking Download in the hero panel. Has a free-text "Filter repacks" input + a collapsible "Filter by source" drawer with checkboxes per repacker (Official / GOG / FitGirl / OnlineFix / Xatab / DODI). Each repack row shows: colored availability orb (green online / amber partial / red offline) + title + "New" badge (if created in last 14 days) + "Last downloaded" badge + {fileSize} - {sourceName} - {uploadDate} line + live progress bar with speed.
           - **Downloads page redesigned with Hydra 3-section layout.** Three sections: "Download in progress" (active download shown as a big HeroDownloadView with blurred bg + cover + status + animated % + glass Pause/Cancel buttons + speed stats) / "Queued / paused / failed" / "Downloads completed". Per-row actions: Install / Pause / Resume / Cancel / Remove / Open folder.
           - **Bottom panel (Hydra-style persistent footer).** Single-line current download status ("Downloading Mindustry 45% · 2.3 MB/s") or "No downloads in progress" — clicking navigates to the Downloads tab. Version button on the right.
-          - **Color scheme updated to Hydra.** `#0d0d0d` / `#121212` backgrounds, `#d0d1d7` / `#f0f1f7` text, `rgba(255,255,255,0.08)` borders, `#16b195` brand teal, `#fbbf24` gold for paused state, `#4ade80` for success.
-          - **Renamed "sources" → "repacks"** throughout the codebase to match Hydra's terminology. Each repack now has the proper Hydra fields: `uris`, `unavailableUris`, `uploadDate`, `createdAt`, `downloadSourceName`, `fileSize`, `title` (display name like "FitGirl · v1.4.0 · Win x64"), `kind` (badge color), `seeders`, `leechers`, `quality`, `languages`.
+          - **Color scheme updated to Hydra.** #0d0d0d / #121212 backgrounds, #d0d1d7 / #f0f1f7 text, rgba(255,255,255,0.08) borders, #16b195 brand teal, #fbbf24 gold for paused state, #4ade80 for success.
+          - **Renamed "sources" → "repacks"** throughout the codebase to match Hydra's terminology. Each repack now has the proper Hydra fields: uris, unavailableUris, uploadDate, createdAt, downloadSourceName, fileSize, title (display name like "FitGirl · v1.4.0 · Win x64"), kind (badge color), seeders, leechers, quality, languages.
           - **All existing features unchanged.** Scan/detect, library carousel, achievements, collections, activity, auto-updater, RAWG metadata patching — all still work exactly as before.
 
-          **v3.7.1 — Hotfix for Store tab "Cannot find module '@shared/store-catalog'" error:**
-          - Fixed the Store-tab crash by replacing `await import("@shared/store-catalog")` with the relative path `await import("../shared/store-catalog")` in all 5 IPC handlers.
+          **v3.7.1 — Hotfix for Store tab 'Cannot find module @shared/store-catalog' error:**
+          - Fixed the Store-tab crash by replacing await import(@shared/store-catalog) with the relative path await import(../shared/store-catalog) in all 5 IPC handlers.
 
           **v3.7.0 — Real Hydra-style game downloads in the Store (original release):**
           - Real streaming downloads via fs.createWriteStream with NEXUSPKG magic header + JSON metadata + deterministic Mulberry32 PRNG payload.
@@ -80,8 +80,8 @@ jobs:
           Auto-detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox, patches rich metadata via the RAWG + Steam APIs, and launches games natively.
 
           **Downloads:**
-          - \`NEXUS-Setup-3.8.0.exe\` — NSIS installer (recommended, supports auto-update). Creates desktop + Start Menu shortcuts.
-          - \`NEXUS-Portable-3.8.0.exe\` — single-file portable build, no install required.
+          - \NEXUS-Setup-3.8.0.exe\ — NSIS installer (recommended, supports auto-update). Creates desktop + Start Menu shortcuts.
+          - \NEXUS-Portable-3.8.0.exe\ — single-file portable build, no install required.
 
           Minimum: Windows 10 64-bit.
           "@
