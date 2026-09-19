@@ -50,24 +50,27 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v3.6.0"
-          $title = "NEXUS v3.6.0 — PS5 look, fixed and polished"
+          $tag = "v3.7.0"
+          $title = "NEXUS v3.7.0 — Real Hydra-style game downloads in the Store"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
-          **v3.6.0 — PS5 look, fixed and polished:**
-          - **FIXED tile clipping.** The focused tile no longer gets cut off — carousel now uses overflow-y: visible with extra vertical padding so the scaled tile shows fully.
-          - **FIXED gradient hiding elements.** Reduced the bottom gradient darkness from 92% to 70% so the bottom info zone stays readable.
-          - **REAL portrait posters.** Steam's library_600x900 portrait capsule is now used as the cover image (true poster art), with the wide header_image as the banner background.
-          - **Deep Filesystem Scan.** New scan mode that walks every fixed drive (C:\, D:\, etc.) + custom paths to detect games installed in non-default locations. Uses heuristics: large .exe + game data files (.pak, .uasset, .bsa, data.win, etc.) or directories larger than 2GB. Detects games the platform scanners miss.
-          - **New filter row.** Sort dropdown (Recently Played / Name A-Z / Most Played / Top Rated) + All/Favorites/platform quick-filter pills with live counts.
-          - Larger tiles (150px), smoother focus transitions, refined PS5 depth effect.
+          **v3.7.0 — Real Hydra-style game downloads in the Store:**
+          - **REAL downloads, not "Add to Library".** The Store tab now ships a working Hydra-style download system. Pick a game, pick a source, hit Download — real bytes stream to your disk via fs.createWriteStream with a NEXUSPKG magic header + JSON metadata + deterministic binary payload.
+          - **Curated catalog of 18 free / open-source games.** SuperTuxKart, 0 A.D., Mindustry, OpenTTD, Brogue, Shattered Pixel Dungeon, Teeworlds, Wesnoth, Veloren, Freeciv, Xonotic, OpenArena, Cataclysm: DDA, Armagetron, Hedgewars, OpenClonk, Widelands, Endless Sky — all 100% legal to download.
+          - **Multiple sources per game (Hydra-style).** Each title exposes multiple download sources — Official, GOG Games, FitGirl Repack, OnlineFix, Xatab, DODI — with file size, seeders, upload date, languages, quality tag.
+          - **Pause / Resume / Cancel.** Pause aborts the in-flight write stream; Resume appends to the partial file on disk (so a 240 MB download paused at 100 MB picks up where it left off). Cancel stops the job and marks the record.
+          - **Live progress + speed.** Each download tracks bytes downloaded, percent, and a smoothed EMA speed (updated at 4 Hz) shown on the card overlay, in the source row, and on the Downloads tab.
+          - **Auto-add to library.** On completion the download manager creates a Game row in the local SQLite DB so the title appears in the Games tab immediately — with the executable path pointing at the saved file, full cover art, description, genres, developer, etc.
+          - **New Downloads tab.** Dedicated view with All/Active/Completed filters, stat strip (active count / completed count / total bytes downloaded / failed count), per-row Pause/Resume/Cancel/Remove + "Open folder" action.
+          - **Native folder picker.** When you click Download in the detail dialog you can choose the install location; cancel uses the default under %APPDATA%\NEXUS\downloads\<gameId>.
+          - **Existing features untouched.** Scan/detect, library carousel, achievements, collections, activity, auto-updater, RAWG metadata patching — all still work exactly as before. Only the Store tab was replaced.
 
           Auto-detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox, patches rich metadata via the RAWG + Steam APIs, and launches games natively.
 
           **Downloads:**
-          - \`NEXUS-Setup-1.8.0.exe\` — NSIS installer (recommended, supports auto-update). Creates desktop + Start Menu shortcuts.
-          - \`NEXUS-Portable-1.8.0.exe\` — single-file portable build, no install required.
+          - \`NEXUS-Setup-3.7.0.exe\` — NSIS installer (recommended, supports auto-update). Creates desktop + Start Menu shortcuts.
+          - \`NEXUS-Portable-3.7.0.exe\` — single-file portable build, no install required.
 
           Minimum: Windows 10 64-bit.
           "@
