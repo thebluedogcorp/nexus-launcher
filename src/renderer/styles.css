@@ -388,3 +388,44 @@ textarea.field-input{height:auto;padding:11px 13px;resize:vertical;font-family:"
 .ach-progress{height:4px;border-radius:999px;background:rgba(255,255,255,.05);overflow:hidden;margin-top:8px}
 .ach-progress>div{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--accent),#22d3ee);transition:width .3s}
 .ach-pct{font-size:10px;color:var(--text-faint);margin-top:4px;font-variant-numeric:tabular-nums}
+
+/* ============ ACHIEVEMENTS + ACTIVITY TAB FIXES ============ */
+/* Override the old transparent styles with solid, visible ones */
+
+/* Achievements grid — make cards solid and readable */
+.ach-grid{padding:20px 32px 40px}
+.ach-card{background:rgba(20,20,28,.85)!important;border:1px solid var(--border2)!important;backdrop-filter:blur(20px);box-shadow:0 4px 20px -8px rgba(0,0,0,.5)}
+.ach-card.unlocked{border-color:rgba(74,222,128,.3)!important;background:rgba(20,28,22,.85)!important}
+.ach-card.locked{opacity:.6}
+.ach-card:hover{transform:translateY(-2px);box-shadow:0 8px 28px -8px rgba(0,0,0,.6)}
+.ach-icon.unlocked{background:rgba(74,222,128,.2)!important}
+.ach-icon.locked{background:rgba(255,255,255,.08)!important}
+.ach-name{font-size:13.5px!important;color:#fff!important}
+.ach-desc{font-size:11.5px!important;color:var(--dim)!important}
+.ach-progress{background:rgba(255,255,255,.08)!important;height:5px!important}
+.ach-pct{color:var(--dim)!important}
+
+/* Nav tabs — solid background, clear active state */
+.nav-tabs{padding:0 32px;margin-top:2px;border-bottom:1px solid var(--border)}
+.nav-tab{padding:10px 18px;border-radius:0;font-size:13px;font-weight:600;color:var(--faint);transition:all .15s;position:relative;border-bottom:2px solid transparent}
+.nav-tab:hover{color:var(--dim);background:rgba(255,255,255,.03)}
+.nav-tab.active{color:#fff;border-bottom-color:var(--accent)}
+.nav-tab.active::after{display:none}
+
+/* Dashboard cards — more solid */
+.dash-card{background:rgba(20,20,28,.8)!important;border:1px solid var(--border2)!important}
+.dash-card-title{color:var(--dim)!important}
+.dash-stat-row .name{color:var(--dim)!important}
+.dash-quick-btn{background:rgba(255,255,255,.04)!important;border:1px solid var(--border2)!important}
+.dash-quick-btn:hover{background:rgba(255,255,255,.08)!important}
+
+/* Info card — more solid */
+.info-card{background:rgba(20,20,28,.8)!important;border:1px solid var(--border2)!important}
+.info-card-label{border:1px solid var(--border2)!important;color:var(--dim)!important}
+
+/* Activity tab container */
+.activity-list{padding:20px 32px 40px}
+.activity-item{display:flex;align-items:center;gap:12px;padding:10px 14px;background:rgba(20,20,28,.8);border:1px solid var(--border2);border-radius:10px;margin-bottom:8px;backdrop-filter:blur(14px)}
+.activity-item .title{font-size:13px;font-weight:600;color:#fff;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.activity-item .time{font-size:11px;color:var(--faint);flex-shrink:0}
+.activity-item .icon{width:32px;height:32px;border-radius:7px;display:flex;align-items:center;justify-content:center;background:rgba(74,222,128,.1);color:var(--accent);flex-shrink:0}

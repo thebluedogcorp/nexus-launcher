@@ -520,16 +520,22 @@ export function App() {
           </div>
         ) : activeTab === "activity" ? (
           /* ===== ACTIVITY TAB ===== */
-          <div style={{ flex: 1, overflowY: "auto", padding: "0 32px 32px" }}>
-            <div className="dash-card" style={{ maxWidth: 600 }}>
-              <div className="dash-card-title"><Icon.Clock size={13} /> Recent Activity</div>
-              {games.filter((g) => g.lastPlayedAt).sort((a, b) => (b.lastPlayedAt ?? "").localeCompare(a.lastPlayedAt ?? "")).slice(0, 15).map((g) => (
-                <div key={g.id} className="dash-recent">
+          <div style={{ flex: 1, overflowY: "auto" }}>
+            <div className="activity-list">
+              <div style={{ fontSize: 18, fontWeight: 700, color: "#fff", marginBottom: 16, letterSpacing: "-0.02em" }}>Recent Activity</div>
+              {games.filter((g) => g.lastPlayedAt).sort((a, b) => (b.lastPlayedAt ?? "").localeCompare(a.lastPlayedAt ?? "")).slice(0, 20).map((g) => (
+                <div key={g.id} className="activity-item" onClick={() => openPage(g.id)} style={{ cursor: "pointer" }}>
+                  <div className="icon"><Icon.Play size={14} /></div>
                   <span className="title">{g.title}</span>
                   <span className="time">{relativeTime(g.lastPlayedAt)}</span>
                 </div>
               ))}
-              {games.filter((g) => g.lastPlayedAt).length === 0 && <p style={{ fontSize: 13, color: "var(--faint)", padding: 8 }}>No activity yet. Launch a game to get started!</p>}
+              {games.filter((g) => g.lastPlayedAt).length === 0 && (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: 40, textAlign: "center" }}>
+                  <div style={{ width: 64, height: 64, borderRadius: 16, background: "rgba(74,222,128,.08)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--accent)", marginBottom: 14 }}><Icon.Gamepad size={28} /></div>
+                  <p style={{ fontSize: 14, color: "var(--dim)" }}>No activity yet. Launch a game to get started!</p>
+                </div>
+              )}
             </div>
           </div>
         ) : (
