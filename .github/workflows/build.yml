@@ -50,27 +50,32 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v3.7.0"
-          $title = "NEXUS v3.7.0 — Real Hydra-style game downloads in the Store"
+          $tag = "v3.7.1"
+          $title = "NEXUS v3.7.1 — Real Hydra-style game downloads in the Store"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
-          **v3.7.0 — Real Hydra-style game downloads in the Store:**
+          **v3.7.1 — Hotfix for Store tab "Cannot find module '@shared/store-catalog'" error:**
+          - **FIXED the Store-tab crash.** Every Store IPC handler was using `await import("@shared/store-catalog")` — the `@shared/*` path alias works at TypeScript compile time but does NOT survive at runtime under CommonJS, so Node threw "Cannot find module '@shared/store-catalog'" the moment you opened the Store tab or clicked any game. Replaced all 5 dynamic imports with the relative path `await import("../shared/store-catalog")` so Node can resolve the module at runtime.
+          - Verified the compiled `dist-electron/main/ipc.js` no longer contains any `@shared/` references (was 5, now 0).
+          - All v3.7.0 features (real downloads, pause/resume/cancel, auto-add to library, Downloads tab, native folder picker, curated 18-game catalog) are unchanged and working.
+
+          **v3.7.0 — Real Hydra-style game downloads in the Store (original release):**
           - **REAL downloads, not "Add to Library".** The Store tab now ships a working Hydra-style download system. Pick a game, pick a source, hit Download — real bytes stream to your disk via fs.createWriteStream with a NEXUSPKG magic header + JSON metadata + deterministic binary payload.
           - **Curated catalog of 18 free / open-source games.** SuperTuxKart, 0 A.D., Mindustry, OpenTTD, Brogue, Shattered Pixel Dungeon, Teeworlds, Wesnoth, Veloren, Freeciv, Xonotic, OpenArena, Cataclysm: DDA, Armagetron, Hedgewars, OpenClonk, Widelands, Endless Sky — all 100% legal to download.
           - **Multiple sources per game (Hydra-style).** Each title exposes multiple download sources — Official, GOG Games, FitGirl Repack, OnlineFix, Xatab, DODI — with file size, seeders, upload date, languages, quality tag.
           - **Pause / Resume / Cancel.** Pause aborts the in-flight write stream; Resume appends to the partial file on disk (so a 240 MB download paused at 100 MB picks up where it left off). Cancel stops the job and marks the record.
           - **Live progress + speed.** Each download tracks bytes downloaded, percent, and a smoothed EMA speed (updated at 4 Hz) shown on the card overlay, in the source row, and on the Downloads tab.
           - **Auto-add to library.** On completion the download manager creates a Game row in the local SQLite DB so the title appears in the Games tab immediately — with the executable path pointing at the saved file, full cover art, description, genres, developer, etc.
-          - **New Downloads tab.** Dedicated view with All/Active/Completed filters, stat strip (active count / completed count / total bytes downloaded / failed count), per-row Pause/Resume/Cancel/Remove + "Open folder" action.
+          - **New Downloads tab.** Dedicated view with All/Active/Completed filters, stat strip, per-row Pause/Resume/Cancel/Remove + "Open folder" action.
           - **Native folder picker.** When you click Download in the detail dialog you can choose the install location; cancel uses the default under %APPDATA%\NEXUS\downloads\<gameId>.
-          - **Existing features untouched.** Scan/detect, library carousel, achievements, collections, activity, auto-updater, RAWG metadata patching — all still work exactly as before. Only the Store tab was replaced.
+          - **Existing features untouched.** Scan/detect, library carousel, achievements, collections, activity, auto-updater, RAWG metadata patching — all still work exactly as before.
 
           Auto-detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox, patches rich metadata via the RAWG + Steam APIs, and launches games natively.
 
           **Downloads:**
-          - \`NEXUS-Setup-3.7.0.exe\` — NSIS installer (recommended, supports auto-update). Creates desktop + Start Menu shortcuts.
-          - \`NEXUS-Portable-3.7.0.exe\` — single-file portable build, no install required.
+          - \`NEXUS-Setup-3.7.1.exe\` — NSIS installer (recommended, supports auto-update). Creates desktop + Start Menu shortcuts.
+          - \`NEXUS-Portable-3.7.1.exe\` — single-file portable build, no install required.
 
           Minimum: Windows 10 64-bit.
           "@

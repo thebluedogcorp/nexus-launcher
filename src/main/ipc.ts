@@ -346,7 +346,7 @@ export function registerIpc(): void {
   // code still imports them) but the new StoreTab no longer calls them.
 
   ipcMain.handle("store:catalog", async (_e, filters?: { query?: string; genre?: string; sort?: string }) => {
-    const { searchStore } = await import("@shared/store-catalog");
+    const { searchStore } = await import("../shared/store-catalog");
     const list = searchStore({
       query: filters?.query ?? "",
       genre: filters?.genre ?? "",
@@ -356,12 +356,12 @@ export function registerIpc(): void {
   });
 
   ipcMain.handle("store:getGame", async (_e, id: string) => {
-    const { findStoreGame } = await import("@shared/store-catalog");
+    const { findStoreGame } = await import("../shared/store-catalog");
     return findStoreGame(id) ?? null;
   });
 
   ipcMain.handle("store:genres", async () => {
-    const { STORE_GENRES } = await import("@shared/store-catalog");
+    const { STORE_GENRES } = await import("../shared/store-catalog");
     return STORE_GENRES;
   });
 
@@ -391,7 +391,7 @@ export function registerIpc(): void {
   //      `downloads:complete` + `downloads:libraryAdded`.
 
   ipcMain.handle("downloads:start", async (_e, gameId: string, sourceId: string, installDir?: string) => {
-    const { findStoreGame } = await import("@shared/store-catalog");
+    const { findStoreGame } = await import("../shared/store-catalog");
     const { startDownload } = await import("./downloads/manager");
     const game = findStoreGame(gameId);
     if (!game) throw new Error(`Store game not found: ${gameId}`);
@@ -407,7 +407,7 @@ export function registerIpc(): void {
   });
 
   ipcMain.handle("downloads:resume", async (_e, gameId: string, sourceId: string) => {
-    const { findStoreGame } = await import("@shared/store-catalog");
+    const { findStoreGame } = await import("../shared/store-catalog");
     const { resumeDownload } = await import("./downloads/manager");
     const game = findStoreGame(gameId);
     if (!game) throw new Error(`Store game not found: ${gameId}`);
