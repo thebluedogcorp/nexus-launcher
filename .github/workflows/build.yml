@@ -50,73 +50,49 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v3.9.1"
-          $title = "NEXUS v3.9.1 — Clean, dynamic, bright UI redesign"
+          $tag = "v3.9.2"
+          $title = "NEXUS v3.9.2 — Fixed Steam game auto-detection"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
-          **v3.9.1 — Clean, dynamic, bright UI redesign** (user feedback: UI had z-index issues, was overshadowed, needed a proper design system).
-          
-          This release establishes a proper design system with documented tokens, consistent surfaces, and a clean z-index hierarchy:
-          
-          **Design system tokens (all new):**
-          - Z-index scale: 0 (bg) / 1 (app) / 10 (content) / 20 (topbar) / 30 (hints) / 50 (page) / 100 (modal) / 200 (toast) / 300 (context menu). Every component now uses --z-bg / --z-app / --z-content / etc. instead of arbitrary numbers.
-          - Spacing scale: --s-1 (4px) / --s-2 (8px) / --s-3 (12px) / --s-4 (16px) / --s-5 (24px) / --s-6 (32px) / --s-7 (48px). No more arbitrary px values.
-          - Radii: --r-sm (6px) / --r-md (8px) / --r-lg (12px) / --r-xl (16px) / --r-pill (999px).
-          - Shadows: --shadow-low / --shadow-mid / --shadow-high / --shadow-glow — 3 elevation levels + accent glow.
-          - Transitions: --t-fast (120ms) / --t-base (180ms) / --t-slow (280ms) — all with the same easing curve.
-          - Surface tokens: --bg / --bg-2 / --surface / --surface-2 / --surface-glass — every card/input/modal now uses a consistent surface instead of inventing its own rgba.
-          
-          **Brightness fixes (UI was too dark / overshadowed):**
-          - Body bg lifted from #15151c to #1a1a22 (warmer, less murky).
-          - Surface bg lifted from #22222e to #2a2a36 (cards/inputs more visible).
-          - Border opacity raised from 0.10 to 0.14 (border lines more visible).
-          - Text-faint opacity raised from 0.34 to 0.42 (secondary text readable).
-          - Accent teal brightened from #16b195 to #2dd4bf (more vibrant).
-          - Dynamic background overlay softened — the old gradient used rgba(6,6,10,0.8) at the top/bottom which was too aggressive; now uses rgba(20,20,28,0.72) top / 0.28 mid / 0.78 bottom so the artwork breathes.
-          - Game page hero overlay softened similarly.
-          - Modal overlay lightened from 0.62 to 0.55 (less black, more see-through).
-          
-          **Z-index layering fixes (the core issue):**
-          - Before: z-index values were 0, 1, 2, 4, 10, 15, 18, 20, 50, 100, 200, 300 — no documented scale, no consistency. The bg-overlay at z-index 1 with its dark gradient was visually competing with the app shell at z-index 2.
-          - After: every z-index uses a CSS custom property (--z-bg, --z-app, --z-content, --z-topbar, --z-hints, --z-page, --z-modal, --z-toast, --z-ctx) with a documented hierarchy. The bg-overlay now sits at --z-bg (same layer as bg-layer, below the app) so it no longer overshadows content.
-          
-          **Component polish:**
-          - Topbar: 56px tall (was 54px), proper backdrop-blur + saturate, border-bottom added, logo uses accent gradient with glow shadow, search input focuses to accent border color, icon buttons lift on hover.
-          - Nav tabs: redesigned with accent-colored active indicator bar (was a faint white underline), proper hover background, badge for achievement count uses accent pill.
-          - Carousel tiles: focused tile now has accent-teal border + teal glow (was white border + white glow — too cold), dimmed tiles are slightly brighter (0.68 brightness vs 0.65).
-          - Info card (right side): uses --surface-glass + --shadow-mid for proper elevation.
-          - Buttons: all use --r-pill radius, --t-base transitions, --shadow-glow on primary.
-          - Filter pills: --surface-glass background, --surface-2 on hover/active (was rgba(20,20,28,0.65) — inconsistent).
-          - Modals: --r-xl radius, --shadow-high, --bg-2 background, proper header/body/footer padding with spacing tokens.
-          - Context menu: --surface-glass + --shadow-high + backdrop-blur (was --bg-2 with ad-hoc shadow).
-          - Toasts: --surface-glass + --shadow-high + backdrop-blur, accent-teal for success.
-          - Achievements: solid --surface cards (was transparent rgba(20,20,28,0.85) with !important overrides — messy), unlocked cards have a subtle accent gradient, hover lifts with --shadow-mid.
-          - Activity items: solid --surface rows with hover --surface-2 (was transparent rgba(20,20,28,0.8)).
-          - Stats dashboard: --surface cards with --accent icon color (was --green — inconsistent with new teal accent).
-          - Game editor fields: focus border uses --accent (was rgba(255,255,255,0.2)).
-          - Hints bar: uses --z-hints, softer gradient.
-          
-          **Scrollbar visibility (was hidden — bad UX):**
-          - Before: ::-webkit-scrollbar{width:0;height:0} — scrollbars were completely invisible, users couldn't tell if a list was scrollable.
-          - After: 10px wide scrollbars with rgba(255,255,255,0.10) thumb, accent-teal on hover, rounded with padding-box clip so the thumb doesn't touch the edges. Firefox scrollbar-width:thin + scrollbar-color also set.
-          
-          **Code cleanup:**
-          - Deleted the duplicate .nav-tabs block (was defined twice — once at line 215 and again at line 658 with different rules, the second one winning via source order).
-          - Deleted the ACHIEVEMENTS + ACTIVITY TAB FIXES override block (~30 lines of !important rules that were fighting the earlier definitions). The earlier definitions are now correct by default.
-          - Replaced inline style on the achievements nav-tab badge (style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700 }}) with a proper .nav-tab-badge CSS class.
-          
-          **Verification:**
-          - TypeScript compile: zero errors on both main process and renderer.
-          - Vite build: succeeded. CSS grew from 33.63 KB to 36.84 KB (the design tokens + a few new component styles) but the JS stayed at 333 KB.
-          - No !important rules remain in the achievements/dashboard/activity sections (all removed).
-          
+          **v3.9.2 — Fixed Steam game auto-detection** (user reported Steam games not being detected automatically, had to add them manually).
+
+          The Steam detector was rewritten with 5 fallback methods for finding the Steam install, plus extensive logging so you can see exactly what's happening when detection fails:
+
+          **5 methods to find the Steam install directory:**
+          1. Registry HKCU Software Valve Steam SteamPath (with /reg:32 and /reg:64 fallbacks for 32/64-bit view issues)
+          2. Registry HKLM SOFTWARE WOW6432Node Valve Steam InstallPath (and the 32-bit SOFTWARE Valve Steam path)
+          3. Running process detection — wmic finds steam.exe and gets its directory (works if Steam is currently running)
+          4. Filesystem scan of common default locations on ALL drive letters (C, D, E, F, G) — catches Steam installed on D: Steam or F: Games SteamLibrary etc.
+          5. Last resort — checks if a steamapps folder exists anywhere on C/D/E/F/G drives
+
+          **2 methods to read library folders:**
+          A. libraryfolders.vdf (modern Steam) — the primary source
+          B. config.vdf BaseInstallFolder entries — fallback if libraryfolders.vdf is missing or doesn't list all libraries
+
+          **Also fixed:**
+          - SteamPath from registry uses forward slashes — now normalized to backslashes before the existsSync check.
+          - Library folder paths from VDF also normalized (forward slashes to backslashes).
+          - Library folder paths from config.vdf also normalized.
+          - The steamapps subdirectory is now correctly resolved for library folders that don't end in steamapps — the detector checks if the library path ends in steamapps and if not, appends steamapps automatically. This fixes detection when Steam libraries are on D: SteamLibrary (where manifests are at D: SteamLibrary steamapps).
+          - Added extensive console.log / console.warn logging throughout the detection flow so the user can see exactly what's happening (Steam install found at..., Found N library folder(s), Found N manifest(s), Detected: game name, etc.). These logs appear in the Electron main process console / dev tools.
+
+          **Before this fix:**
+          - The detector only checked C: Program Files (x86) Steam and C: Program Files Steam as fallbacks — if Steam was on D: drive, detection failed silently.
+          - No logging — the user had no way to know WHY Steam detection wasn't working.
+          - No config.vdf fallback — if libraryfolders.vdf was missing or incomplete, some Steam libraries were missed.
+
+          **After this fix:**
+          - Steam install is found via 5 different methods — registry, 32/64-bit view, running process, filesystem scan across 5 drives, and last-resort steamapps existence check.
+          - Library folders are read from BOTH libraryfolders.vdf AND config.vdf — if one is missing or incomplete, the other fills the gap.
+          - Every step is logged so the user can see exactly what's happening in the console.
+
           Auto-detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox, patches rich metadata via the RAWG + Steam APIs, and launches games natively.
-          
+
           **Downloads:**
-          - NEXUS-Setup-3.9.1.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-3.9.1.exe — single-file portable build.
-          
+          - NEXUS-Setup-3.9.2.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-3.9.2.exe — single-file portable build.
+
           Minimum: Windows 10 64-bit.
           "@
 
