@@ -487,7 +487,7 @@ export function App() {
       {/* Nav tabs */}
       <div className="nav-tabs">
         <button className={activeTab === "games" ? "nav-tab active" : "nav-tab"} onClick={() => setActiveTab("games")}>Games</button>
-        <button className={activeTab === "achievements" ? "nav-tab active" : "nav-tab"} onClick={() => setActiveTab("achievements")}>Achievements {achievements.filter((a) => a.unlockedAt).length > 0 && <span style={{ fontSize: 10, color: "var(--accent)", fontWeight: 700 }}>{achievements.filter((a) => a.unlockedAt).length}</span>}</button>
+        <button className={activeTab === "achievements" ? "nav-tab active" : "nav-tab"} onClick={() => setActiveTab("achievements")}>Achievements {achievements.filter((a) => a.unlockedAt).length > 0 && <span className="nav-tab-badge">{achievements.filter((a) => a.unlockedAt).length}</span>}</button>
         <button className={activeTab === "activity" ? "nav-tab active" : "nav-tab"} onClick={() => setActiveTab("activity")}>Activity</button>
       </div>
 
