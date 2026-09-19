@@ -582,7 +582,6 @@ export function App() {
             }}>
               <button className="carousel-arrow left" onClick={() => { const c = document.querySelector(".carousel") as HTMLElement; if (c) c.scrollBy({ left: -280, behavior: "smooth" }); }}><span style={{ display: "inline-flex", transform: "rotate(180deg)" }}><Icon.Chevron size={20} /></span></button>
               <button className="carousel-arrow right" onClick={() => { const c = document.querySelector(".carousel") as HTMLElement; if (c) c.scrollBy({ left: 280, behavior: "smooth" }); }}><Icon.Chevron size={20} /></button>
-              <div className="carousel-outer">
               <div className="carousel">
                 {games.map((g, i) => (
                   <div key={g.id} className={i === focusedIdx ? "tile focused" : "tile"} onMouseEnter={() => { focusSourceRef.current = "mouse"; setFocusedIdx(i); }} onClick={() => openPage(g.id)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, game: g }); }}>
@@ -605,7 +604,6 @@ export function App() {
                     )}
                   </div>
                 ))}
-              </div>
               </div>
             </div>
 
