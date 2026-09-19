@@ -169,6 +169,24 @@ export function registerIpc(): void {
   // ===== Metadata =====
   ipcMain.handle("metadata:search", (_e, q: string) => searchRawg(q, 8));
 
+  // ===== Store / Browse =====
+  ipcMain.handle("store:search", async (_e, q: string, page: number) => {
+    const { searchStore } = await import("./metadata/rawg");
+    return searchStore(q, page, 24);
+  });
+  ipcMain.handle("store:trending", async (_e, page: number) => {
+    const { browseTrending } = await import("./metadata/rawg");
+    return browseTrending(page, 24);
+  });
+  ipcMain.handle("store:topRated", async (_e, page: number) => {
+    const { browseTopRated } = await import("./metadata/rawg");
+    return browseTopRated(page, 24);
+  });
+  ipcMain.handle("store:newReleases", async (_e, page: number) => {
+    const { browseNewReleases } = await import("./metadata/rawg");
+    return browseNewReleases(page, 24);
+  });
+
   // Patch metadata for every game that's missing a banner image (best-effort,
   // sequential to avoid hammering RAWG rate limits). Uses the multi-source
   // aggregator (RAWG -> Steam -> PCGamingWiki).

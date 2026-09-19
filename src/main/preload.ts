@@ -139,6 +139,15 @@ const api = {
   // Metadata
   searchMetadata: (q: string) =>
     ipcRenderer.invoke("metadata:search", q) as Promise<MetadataResult[]>,
+  // Store / Browse
+  storeSearch: (q: string, page: number) =>
+    ipcRenderer.invoke("store:search", q, page) as Promise<{ results: Array<Record<string, unknown>>; count: number; next: string | null }>,
+  storeTrending: (page: number) =>
+    ipcRenderer.invoke("store:trending", page) as Promise<{ results: Array<Record<string, unknown>>; count: number; next: string | null }>,
+  storeTopRated: (page: number) =>
+    ipcRenderer.invoke("store:topRated", page) as Promise<{ results: Array<Record<string, unknown>>; count: number; next: string | null }>,
+  storeNewReleases: (page: number) =>
+    ipcRenderer.invoke("store:newReleases", page) as Promise<{ results: Array<Record<string, unknown>>; count: number; next: string | null }>,
 
   // Stats & settings
   getStats: () => ipcRenderer.invoke("stats:get") as Promise<Stats>,

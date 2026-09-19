@@ -180,3 +180,121 @@ export async function bestMatchForTitle(
   }
   return best;
 }
+
+// ===== Store / Browse endpoints =====
+
+export interface StoreGame {
+  rawgId: number;
+  title: string;
+  coverImage: string | null;
+  rating: number | null;
+  ratingCount: number | null;
+  releaseDate: string | null;
+  genres: string[];
+  description: string | null;
+  developer: string | null;
+  publisher: string | null;
+  screenshots: string[];
+  shortDescription: string | null;
+  platforms: string[];
+  metacritic: number | null;
+  esrbRating: string | null;
+}
+
+/** Browse trending/popular games from RAWG (for the Store tab). */
+export async function browseTrending(page = 1, pageSize = 20): Promise<{ results: StoreGame[]; count: number; next: string | null }> {
+  const key = await getApiKey();
+  if (!key) return { results: [], count: 0, next: null };
+  try {
+    const res = await withTimeout(
+      fetch(`${BASE}/games?key=${encodeURIComponent(key)}&ordering=-added&page=${page}&page_size=${pageSize}`),
+      10_000,
+    );
+    if (!res.ok) return { results: [], count: 0, next: null };
+    const json = (await res.json()) as { results?: Array<Record<string, unknown>>; count?: number; next?: string | null };
+    return { results: (json.results ?? []).map(rawgToStoreGame), count: json.count ?? 0, next: json.next ?? null };
+  } catch { return { results: [], count: 0, next: null }; }
+}
+
+/** Browse top-rated games from RAWG. */
+export async function browseTopRated(page = 1, pageSize = 20): Promise<{ results: StoreGame[]; count: number; next: string | null }> {
+  const key = await getApiKey();
+  if (!key) return { results: [], count: 0, next: null };
+  try {
+    const res = await withTimeout(
+      fetch(`${BASE}/games?key=${encodeURIComponent(key)}&ordering=-rating&page=${page}&page_size=${pageSize}`),
+      10_000,
+    );
+    if (!res.ok) return { results: [], count: 0, next: null };
+    const json = (await res.json()) as { results?: Array<Record<string, unknown>>; count?: number; next?: string | null };
+    return { results: (json.results ?? []).map(rawgToStoreGame), count: json.count ?? 0, next: json.next ?? null };
+  } catch { return { results: [], count: 0, next: null }; }
+}
+
+/** Browse new releases from RAWG. */
+export async function browseNewReleases(page = 1, pageSize = 20): Promise<{ results: StoreGame[]; count: number; next: string | null }> {
+  const key = await getApiKey();
+  if (!key) return { results: [], count: 0, next: null };
+  try {
+    const now = new Date();
+    const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+    const dateRange = `${oneYearAgo.toISOString().slice(0, 10)},${now.toISOString().slice(0, 10)}`;
+    const res = await withTimeout(
+      fetch(`${BASE}/games?key=${encodeURIComponent(key)}&dates=${dateRange}&ordering=-released&page=${page}&page_size=${pageSize}`),
+      10_000,
+    );
+    if (!res.ok) return { results: [], count: 0, next: null };
+    const json = (await res.json()) as { results?: Array<Record<string, unknown>>; count?: number; next?: string | null };
+    return { results: (json.results ?? []).map(rawgToStoreGame), count: json.count ?? 0, next: json.next ?? null };
+  } catch { return { results: [], count: 0, next: null }; }
+}
+
+/** Search RAWG for store results (richer than the basic searchRawg). */
+export async function searchStore(query: string, page = 1, pageSize = 20): Promise<{ results: StoreGame[]; count: number; next: string | null }> {
+  const key = await getApiKey();
+  if (!key) return { results: [], count: 0, next: null };
+  const q = query.trim();
+  if (!q) return { results: [], count: 0, next: null };
+  try {
+    const res = await withTimeout(
+      fetch(`${BASE}/games?key=${encodeURIComponent(key)}&search=${encodeURIComponent(q)}&page=${page}&page_size=${pageSize}`),
+      10_000,
+    );
+    if (!res.ok) return { results: [], count: 0, next: null };
+    const json = (await res.json()) as { results?: Array<Record<string, unknown>>; count?: number; next?: string | null };
+    return { results: (json.results ?? []).map(rawgToStoreGame), count: json.count ?? 0, next: json.next ?? null };
+  } catch { return { results: [], count: 0, next: null }; }
+}
+
+function rawgToStoreGame(r: Record<string, unknown>): StoreGame {
+  const genres = Array.isArray(r.genres) ? r.genres.map((g: Record<string, unknown>) => String(g.name ?? "")).filter(Boolean) : [];
+  const developers = Array.isArray(r.developers) ? r.developers : [];
+  const publishers = Array.isArray(r.publishers) ? r.publishers : [];
+  const platforms = Array.isArray(r.platforms)
+    ? r.platforms.map((p: Record<string, unknown>) => {
+        const platform = p.platform as Record<string, unknown> | undefined;
+        return String(platform?.name ?? "");
+      }).filter(Boolean)
+    : [];
+  const metacritic = r.metacritic && typeof r.metacritic === "object" && "score" in (r.metacritic as Record<string, unknown>)
+    ? Number((r.metacritic as Record<string, unknown>).score) : (typeof r.metacritic === "number" ? r.metacritic : null);
+  const esrb = r.esrb_rating && typeof r.esrb_rating === "object" && "name" in (r.esrb_rating as Record<string, unknown>)
+    ? String((r.esrb_rating as Record<string, unknown>).name) : null;
+  return {
+    rawgId: Number(r.id),
+    title: String(r.name ?? ""),
+    coverImage: r.background_image ? String(r.background_image) : null,
+    rating: typeof r.rating === "number" ? r.rating : null,
+    ratingCount: typeof r.ratings_count === "number" ? r.ratings_count : null,
+    releaseDate: r.released ? String(r.released) : null,
+    genres,
+    description: r.description_raw ? String(r.description_raw) : r.description ? String(r.description) : null,
+    developer: developers[0]?.name ? String(developers[0].name) : undefined,
+    publisher: publishers[0]?.name ? String(publishers[0].name) : undefined,
+    screenshots: [],
+    shortDescription: r.description_raw ? String(r.description_raw).replace(/<[^>]+>/g, "").slice(0, 200) + "…" : null,
+    platforms,
+    metacritic,
+    esrbRating: esrb,
+  };
+}
