@@ -10,6 +10,8 @@ import { UpdateDialog } from "./components/UpdateDialog";
 import { ToastContainer, type Toast } from "./components/Toast";
 import { useGamepadController } from "./lib/useGamepad";
 import { formatPlaytime, formatPlaytimeShort, formatSize, platformColor, platformLabel, gradientFor, initials, relativeTime } from "./lib/helpers";
+import { StoreTab, DownloadsTab } from "./components/StoreTab";
+import type { DownloadEntry } from "../main/preload";
 
 interface Filters { platform: string; favOnly: boolean; query: string; sort: SortKey }
 const DEFAULT_FILTERS: Filters = { platform: "all", favOnly: false, query: "", sort: "recent" };
@@ -46,11 +48,13 @@ export function App() {
   // v2.0 features state
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; game: Game } | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"games" | "store" | "achievements" | "activity">("games");
+  const [activeTab, setActiveTab] = useState<"games" | "store" | "downloads" | "achievements" | "activity">("games");
   const [achievements, setAchievements] = useState<Array<{ id: string; name: string; description: string; icon: string; unlockedAt: string | null; progress: number; maxProgress: number }>>([]);
   const [editorGame, setEditorGame] = useState<Game | null>(null);
   const [updateAvailable, setUpdateAvailable] = useState<{ version?: string; releaseUrl?: string; downloadUrl?: string; downloadSize?: number } | null>(null);
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
+  // Downloads state — synced with the main-process download manager.
+  const [downloads, setDownloads] = useState<DownloadEntry[]>([]);
 
   const toast = useCallback((type: Toast["type"], title: string, desc?: string) => {
     setToasts((prev) => [...prev, { id: Date.now() + Math.random(), type, title, desc }]);
@@ -107,7 +111,30 @@ export function App() {
     const offP = (window as unknown as { nexus?: { onPatchProgress?: (cb: (p: { gameId: number; title: string; current: number; total: number }) => void) => () => void } }).nexus?.onPatchProgress?.((p) => { setPatching(true); setPatchProgress({ current: p.current, total: p.total, title: p.title }); });
     const offG = (window as unknown as { nexus?: { onPatchGameUpdated?: (cb: (p: { game: Game }) => void) => () => void } }).nexus?.onPatchGameUpdated?.(({ game }) => { setGames((prev) => prev.map((g) => (g.id === game.id ? game : g))); if (pageGame?.id === game.id) setPageGame(game); refreshStats(); });
     const offD = (window as unknown as { nexus?: { onPatchDone?: (cb: (p: { patched: number; attempted: number }) => void) => () => void } }).nexus?.onPatchDone?.(({ patched, attempted }) => { setPatching(false); setPatchProgress(null); if (patched > 0) toast("success", `Enriched ${patched} of ${attempted} games`, "Artwork fetched automatically."); refreshAll(); });
-    return () => { offP?.(); offG?.(); offD?.(); };
+
+    // ===== Downloads: live progress + completion =====
+    // Pull the current list once on mount, then subscribe to live updates.
+    (async () => {
+      try {
+        const list = await window.nexus.listDownloads();
+        setDownloads(list);
+      } catch {}
+    })();
+    const offProg = window.nexus.onDownloadProgress?.(() => {
+      // Throttled re-pull of the entire list — keeps the UI in sync without
+      // flooding React state updates.
+      window.nexus.listDownloads().then(setDownloads).catch(() => {});
+    });
+    const offDone = window.nexus.onDownloadProgress?.(() => {
+      // No-op — progress handler above covers all status changes.
+    });
+    const offLib = window.nexus.onDownloadLibraryAdded?.(() => {
+      // A finished download was added to the library — refresh the games list
+      // so the new title appears in the carousel.
+      refreshAll();
+      window.nexus.listDownloads().then(setDownloads).catch(() => {});
+    });
+    return () => { offP?.(); offG?.(); offD?.(); offProg?.(); offDone?.(); offLib?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -488,14 +515,36 @@ export function App() {
       <div className="nav-tabs">
         <button className={activeTab === "games" ? "nav-tab active" : "nav-tab"} onClick={() => setActiveTab("games")}>Games</button>
         <button className={activeTab === "store" ? "nav-tab active" : "nav-tab"} onClick={() => setActiveTab("store")}>Store</button>
+        <button className={activeTab === "downloads" ? "nav-tab active" : "nav-tab"} onClick={() => setActiveTab("downloads")}>
+          Downloads {downloads.filter((d) => d.status === "downloading" || d.status === "paused" || d.status === "queued").length > 0 && (
+            <span style={{ fontSize: 10, color: "var(--accent)", fontWeight: 700 }}>
+              {downloads.filter((d) => d.status === "downloading" || d.status === "paused" || d.status === "queued").length}
+            </span>
+          )}
+        </button>
         <button className={activeTab === "achievements" ? "nav-tab active" : "nav-tab"} onClick={() => setActiveTab("achievements")}>Achievements {achievements.filter((a) => a.unlockedAt).length > 0 && <span style={{ fontSize: 10, color: "var(--accent)", fontWeight: 700 }}>{achievements.filter((a) => a.unlockedAt).length}</span>}</button>
         <button className={activeTab === "activity" ? "nav-tab active" : "nav-tab"} onClick={() => setActiveTab("activity")}>Activity</button>
       </div>
 
       <main className="stage">
         {activeTab === "store" ? (
-          /* ===== STORE TAB ===== */
-          <StoreTab onAddGame={handleAdd} toast={toast} />
+          /* ===== STORE TAB (curated catalog + real downloads) ===== */
+          <StoreTab
+            toast={toast}
+            downloads={downloads}
+            onLibraryChanged={() => { refreshAll(); setActiveTab("games"); }}
+            onOpenDownloads={() => setActiveTab("downloads")}
+            onDownloadsChanged={() => { void window.nexus.listDownloads().then(setDownloads); }}
+          />
+        ) : activeTab === "downloads" ? (
+          /* ===== DOWNLOADS TAB ===== */
+          <DownloadsTab
+            downloads={downloads}
+            onRefresh={() => { void window.nexus.listDownloads().then(setDownloads); }}
+            onOpenStore={() => setActiveTab("store")}
+            onLibraryChanged={() => { refreshAll(); setActiveTab("games"); }}
+            toast={toast}
+          />
         ) : activeTab === "achievements" ? (
           /* ===== ACHIEVEMENTS TAB ===== */
           <div style={{ flex: 1, overflowY: "auto" }}>
@@ -765,142 +814,6 @@ export function App() {
 
       {controllerConnected && !pageGame && <div className="hints-bar"><span className="hint"><span className="k">↑↓</span> {gpZone === "topbar" ? "Top Bar" : gpZone === "filters" ? "Filters" : gpZone === "carousel" ? "Games" : "Actions"}</span><span className="hint"><span className="k">←→</span> Navigate</span><span className="hint"><span className="k r">A</span> Select</span><span className="hint"><span className="k r">X</span> Play</span><span className="hint"><span className="k r">Y</span> Details</span><span className="hint"><span className="k r">B</span> Back</span><span className="hint"><span className="k">☰</span> Settings</span></div>}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
-    </div>
-  );
-}
-
-// ===== Store Tab =====
-interface StoreGame {
-  rawgId: number; title: string; coverImage: string | null; rating: number | null;
-  ratingCount: number | null; releaseDate: string | null; genres: string[];
-  shortDescription: string | null; developer: string | null; metacritic: number | null;
-  esrbRating: string | null;
-}
-
-function StoreTab({ onAddGame, toast }: {
-  onAddGame: (input: { title: string; platform: PlatformId; autoPatch?: boolean }) => Promise<Game>;
-  toast: (type: Toast["type"], title: string, desc?: string) => void;
-}) {
-  const [category, setCategory] = useState<"trending" | "topRated" | "newReleases" | "search">("trending");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchInput, setSearchInput] = useState("");
-  const [page, setPage] = useState(1);
-  const [storeGames, setStoreGames] = useState<StoreGame[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [hasMore, setHasMore] = useState(false);
-  const [addedIds, setAddedIds] = useState<Set<number>>(new Set());
-
-  const fetchGames = useCallback(async () => {
-    setLoading(true);
-    try {
-      let res: { results: StoreGame[]; count: number; next: string | null };
-      if (category === "search" && searchQuery) {
-        res = await window.nexus.storeSearch(searchQuery, page) as typeof res;
-      } else if (category === "topRated") {
-        res = await window.nexus.storeTopRated(page) as typeof res;
-      } else if (category === "newReleases") {
-        res = await window.nexus.storeNewReleases(page) as typeof res;
-      } else {
-        res = await window.nexus.storeTrending(page) as typeof res;
-      }
-      if (page === 1) setStoreGames(res.results);
-      else setStoreGames((prev) => [...prev, ...res.results]);
-      setHasMore(!!res.next);
-    } catch { setStoreGames([]); setHasMore(false); }
-    finally { setLoading(false); }
-  }, [category, searchQuery, page]);
-
-  useEffect(() => { setPage(1); }, [category, searchQuery]);
-  useEffect(() => { fetchGames(); }, [fetchGames]);
-
-  const doSearch = () => {
-    if (searchInput.trim()) { setCategory("search"); setSearchQuery(searchInput.trim()); }
-  };
-
-  const addToLibrary = async (game: StoreGame) => {
-    try {
-      await onAddGame({ title: game.title, platform: "manual", autoPatch: true });
-      setAddedIds((prev) => new Set(prev).add(game.rawgId));
-      toast("success", `${game.title} added to library`, "Metadata auto-patched from RAWG.");
-    } catch { toast("error", "Failed to add", "Try again or add manually."); }
-  };
-
-  const categories = [
-    { id: "trending" as const, label: "Trending" },
-    { id: "topRated" as const, label: "Top Rated" },
-    { id: "newReleases" as const, label: "New Releases" },
-  ];
-
-  return (
-    <div style={{ flex: 1, overflowY: "auto" }}>
-      {/* Search + category bar */}
-      <div style={{ display: "flex", gap: 8, padding: "12px 32px", alignItems: "center", flexShrink: 0, position: "sticky", top: 0, zIndex: 10, background: "rgba(6,6,10,.85)", backdropFilter: "blur(14px)" }}>
-        <div style={{ position: "relative", flex: 1, maxWidth: 400 }}>
-          <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--faint)" }}><Icon.Search size={15} /></span>
-          <input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && doSearch()} placeholder="Search the store…" style={{ width: "100%", height: 34, borderRadius: 8, border: "1px solid var(--border2)", background: "rgba(20,20,28,.7)", color: "var(--text)", padding: "0 12px 0 32px", fontSize: 12.5, outline: "none" }} />
-        </div>
-        {categories.map((c) => (
-          <button key={c.id} className={category === c.id ? "filter-pill active" : "filter-pill"} onClick={() => { setCategory(c.id); setSearchQuery(""); }}>{c.label}</button>
-        ))}
-      </div>
-
-      {/* Results grid */}
-      <div style={{ padding: "0 32px 40px" }}>
-        {loading && page === 1 ? (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 14 }}>
-            {Array.from({ length: 12 }).map((_, i) => <div key={i} className="shimmer" style={{ height: 280, borderRadius: 12 }} />)}
-          </div>
-        ) : storeGames.length === 0 ? (
-          <div style={{ textAlign: "center", padding: 60, color: "var(--faint)" }}>
-            {category === "search" ? `No results for "${searchQuery}"` : "No games found. Make sure your RAWG API key is configured in Settings."}
-          </div>
-        ) : (
-          <>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 14 }}>
-              {storeGames.map((g) => (
-                <div key={g.rawgId} style={{ background: "rgba(20,20,28,.82)", border: "1px solid var(--border2)", borderRadius: 12, overflow: "hidden", backdropFilter: "blur(14px)", transition: "all .2s" }} onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.borderColor = "rgba(255,255,255,.15)"; }} onMouseLeave={(e) => { e.currentTarget.style.transform = ""; e.currentTarget.style.borderColor = "var(--border2)"; }}>
-                  {/* Cover image */}
-                  <div style={{ position: "relative", aspectRatio: "3/4", overflow: "hidden", background: "var(--surface)" }}>
-                    {g.coverImage ? (
-                      <img src={g.coverImage} alt={g.title} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
-                    ) : (
-                      <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "radial-gradient(circle at 30% 20%, #1a1a24, #050505)" }}>
-                        <span style={{ fontSize: 32, fontWeight: 900, color: "rgba(255,255,255,.5)" }}>{g.title.charAt(0)}</span>
-                      </div>
-                    )}
-                    {/* Rating badge */}
-                    {g.rating !== null && (
-                      <div style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,.7)", backdropFilter: "blur(8px)", borderRadius: 6, padding: "3px 7px", fontSize: 10, fontWeight: 700, color: "var(--gold)", display: "flex", alignItems: "center", gap: 3 }}>
-                        <Icon.Star size={10} filled /> {g.rating.toFixed(1)}
-                      </div>
-                    )}
-                    {g.metacritic !== null && (
-                      <div style={{ position: "absolute", top: 8, left: 8, background: "rgba(0,0,0,.7)", backdropFilter: "blur(8px)", borderRadius: 6, padding: "3px 7px", fontSize: 10, fontWeight: 700, color: g.metacritic >= 75 ? "#4ade80" : g.metacritic >= 50 ? "#fbbf24" : "#f87171" }}>{g.metacritic}</div>
-                    )}
-                  </div>
-                  {/* Info */}
-                  <div style={{ padding: 10 }}>
-                    <div style={{ fontSize: 12.5, fontWeight: 600, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.title}</div>
-                    <div style={{ fontSize: 10.5, color: "var(--faint)", marginTop: 3, display: "flex", gap: 6, alignItems: "center" }}>
-                      {g.releaseDate && <span>{g.releaseDate.slice(0, 4)}</span>}
-                      {g.genres.length > 0 && <span>· {g.genres.slice(0, 2).join(", ")}</span>}
-                    </div>
-                    {g.shortDescription && <p style={{ fontSize: 10.5, color: "var(--dim)", marginTop: 6, lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{g.shortDescription}</p>}
-                    <button onClick={() => addToLibrary(g)} disabled={addedIds.has(g.rawgId)} style={{ width: "100%", marginTop: 8, height: 32, borderRadius: 8, fontSize: 11.5, fontWeight: 600, transition: "all .15s", background: addedIds.has(g.rawgId) ? "rgba(74,222,128,.1)" : "var(--accent)", color: addedIds.has(g.rawgId) ? "var(--accent)" : "#04220e", border: "none", cursor: addedIds.has(g.rawgId) ? "default" : "pointer" }}>
-                      {addedIds.has(g.rawgId) ? "✓ In Library" : "+ Add to Library"}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            {hasMore && !loading && (
-              <div style={{ textAlign: "center", marginTop: 20 }}>
-                <button className="btn btn-ghost" onClick={() => setPage((p) => p + 1)} disabled={loading}>Load More</button>
-              </div>
-            )}
-          </>
-        )}
-      </div>
     </div>
   );
 }
