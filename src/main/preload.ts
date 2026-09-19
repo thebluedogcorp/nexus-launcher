@@ -13,26 +13,6 @@ import type {
   ScanSummary,
   Stats,
 } from "@shared/types";
-import type { StoreGame, StoreSortKey } from "@shared/store-catalog";
-
-// Download entry — mirrors src/main/downloads/manager.ts DownloadEntry.
-export interface DownloadEntry {
-  key: string;
-  gameId: string;
-  gameTitle: string;
-  sourceId: string;
-  sourceLabel: string;
-  coverImage?: string;
-  totalBytes: number;
-  downloadedBytes: number;
-  status: "queued" | "downloading" | "paused" | "completed" | "failed" | "cancelled";
-  speedBps: number;
-  startedAt: number;
-  completedAt?: number;
-  error?: string;
-  installPath?: string;
-  libraryGameId?: number;
-}
 
 const api = {
   // Games
@@ -159,66 +139,12 @@ const api = {
   // Metadata
   searchMetadata: (q: string) =>
     ipcRenderer.invoke("metadata:search", q) as Promise<MetadataResult[]>,
-  // Store / Browse
-  storeSearch: (q: string, page: number) =>
-    ipcRenderer.invoke("store:search", q, page) as Promise<{ results: Array<Record<string, unknown>>; count: number; next: string | null }>,
-  storeTrending: (page: number) =>
-    ipcRenderer.invoke("store:trending", page) as Promise<{ results: Array<Record<string, unknown>>; count: number; next: string | null }>,
-  storeTopRated: (page: number) =>
-    ipcRenderer.invoke("store:topRated", page) as Promise<{ results: Array<Record<string, unknown>>; count: number; next: string | null }>,
-  storeNewReleases: (page: number) =>
-    ipcRenderer.invoke("store:newReleases", page) as Promise<{ results: Array<Record<string, unknown>>; count: number; next: string | null }>,
 
   // Stats & settings
   getStats: () => ipcRenderer.invoke("stats:get") as Promise<Stats>,
   getSettings: () => ipcRenderer.invoke("settings:get") as Promise<LauncherSettings>,
   setSettings: (s: Partial<LauncherSettings>) =>
     ipcRenderer.invoke("settings:set", s) as Promise<LauncherSettings>,
-
-  // ===== NEXUS Store (curated catalog + real downloads) =====
-  storeCatalog: (filters?: { query?: string; genre?: string; sources?: string[]; sort?: StoreSortKey }) =>
-    ipcRenderer.invoke("store:catalog", filters) as Promise<StoreGame[]>,
-  getStoreGame: (id: string) =>
-    ipcRenderer.invoke("store:getGame", id) as Promise<StoreGame | null>,
-  storeGenres: () => ipcRenderer.invoke("store:genres") as Promise<string[]>,
-  storeSourceNames: () => ipcRenderer.invoke("store:sourceNames") as Promise<string[]>,
-  pickInstallDir: () =>
-    ipcRenderer.invoke("store:pickInstallDir") as Promise<{ ok: boolean; path: string | null; error?: string }>,
-
-  // ===== Downloads =====
-  startDownload: (gameId: string, sourceId: string, installDir?: string) =>
-    ipcRenderer.invoke("downloads:start", gameId, sourceId, installDir) as Promise<DownloadEntry>,
-  pauseDownload: (gameId: string, sourceId: string) =>
-    ipcRenderer.invoke("downloads:pause", gameId, sourceId) as Promise<boolean>,
-  resumeDownload: (gameId: string, sourceId: string) =>
-    ipcRenderer.invoke("downloads:resume", gameId, sourceId) as Promise<DownloadEntry | undefined>,
-  cancelDownload: (gameId: string, sourceId: string) =>
-    ipcRenderer.invoke("downloads:cancel", gameId, sourceId) as Promise<boolean>,
-  removeDownload: (gameId: string, sourceId: string) =>
-    ipcRenderer.invoke("downloads:remove", gameId, sourceId) as Promise<boolean>,
-  listDownloads: () => ipcRenderer.invoke("downloads:list") as Promise<DownloadEntry[]>,
-  installDownload: (gameId: string, sourceId: string) =>
-    ipcRenderer.invoke("downloads:install", gameId, sourceId) as Promise<{ ok: boolean; libraryGameId?: number; error?: string }>,
-  clearCompletedDownloads: () =>
-    ipcRenderer.invoke("downloads:clearCompleted") as Promise<boolean>,
-  openDownloadFolder: (gameId: string, sourceId: string) =>
-    ipcRenderer.invoke("downloads:openFolder", gameId, sourceId) as Promise<{ ok: boolean; message: string }>,
-  // Live event subscriptions
-  onDownloadProgress: (cb: (e: DownloadEntry) => void) => {
-    const l = (_e: unknown, p: DownloadEntry) => cb(p);
-    ipcRenderer.on("downloads:progress", l);
-    return () => ipcRenderer.removeListener("downloads:progress", l);
-  },
-  onDownloadComplete: (cb: (e: DownloadEntry) => void) => {
-    const l = (_e: unknown, p: DownloadEntry) => cb(p);
-    ipcRenderer.on("downloads:complete", l);
-    return () => ipcRenderer.removeListener("downloads:complete", l);
-  },
-  onDownloadLibraryAdded: (cb: (p: { key: string; game: Game }) => void) => {
-    const l = (_e: unknown, p: { key: string; game: Game }) => cb(p);
-    ipcRenderer.on("downloads:libraryAdded", l);
-    return () => ipcRenderer.removeListener("downloads:libraryAdded", l);
-  },
 };
 
 contextBridge.exposeInMainWorld("nexus", api);

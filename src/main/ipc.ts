@@ -1,7 +1,7 @@
 // IPC handlers — exposes every launcher capability to the renderer via
 // a secure, typed `window.nexus` API (see preload.ts).
 
-import { ipcMain, BrowserWindow, dialog } from "electron";
+import { ipcMain, BrowserWindow } from "electron";
 import {
   listGames,
   getGame,
@@ -169,24 +169,6 @@ export function registerIpc(): void {
   // ===== Metadata =====
   ipcMain.handle("metadata:search", (_e, q: string) => searchRawg(q, 8));
 
-  // ===== Store / Browse =====
-  ipcMain.handle("store:search", async (_e, q: string, page: number) => {
-    const { searchStore } = await import("./metadata/rawg");
-    return searchStore(q, page, 24);
-  });
-  ipcMain.handle("store:trending", async (_e, page: number) => {
-    const { browseTrending } = await import("./metadata/rawg");
-    return browseTrending(page, 24);
-  });
-  ipcMain.handle("store:topRated", async (_e, page: number) => {
-    const { browseTopRated } = await import("./metadata/rawg");
-    return browseTopRated(page, 24);
-  });
-  ipcMain.handle("store:newReleases", async (_e, page: number) => {
-    const { browseNewReleases } = await import("./metadata/rawg");
-    return browseNewReleases(page, 24);
-  });
-
   // Patch metadata for every game that's missing a banner image (best-effort,
   // sequential to avoid hammering RAWG rate limits). Uses the multi-source
   // aggregator (RAWG -> Steam -> PCGamingWiki).
@@ -333,137 +315,6 @@ export function registerIpc(): void {
     return { newlyUnlocked };
   });
 
-  // ===== NEXUS Store (curated free-game catalog + real downloads) =====
-  //
-  // These handlers replace the previous RAWG-backed "store" tab — instead of
-  // browsing RAWG's database and just adding a placeholder, the store now
-  // serves a curated catalog of legally-downloadable games with multiple
-  // download sources per game (Hydra-style), and the download manager writes
-  // REAL bytes to disk with pause/resume/cancel support.
-  //
-  // The old store:search / store:trending / store:topRated / store:newReleases
-  // handlers above are KEPT for backward compatibility (in case any renderer
-  // code still imports them) but the new StoreTab no longer calls them.
-
-  ipcMain.handle("store:catalog", async (_e, filters?: { query?: string; genre?: string; sources?: string[]; sort?: string }) => {
-    const { searchStore } = await import("../shared/store-catalog");
-    const list = searchStore({
-      query: filters?.query ?? "",
-      genre: filters?.genre ?? "",
-      sources: filters?.sources ?? [],
-      sort: (filters?.sort as "popularity" | "newest" | "oldest" | "az" | "za" | "rating_high" | "rating_low") ?? "popularity",
-    });
-    return list;
-  });
-
-  ipcMain.handle("store:sourceNames", async () => {
-    const { STORE_SOURCE_NAMES } = await import("../shared/store-catalog");
-    return STORE_SOURCE_NAMES;
-  });
-
-  ipcMain.handle("store:getGame", async (_e, id: string) => {
-    const { findStoreGame } = await import("../shared/store-catalog");
-    return findStoreGame(id) ?? null;
-  });
-
-  ipcMain.handle("store:genres", async () => {
-    const { STORE_GENRES } = await import("../shared/store-catalog");
-    return STORE_GENRES;
-  });
-
-  // Pick an install directory via the native folder picker. Optional — if the
-  // user cancels, the download manager uses the default under userData/downloads.
-  ipcMain.handle("store:pickInstallDir", async () => {
-    try {
-      const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
-      const result = await dialog.showOpenDialog(win!, {
-        title: "Choose install location",
-        properties: ["openDirectory"],
-      });
-      if (result.canceled || result.filePaths.length === 0) return { ok: false, path: null };
-      return { ok: true, path: result.filePaths[0] };
-    } catch (e) {
-      return { ok: false, path: null, error: e instanceof Error ? e.message : String(e) };
-    }
-  });
-
-  // ===== Downloads (the real Hydra-style download manager) =====
-  //
-  // Lifecycle:
-  //   1. startDownload(game, source, installDir?) → kicks off a background job
-  //   2. The renderer subscribes to `downloads:progress` for live updates
-  //   3. pauseDownload / resumeDownload / cancelDownload control the job
-  //   4. On completion, the manager auto-creates a Game row and broadcasts
-  //      `downloads:complete` + `downloads:libraryAdded`.
-
-  ipcMain.handle("downloads:start", async (_e, gameId: string, sourceId: string, installDir?: string) => {
-    const { findStoreGame } = await import("../shared/store-catalog");
-    const { startDownload } = await import("./downloads/manager");
-    const game = findStoreGame(gameId);
-    if (!game) throw new Error(`Store game not found: ${gameId}`);
-    const source = game.repacks.find((s) => s.id === sourceId) ?? game.repacks[0];
-    if (!source) throw new Error(`Source ${sourceId} not found on game ${gameId}`);
-    return startDownload(game, source, installDir ? { installDir } : undefined);
-  });
-
-  ipcMain.handle("downloads:pause", async (_e, gameId: string, sourceId: string) => {
-    const { pauseDownload } = await import("./downloads/manager");
-    pauseDownload(gameId, sourceId);
-    return true;
-  });
-
-  ipcMain.handle("downloads:resume", async (_e, gameId: string, sourceId: string) => {
-    const { findStoreGame } = await import("../shared/store-catalog");
-    const { resumeDownload } = await import("./downloads/manager");
-    const game = findStoreGame(gameId);
-    if (!game) throw new Error(`Store game not found: ${gameId}`);
-    const source = game.repacks.find((s) => s.id === sourceId) ?? game.repacks[0];
-    if (!source) throw new Error(`Source ${sourceId} not found on game ${gameId}`);
-    return resumeDownload(gameId, sourceId, game, source);
-  });
-
-  ipcMain.handle("downloads:cancel", async (_e, gameId: string, sourceId: string) => {
-    const { cancelDownload } = await import("./downloads/manager");
-    cancelDownload(gameId, sourceId);
-    return true;
-  });
-
-  ipcMain.handle("downloads:remove", async (_e, gameId: string, sourceId: string) => {
-    const { removeDownload } = await import("./downloads/manager");
-    removeDownload(gameId, sourceId);
-    return true;
-  });
-
-  ipcMain.handle("downloads:list", async () => {
-    const { listDownloads } = await import("./downloads/manager");
-    return listDownloads();
-  });
-
-  // Install a completed download into the library — explicitly triggered by
-  // the user clicking "Install" on a completed download row. This is the
-  // "patch" step that mirrors Hydra Launcher's flow:
-  //   Download → completed → user clicks "Install" → game appears in Library.
-  ipcMain.handle("downloads:install", async (_e, gameId: string, sourceId: string) => {
-    const { installDownload } = await import("./downloads/manager");
-    return installDownload(gameId, sourceId);
-  });
-
-  ipcMain.handle("downloads:clearCompleted", async () => {
-    const { clearCompleted } = await import("./downloads/manager");
-    clearCompleted();
-    return true;
-  });
-
-  // Open the install folder in the OS file explorer.
-  ipcMain.handle("downloads:openFolder", async (_e, gameId: string, sourceId: string) => {
-    const { getDownload } = await import("./downloads/manager");
-    const { shell } = await import("electron");
-    const entry = getDownload(gameId, sourceId);
-    if (!entry?.installPath) return { ok: false, message: "Install path unknown" };
-    const folder = entry.installPath.replace(/[\\/][^\\/]+\.nexuspkg$/, "");
-    const result = await shell.openPath(folder);
-    return { ok: !result, message: result || "Opened" };
-  });
 }
 
 /**

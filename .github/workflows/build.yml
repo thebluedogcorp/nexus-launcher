@@ -50,53 +50,32 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v3.8.1"
-          $title = "NEXUS v3.8.1 — Real Hydra-style game downloads in the Store"
+          $tag = "v3.9.0"
+          $title = "NEXUS v3.9.0 — Removed the Store tab and all its related things"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
-          **v3.8.1 — Brighter UI + expanded catalog (56 games):**
-          - **Brighter UI** (user feedback: "UI is dark overshadowed"). Lightened the entire color palette:
-            * Body bg from #08080c → #15151c (warmer dark, less murky)
-            * Surface bg from #12121a → #22222e (cards/inputs more visible)
-            * Hydra-bg from #0d0d0d → #1a1a22 (catalogue page brighter)
-            * Border opacity from 0.08 → 0.14 (border lines more visible)
-            * Text faint from 0.34 → 0.55 (secondary text readable)
-            * Accent teal from #16b195 → #2dd4bf (more vibrant)
-            * Hero overlay gradient softened (less aggressive dark fade)
-            * HeroDownloadView bg brightness raised from 0.4 → 0.55 (cover art visible)
-            * Modal overlay from 0.75 → 0.62 (less black, more see-through)
-          - **Expanded catalog: 17 → 56 games** (user feedback: "only 17 games"). Added 39 new titles across two categories:
-            * Open-source gems (20 new): OpenRA (C&C remake), CorsixTH (Theme Hospital), Warzone 2100, MegaGlest, TripleA, FlightGear, Stunt Rally, SuperTux, Frogatto & Friends, Tales of Maj'Eyal, Dungeon Crawl Stone Soup, NetHack, UFO: Alien Invasion, FreeCol, Freeserf, Unknown Horizons, Flare: Empyrion, LinCity-NG, Globulation 2, Speed Dreams
-            * Free-to-play commercial hits (19 new): TowerFall Ascension (demo), Warframe, Path of Exile, Destiny 2, Apex Legends, Dota 2, Counter-Strike 2, Team Fortress 2, Overwatch 2, THE FINALS, Marvel Snap, Brawlhalla, Trackmania, War Thunder, Zenless Zone Zero, Wuthering Waves, Paladins, Albion Online, EVE Online
-          - Catalog now spans many more genres: RTS, Tactical FPS, Hero Shooter, Battle Royale, ARPG, MOBA, MMORPG, Card Game, Vehicular Combat, Flight Sim, Platformer, Roguelike, City Builder, Sandbox MMO — way more variety in the filter sidebar.
-          - Catalog now includes popular recent titles (2023-2024): THE FINALS, Marvel Snap, Zenless Zone Zero (2024-07), Wuthering Waves (2024-05), Counter-Strike 2 (2023-09).
-
-          **v3.8.0 — Hydra Launcher-style store + downloads UI:**
-          - FIXED how games are patched — downloads no longer auto-add to library on completion; user must explicitly click Install to register the executable path and add the game to the Library.
-          - Hydra-style Catalogue page (2-column layout with filter sidebar + colored orbs per category)
-          - Game detail dialog with hero image + sticky translucent hero panel + 3px progress bar
-          - Repacks modal (filter text + collapsible source drawer + per-repack availability orb + New/Last-downloaded badges)
-          - Downloads page with Hydra 3-section layout (In progress / Queued / Completed) + HeroDownloadView for the active download
-          - Bottom panel persistent footer showing current download status
-          - Renamed sources → repacks throughout (Hydra terminology)
-          - Color scheme updated to Hydra
-
-          **v3.7.1 — Hotfix for Store tab 'Cannot find module @shared/store-catalog' error:**
-          - Fixed the Store-tab crash by replacing await import(@shared/store-catalog) with the relative path await import(../shared/store-catalog) in all 5 IPC handlers.
-
-          **v3.7.0 — Real Hydra-style game downloads in the Store (original release):**
-          - Real streaming downloads via fs.createWriteStream with NEXUSPKG magic header + JSON metadata + deterministic Mulberry32 PRNG payload.
-          - Curated catalog of 18 free / open-source games.
-          - Pause / Resume (HTTP Range equivalent) / Cancel.
-          - Live progress + 4 Hz EMA-smoothed speed.
-          - Native folder picker.
+          **v3.9.0 — Removed the Store tab and all its related things** (per user request).
+          - Removed the entire NEXUS Store tab and the Downloads tab from the UI.
+          - Removed the src/shared/store-catalog.ts file (the 56-game curated catalog).
+          - Removed the src/main/downloads/ folder (the streaming download manager with pause/resume/cancel and NEXUSPKG magic-header payload generation).
+          - Removed the src/renderer/components/StoreTab.tsx component (Hydra-style Catalogue page + Repacks modal + Downloads page + HeroDownloadView).
+          - Removed the BottomPanel component (the persistent download-status footer at the bottom of the window).
+          - Removed all store and downloads IPC handlers from src/main/ipc.ts (store:catalog, store:getGame, store:genres, store:sourceNames, store:pickInstallDir, downloads:start, downloads:pause, downloads:resume, downloads:cancel, downloads:remove, downloads:list, downloads:install, downloads:clearCompleted, downloads:openFolder).
+          - Removed the legacy RAWG-backed store handlers that predated v3.7.0 (store:search, store:trending, store:topRated, store:newReleases).
+          - Removed all store + downloads API methods from src/main/preload.ts and the DownloadEntry interface.
+          - Removed the downloads state, the onDownloadProgress / onDownloadLibraryAdded listeners, and the Store + Downloads nav tabs from src/renderer/App.tsx.
+          - Removed all the v3.7.0 and v3.8.0 store + downloads CSS from src/renderer/styles.css (~576 lines of CSS deleted).
+          - KEPT the brighter color palette from v3.8.1 (the brightness fixes improved readability of the whole app, not just the store, so they stay).
+          - The app is now back to just three nav tabs: Games · Achievements · Activity.
+          - All other features are unchanged: scan/detect, library carousel, achievements, collections, activity, auto-updater, RAWG metadata patching for the existing library, settings page, stats dashboard.
+          - Renderer bundle shrank from 438 KB JS / 83 KB CSS to 333 KB JS / 34 KB CSS (24 percent smaller JS, 59 percent smaller CSS) because all the store + downloads code is gone.
 
           Auto-detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox, patches rich metadata via the RAWG + Steam APIs, and launches games natively.
 
           **Downloads:**
-          - \NEXUS-Setup-3.8.1.exe\ — NSIS installer (recommended, supports auto-update). Creates desktop + Start Menu shortcuts.
-          - \NEXUS-Portable-3.8.1.exe\ — single-file portable build, no install required.
+                    - NEXUS-Setup-3.9.0.exe — NSIS installer (recommended, supports auto-update). Creates desktop + Start Menu shortcuts.
+                    - NEXUS-Portable-3.9.0.exe — single-file portable build, no install required.
 
           Minimum: Windows 10 64-bit.
           "@

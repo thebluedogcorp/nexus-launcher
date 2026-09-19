@@ -10,8 +10,6 @@ import { UpdateDialog } from "./components/UpdateDialog";
 import { ToastContainer, type Toast } from "./components/Toast";
 import { useGamepadController } from "./lib/useGamepad";
 import { formatPlaytime, formatPlaytimeShort, formatSize, platformColor, platformLabel, gradientFor, initials, relativeTime } from "./lib/helpers";
-import { StoreTab, DownloadsTab } from "./components/StoreTab";
-import type { DownloadEntry } from "../main/preload";
 
 interface Filters { platform: string; favOnly: boolean; query: string; sort: SortKey }
 const DEFAULT_FILTERS: Filters = { platform: "all", favOnly: false, query: "", sort: "recent" };
@@ -48,13 +46,11 @@ export function App() {
   // v2.0 features state
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; game: Game } | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"games" | "store" | "downloads" | "achievements" | "activity">("games");
+  const [activeTab, setActiveTab] = useState<"games" | "achievements" | "activity">("games");
   const [achievements, setAchievements] = useState<Array<{ id: string; name: string; description: string; icon: string; unlockedAt: string | null; progress: number; maxProgress: number }>>([]);
   const [editorGame, setEditorGame] = useState<Game | null>(null);
   const [updateAvailable, setUpdateAvailable] = useState<{ version?: string; releaseUrl?: string; downloadUrl?: string; downloadSize?: number } | null>(null);
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
-  // Downloads state — synced with the main-process download manager.
-  const [downloads, setDownloads] = useState<DownloadEntry[]>([]);
 
   const toast = useCallback((type: Toast["type"], title: string, desc?: string) => {
     setToasts((prev) => [...prev, { id: Date.now() + Math.random(), type, title, desc }]);
@@ -111,30 +107,7 @@ export function App() {
     const offP = (window as unknown as { nexus?: { onPatchProgress?: (cb: (p: { gameId: number; title: string; current: number; total: number }) => void) => () => void } }).nexus?.onPatchProgress?.((p) => { setPatching(true); setPatchProgress({ current: p.current, total: p.total, title: p.title }); });
     const offG = (window as unknown as { nexus?: { onPatchGameUpdated?: (cb: (p: { game: Game }) => void) => () => void } }).nexus?.onPatchGameUpdated?.(({ game }) => { setGames((prev) => prev.map((g) => (g.id === game.id ? game : g))); if (pageGame?.id === game.id) setPageGame(game); refreshStats(); });
     const offD = (window as unknown as { nexus?: { onPatchDone?: (cb: (p: { patched: number; attempted: number }) => void) => () => void } }).nexus?.onPatchDone?.(({ patched, attempted }) => { setPatching(false); setPatchProgress(null); if (patched > 0) toast("success", `Enriched ${patched} of ${attempted} games`, "Artwork fetched automatically."); refreshAll(); });
-
-    // ===== Downloads: live progress + completion =====
-    // Pull the current list once on mount, then subscribe to live updates.
-    (async () => {
-      try {
-        const list = await window.nexus.listDownloads();
-        setDownloads(list);
-      } catch {}
-    })();
-    const offProg = window.nexus.onDownloadProgress?.(() => {
-      // Throttled re-pull of the entire list — keeps the UI in sync without
-      // flooding React state updates.
-      window.nexus.listDownloads().then(setDownloads).catch(() => {});
-    });
-    const offDone = window.nexus.onDownloadProgress?.(() => {
-      // No-op — progress handler above covers all status changes.
-    });
-    const offLib = window.nexus.onDownloadLibraryAdded?.(() => {
-      // A finished download was added to the library — refresh the games list
-      // so the new title appears in the carousel.
-      refreshAll();
-      window.nexus.listDownloads().then(setDownloads).catch(() => {});
-    });
-    return () => { offP?.(); offG?.(); offD?.(); offProg?.(); offDone?.(); offLib?.(); };
+    return () => { offP?.(); offG?.(); offD?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -514,38 +487,12 @@ export function App() {
       {/* Nav tabs */}
       <div className="nav-tabs">
         <button className={activeTab === "games" ? "nav-tab active" : "nav-tab"} onClick={() => setActiveTab("games")}>Games</button>
-        <button className={activeTab === "store" ? "nav-tab active" : "nav-tab"} onClick={() => setActiveTab("store")}>Store</button>
-        <button className={activeTab === "downloads" ? "nav-tab active" : "nav-tab"} onClick={() => setActiveTab("downloads")}>
-          Downloads {downloads.filter((d) => d.status === "downloading" || d.status === "paused" || d.status === "queued").length > 0 && (
-            <span style={{ fontSize: 10, color: "var(--accent)", fontWeight: 700 }}>
-              {downloads.filter((d) => d.status === "downloading" || d.status === "paused" || d.status === "queued").length}
-            </span>
-          )}
-        </button>
         <button className={activeTab === "achievements" ? "nav-tab active" : "nav-tab"} onClick={() => setActiveTab("achievements")}>Achievements {achievements.filter((a) => a.unlockedAt).length > 0 && <span style={{ fontSize: 10, color: "var(--accent)", fontWeight: 700 }}>{achievements.filter((a) => a.unlockedAt).length}</span>}</button>
         <button className={activeTab === "activity" ? "nav-tab active" : "nav-tab"} onClick={() => setActiveTab("activity")}>Activity</button>
       </div>
 
       <main className="stage">
-        {activeTab === "store" ? (
-          /* ===== STORE TAB (curated catalog + real downloads) ===== */
-          <StoreTab
-            toast={toast}
-            downloads={downloads}
-            onLibraryChanged={() => { refreshAll(); setActiveTab("games"); }}
-            onOpenDownloads={() => setActiveTab("downloads")}
-            onDownloadsChanged={() => { void window.nexus.listDownloads().then(setDownloads); }}
-          />
-        ) : activeTab === "downloads" ? (
-          /* ===== DOWNLOADS TAB ===== */
-          <DownloadsTab
-            downloads={downloads}
-            onRefresh={() => { void window.nexus.listDownloads().then(setDownloads); }}
-            onOpenStore={() => setActiveTab("store")}
-            onLibraryChanged={() => { refreshAll(); setActiveTab("games"); }}
-            toast={toast}
-          />
-        ) : activeTab === "achievements" ? (
+        {activeTab === "achievements" ? (
           /* ===== ACHIEVEMENTS TAB ===== */
           <div style={{ flex: 1, overflowY: "auto" }}>
             <div className="ach-grid">
@@ -814,63 +761,9 @@ export function App() {
 
       {controllerConnected && !pageGame && <div className="hints-bar"><span className="hint"><span className="k">↑↓</span> {gpZone === "topbar" ? "Top Bar" : gpZone === "filters" ? "Filters" : gpZone === "carousel" ? "Games" : "Actions"}</span><span className="hint"><span className="k">←→</span> Navigate</span><span className="hint"><span className="k r">A</span> Select</span><span className="hint"><span className="k r">X</span> Play</span><span className="hint"><span className="k r">Y</span> Details</span><span className="hint"><span className="k r">B</span> Back</span><span className="hint"><span className="k">☰</span> Settings</span></div>}
 
-      {/* Bottom panel — current download status (Hydra-style persistent footer) */}
-      <BottomPanel downloads={downloads} onOpenDownloads={() => setActiveTab("downloads")} version="3.8.1" />
-
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
-}
-
-// ===== Bottom panel — single-line download status =====
-function BottomPanel({ downloads, onOpenDownloads, version }: { downloads: DownloadEntry[]; onOpenDownloads: () => void; version: string }) {
-  const active = downloads.find((d) => d.status === "downloading" || d.status === "paused");
-  const completed = downloads.find((d) => d.status === "completed" && !d.libraryGameId);
-  const failed = downloads.find((d) => d.status === "failed");
-
-  let statusText = "No downloads in progress";
-  let statusIcon = <Icon.Download size={12} />;
-  let statusClass = "";
-
-  if (active) {
-    const pct = active.totalBytes > 0 ? Math.min(100, (active.downloadedBytes / active.totalBytes) * 100) : 0;
-    if (active.status === "downloading") {
-      const speed = active.speedBps > 0 ? ` · ${formatSpeedShort(active.speedBps)}/s` : "";
-      statusText = `Downloading ${active.gameTitle} ${pct.toFixed(0)}%${speed}`;
-      statusIcon = <Icon.Spinner size={12} />;
-      statusClass = "active";
-    } else {
-      statusText = `Paused ${active.gameTitle} ${pct.toFixed(0)}%`;
-      statusIcon = <Icon.Play size={12} />;
-      statusClass = "paused";
-    }
-  } else if (completed) {
-    statusText = `${completed.gameTitle} ready to install`;
-    statusIcon = <Icon.Download size={12} />;
-    statusClass = "ready";
-  } else if (failed) {
-    statusText = `${failed.gameTitle} failed: ${failed.error ?? "unknown error"}`;
-    statusIcon = <Icon.Close size={12} />;
-    statusClass = "failed";
-  }
-
-  return (
-    <div className="bottom-panel">
-      <button className="bottom-panel__status" onClick={onOpenDownloads} title="Open Downloads">
-        <span className={`bottom-panel__status-icon ${statusClass}`}>{statusIcon}</span>
-        <span className="bottom-panel__status-text">{statusText}</span>
-      </button>
-      <button className="bottom-panel__version" onClick={onOpenDownloads} title="NEXUS v3.8.0">
-        v{version}
-      </button>
-    </div>
-  );
-}
-
-function formatSpeedShort(bytesPerSec: number): string {
-  if (bytesPerSec >= 1_000_000) return `${(bytesPerSec / 1_000_000).toFixed(1)} MB`;
-  if (bytesPerSec >= 1_000) return `${(bytesPerSec / 1_000).toFixed(0)} KB`;
-  return `${bytesPerSec} B`;
 }
 
 function DynamicBackground({ games, focusedIdx, focusedGame }: { games: Game[]; focusedIdx: number; focusedGame: Game | null }) {
