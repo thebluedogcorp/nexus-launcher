@@ -50,22 +50,37 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v3.8.0"
-          $title = "NEXUS v3.8.0 — Real Hydra-style game downloads in the Store"
+          $tag = "v3.8.1"
+          $title = "NEXUS v3.8.1 — Real Hydra-style game downloads in the Store"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
+          **v3.8.1 — Brighter UI + expanded catalog (56 games):**
+          - **Brighter UI** (user feedback: "UI is dark overshadowed"). Lightened the entire color palette:
+            * Body bg from #08080c → #15151c (warmer dark, less murky)
+            * Surface bg from #12121a → #22222e (cards/inputs more visible)
+            * Hydra-bg from #0d0d0d → #1a1a22 (catalogue page brighter)
+            * Border opacity from 0.08 → 0.14 (border lines more visible)
+            * Text faint from 0.34 → 0.55 (secondary text readable)
+            * Accent teal from #16b195 → #2dd4bf (more vibrant)
+            * Hero overlay gradient softened (less aggressive dark fade)
+            * HeroDownloadView bg brightness raised from 0.4 → 0.55 (cover art visible)
+            * Modal overlay from 0.75 → 0.62 (less black, more see-through)
+          - **Expanded catalog: 17 → 56 games** (user feedback: "only 17 games"). Added 39 new titles across two categories:
+            * Open-source gems (20 new): OpenRA (C&C remake), CorsixTH (Theme Hospital), Warzone 2100, MegaGlest, TripleA, FlightGear, Stunt Rally, SuperTux, Frogatto & Friends, Tales of Maj'Eyal, Dungeon Crawl Stone Soup, NetHack, UFO: Alien Invasion, FreeCol, Freeserf, Unknown Horizons, Flare: Empyrion, LinCity-NG, Globulation 2, Speed Dreams
+            * Free-to-play commercial hits (19 new): TowerFall Ascension (demo), Warframe, Path of Exile, Destiny 2, Apex Legends, Dota 2, Counter-Strike 2, Team Fortress 2, Overwatch 2, THE FINALS, Marvel Snap, Brawlhalla, Trackmania, War Thunder, Zenless Zone Zero, Wuthering Waves, Paladins, Albion Online, EVE Online
+          - Catalog now spans many more genres: RTS, Tactical FPS, Hero Shooter, Battle Royale, ARPG, MOBA, MMORPG, Card Game, Vehicular Combat, Flight Sim, Platformer, Roguelike, City Builder, Sandbox MMO — way more variety in the filter sidebar.
+          - Catalog now includes popular recent titles (2023-2024): THE FINALS, Marvel Snap, Zenless Zone Zero (2024-07), Wuthering Waves (2024-05), Counter-Strike 2 (2023-09).
+
           **v3.8.0 — Hydra Launcher-style store + downloads UI:**
-          - **FIXED "how games are patched".** Downloads no longer auto-add to the library on completion. The downloaded .nexuspkg file is just the "installer" — the user must now explicitly click "Install" on a completed download to register the executable path and add the game to the library. This matches Hydra Launcher's flow: Download → completed → user clicks "Install" → game appears in Library.
-          - **Hydra-style Catalogue page.** The Store tab is now a 2-column layout: a games list on the left (200×103 cover + title + genres + repack badges + hover "+" quick-add button) and a filter sidebar on the right with collapsible Genres + Download sources sections, each with per-category colored orbs (genres purple, sources orange).
-          - **Active filter chips** at the top of the catalogue show every active filter as a colored pill with a clear (×) button. Sort dropdown: Popularity / Newest / Oldest / Title A-Z / Title Z-A / Highest rating / Lowest rating.
-          - **Game detail dialog redesigned with Hydra hero panel.** Full-bleed hero image, translucent sticky 64px hero panel with Download/Play/Pause + favorite + options buttons, and a 3px progress bar at the bottom of the panel that fills as the download progresses. Body has a collapsible description (Show more/less) and a 280px right metadata sidebar with Stats + Details + Languages sections.
-          - **Repacks modal (Hydra-style "Open download options").** Triggered by clicking Download in the hero panel. Has a free-text "Filter repacks" input + a collapsible "Filter by source" drawer with checkboxes per repacker (Official / GOG / FitGirl / OnlineFix / Xatab / DODI). Each repack row shows: colored availability orb (green online / amber partial / red offline) + title + "New" badge (if created in last 14 days) + "Last downloaded" badge + {fileSize} - {sourceName} - {uploadDate} line + live progress bar with speed.
-          - **Downloads page redesigned with Hydra 3-section layout.** Three sections: "Download in progress" (active download shown as a big HeroDownloadView with blurred bg + cover + status + animated % + glass Pause/Cancel buttons + speed stats) / "Queued / paused / failed" / "Downloads completed". Per-row actions: Install / Pause / Resume / Cancel / Remove / Open folder.
-          - **Bottom panel (Hydra-style persistent footer).** Single-line current download status ("Downloading Mindustry 45% · 2.3 MB/s") or "No downloads in progress" — clicking navigates to the Downloads tab. Version button on the right.
-          - **Color scheme updated to Hydra.** #0d0d0d / #121212 backgrounds, #d0d1d7 / #f0f1f7 text, rgba(255,255,255,0.08) borders, #16b195 brand teal, #fbbf24 gold for paused state, #4ade80 for success.
-          - **Renamed "sources" → "repacks"** throughout the codebase to match Hydra's terminology. Each repack now has the proper Hydra fields: uris, unavailableUris, uploadDate, createdAt, downloadSourceName, fileSize, title (display name like "FitGirl · v1.4.0 · Win x64"), kind (badge color), seeders, leechers, quality, languages.
-          - **All existing features unchanged.** Scan/detect, library carousel, achievements, collections, activity, auto-updater, RAWG metadata patching — all still work exactly as before.
+          - FIXED how games are patched — downloads no longer auto-add to library on completion; user must explicitly click Install to register the executable path and add the game to the Library.
+          - Hydra-style Catalogue page (2-column layout with filter sidebar + colored orbs per category)
+          - Game detail dialog with hero image + sticky translucent hero panel + 3px progress bar
+          - Repacks modal (filter text + collapsible source drawer + per-repack availability orb + New/Last-downloaded badges)
+          - Downloads page with Hydra 3-section layout (In progress / Queued / Completed) + HeroDownloadView for the active download
+          - Bottom panel persistent footer showing current download status
+          - Renamed sources → repacks throughout (Hydra terminology)
+          - Color scheme updated to Hydra
 
           **v3.7.1 — Hotfix for Store tab 'Cannot find module @shared/store-catalog' error:**
           - Fixed the Store-tab crash by replacing await import(@shared/store-catalog) with the relative path await import(../shared/store-catalog) in all 5 IPC handlers.
@@ -80,8 +95,8 @@ jobs:
           Auto-detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox, patches rich metadata via the RAWG + Steam APIs, and launches games natively.
 
           **Downloads:**
-          - \NEXUS-Setup-3.8.0.exe\ — NSIS installer (recommended, supports auto-update). Creates desktop + Start Menu shortcuts.
-          - \NEXUS-Portable-3.8.0.exe\ — single-file portable build, no install required.
+          - \NEXUS-Setup-3.8.1.exe\ — NSIS installer (recommended, supports auto-update). Creates desktop + Start Menu shortcuts.
+          - \NEXUS-Portable-3.8.1.exe\ — single-file portable build, no install required.
 
           Minimum: Windows 10 64-bit.
           "@

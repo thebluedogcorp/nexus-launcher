@@ -815,7 +815,7 @@ export function App() {
       {controllerConnected && !pageGame && <div className="hints-bar"><span className="hint"><span className="k">↑↓</span> {gpZone === "topbar" ? "Top Bar" : gpZone === "filters" ? "Filters" : gpZone === "carousel" ? "Games" : "Actions"}</span><span className="hint"><span className="k">←→</span> Navigate</span><span className="hint"><span className="k r">A</span> Select</span><span className="hint"><span className="k r">X</span> Play</span><span className="hint"><span className="k r">Y</span> Details</span><span className="hint"><span className="k r">B</span> Back</span><span className="hint"><span className="k">☰</span> Settings</span></div>}
 
       {/* Bottom panel — current download status (Hydra-style persistent footer) */}
-      <BottomPanel downloads={downloads} onOpenDownloads={() => setActiveTab("downloads")} version="3.8.0" />
+      <BottomPanel downloads={downloads} onOpenDownloads={() => setActiveTab("downloads")} version="3.8.1" />
 
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
