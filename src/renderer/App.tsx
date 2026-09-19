@@ -46,6 +46,8 @@ export function App() {
   // v2.0 features state
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; game: Game } | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"games" | "achievements" | "activity">("games");
+  const [achievements, setAchievements] = useState<Array<{ id: string; name: string; description: string; icon: string; unlockedAt: string | null; progress: number; maxProgress: number }>>([]);
   const [editorGame, setEditorGame] = useState<Game | null>(null);
   const [updateAvailable, setUpdateAvailable] = useState<{ version?: string; releaseUrl?: string; downloadUrl?: string; downloadSize?: number } | null>(null);
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
@@ -87,6 +89,20 @@ export function App() {
       } catch (e) {
         toast("error", "Couldn't load library", "The local database may be locked.");
       } finally { setLoading(false); }
+      // Check achievements on startup
+      try {
+        const res = await window.nexus.checkAchievements();
+        if (res.newlyUnlocked.length > 0) {
+          const achs = await window.nexus.getAchievements();
+          setAchievements(achs);
+          res.newlyUnlocked.forEach((id: string) => {
+            const a = achs.find((x: { id: string }) => x.id === id);
+            if (a) toast("success", `🏆 Achievement Unlocked!`, `${a.name} — ${a.description}`);
+          });
+        } else {
+          setAchievements(await window.nexus.getAchievements());
+        }
+      } catch {}
     })();
     const offP = (window as unknown as { nexus?: { onPatchProgress?: (cb: (p: { gameId: number; title: string; current: number; total: number }) => void) => () => void } }).nexus?.onPatchProgress?.((p) => { setPatching(true); setPatchProgress({ current: p.current, total: p.total, title: p.title }); });
     const offG = (window as unknown as { nexus?: { onPatchGameUpdated?: (cb: (p: { game: Game }) => void) => () => void } }).nexus?.onPatchGameUpdated?.(({ game }) => { setGames((prev) => prev.map((g) => (g.id === game.id ? game : g))); if (pageGame?.id === game.id) setPageGame(game); refreshStats(); });
@@ -468,7 +484,57 @@ export function App() {
       </header>
 
       {/* Stage: carousel + info zone */}
+      {/* Nav tabs */}
+      <div className="nav-tabs">
+        <button className={activeTab === "games" ? "nav-tab active" : "nav-tab"} onClick={() => setActiveTab("games")}>Games</button>
+        <button className={activeTab === "achievements" ? "nav-tab active" : "nav-tab"} onClick={() => setActiveTab("achievements")}>Achievements {achievements.filter((a) => a.unlockedAt).length > 0 && <span style={{ fontSize: 10, color: "var(--accent)", fontWeight: 700 }}>{achievements.filter((a) => a.unlockedAt).length}</span>}</button>
+        <button className={activeTab === "activity" ? "nav-tab active" : "nav-tab"} onClick={() => setActiveTab("activity")}>Activity</button>
+      </div>
+
       <main className="stage">
+        {activeTab === "achievements" ? (
+          /* ===== ACHIEVEMENTS TAB ===== */
+          <div style={{ flex: 1, overflowY: "auto" }}>
+            <div className="ach-grid">
+              {achievements.map((a) => {
+                const unlocked = !!a.unlockedAt;
+                const pct = a.maxProgress > 0 ? Math.round((a.progress / a.maxProgress) * 100) : 0;
+                return (
+                  <div key={a.id} className={`ach-card ${unlocked ? "unlocked" : "locked"}`}>
+                    <div className={`ach-icon ${unlocked ? "unlocked" : "locked"}`}>{a.icon}</div>
+                    <div className="ach-body">
+                      <div className="ach-name">{a.name}</div>
+                      <div className="ach-desc">{a.description}</div>
+                      {!unlocked && a.maxProgress > 1 && (
+                        <>
+                          <div className="ach-progress"><div style={{ width: `${pct}%` }} /></div>
+                          <div className="ach-pct">{a.progress} / {a.maxProgress} ({pct}%)</div>
+                        </>
+                      )}
+                      {unlocked && <div className="ach-pct" style={{ color: "var(--accent)" }}>✓ Unlocked</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : activeTab === "activity" ? (
+          /* ===== ACTIVITY TAB ===== */
+          <div style={{ flex: 1, overflowY: "auto", padding: "0 32px 32px" }}>
+            <div className="dash-card" style={{ maxWidth: 600 }}>
+              <div className="dash-card-title"><Icon.Clock size={13} /> Recent Activity</div>
+              {games.filter((g) => g.lastPlayedAt).sort((a, b) => (b.lastPlayedAt ?? "").localeCompare(a.lastPlayedAt ?? "")).slice(0, 15).map((g) => (
+                <div key={g.id} className="dash-recent">
+                  <span className="title">{g.title}</span>
+                  <span className="time">{relativeTime(g.lastPlayedAt)}</span>
+                </div>
+              ))}
+              {games.filter((g) => g.lastPlayedAt).length === 0 && <p style={{ fontSize: 13, color: "var(--faint)", padding: 8 }}>No activity yet. Launch a game to get started!</p>}
+            </div>
+          </div>
+        ) : (
+        /* ===== GAMES TAB ===== */
+        <>
         {/* Filter pills */}
         <div className="filter-row">
           <button className={filters.platform === "all" && !filters.favOnly ? "filter-pill active" : "filter-pill"} onClick={() => setFilters((f) => ({ ...f, platform: "all", favOnly: false }))}>All</button>
@@ -669,6 +735,8 @@ export function App() {
               </div>
             </div>
           </div>
+        )}
+        </>
         )}
       </main>
 

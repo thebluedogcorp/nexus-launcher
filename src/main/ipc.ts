@@ -29,6 +29,7 @@ import { runScan } from "./detectors";
 import { launchGame } from "./launchers";
 import { searchRawg } from "./metadata/rawg";
 import { fetchAggregated } from "./metadata/aggregator";
+import { getAchievements, unlockAchievement, checkAchievements } from "./db";
 import type {
   DetectedGame,
   Game,
@@ -300,6 +301,19 @@ export function registerIpc(): void {
   ipcMain.handle("collections:removeGame", (_e, collectionId: number, gameId: number) => { removeGameFromCollection(collectionId, gameId); return true; });
   ipcMain.handle("collections:delete", (_e, id: number) => { deleteCollection(id); return true; });
   ipcMain.handle("collections:getGames", (_e, collectionId: number) => getGamesInCollection(collectionId));
+
+  // ===== Achievements =====
+  ipcMain.handle("achievements:list", () => getAchievements());
+  ipcMain.handle("achievements:unlock", (_e, id: string) => {
+    const newly = unlockAchievement(id);
+    // Also check all achievements for any that should be unlocked
+    const checked = checkAchievements();
+    return { newlyUnlocked: [...(newly ? [id] : []), ...checked] };
+  });
+  ipcMain.handle("achievements:check", () => {
+    const newlyUnlocked = checkAchievements();
+    return { newlyUnlocked };
+  });
 }
 
 /**

@@ -114,6 +114,9 @@ const api = {
   addGameToCollection: (collectionId: number, gameId: number) => ipcRenderer.invoke("collections:addGame", collectionId, gameId) as Promise<boolean>,
   removeGameFromCollection: (collectionId: number, gameId: number) => ipcRenderer.invoke("collections:removeGame", collectionId, gameId) as Promise<boolean>,
   deleteCollection: (id: number) => ipcRenderer.invoke("collections:delete", id) as Promise<boolean>,
+  // Achievements
+  getAchievements: () => ipcRenderer.invoke("achievements:list") as Promise<Array<{ id: string; name: string; description: string; icon: string; unlockedAt: string | null; progress: number; maxProgress: number }>>,
+  checkAchievements: () => ipcRenderer.invoke("achievements:check") as Promise<{ newlyUnlocked: string[] }>,
 
   // Scan
   runScan: (platforms?: Game["platform"][]) =>

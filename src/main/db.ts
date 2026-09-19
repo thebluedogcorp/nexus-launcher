@@ -165,6 +165,15 @@ function migrate(conn: import("better-sqlite3").Database) {
       minutes INTEGER DEFAULT 0,
       FOREIGN KEY (gameId) REFERENCES games(id) ON DELETE CASCADE
     );
+    CREATE TABLE IF NOT EXISTS achievements (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT NOT NULL,
+      icon TEXT DEFAULT 'trophy',
+      unlockedAt TEXT,
+      progress INTEGER DEFAULT 0,
+      maxProgress INTEGER DEFAULT 1
+    );
   `);
   addColumnIfMissing(conn, "games", "completionStatus", "TEXT");
   addColumnIfMissing(conn, "games", "userRating", "INTEGER");
@@ -880,4 +889,101 @@ export function getGamesInCollection(collectionId: number): Game[] {
     WHERE cg.collectionId = ?
   `).all(collectionId) as GameRow[];
   return rows.map(rowToGame);
+}
+
+// ===== Achievements =====
+
+export interface AchievementDef {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  maxProgress: number;
+}
+
+const ACHIEVEMENT_DEFS: AchievementDef[] = [
+  { id: "first_game", name: "Welcome Aboard", description: "Add your first game to the library", icon: "🎮", maxProgress: 1 },
+  { id: "ten_games", name: "Collector", description: "Have 10 games in your library", icon: "📚", maxProgress: 10 },
+  { id: "fifty_games", name: "Library Master", description: "Have 50 games in your library", icon: "🏆", maxProgress: 50 },
+  { id: "first_play", name: "Let's Play", description: "Launch a game for the first time", icon: "▶️", maxProgress: 1 },
+  { id: "ten_launches", name: "Gamer", description: "Launch games 10 times total", icon: "🎯", maxProgress: 10 },
+  { id: "hundred_launches", name: "Dedicated", description: "Launch games 100 times total", icon: "🔥", maxProgress: 100 },
+  { id: "first_fav", name: "Favorites", description: "Favorite your first game", icon: "⭐", maxProgress: 1 },
+  { id: "ten_favs", name: "Curator", description: "Favorite 10 games", icon: "💖", maxProgress: 10 },
+  { id: "first_complete", name: "Finished", description: "Mark a game as Completed", icon: "✅", maxProgress: 1 },
+  { id: "ten_complete", name: "Completionist", description: "Mark 10 games as Completed", icon: "🎖️", maxProgress: 10 },
+  { id: "first_rating", name: "Critic", description: "Rate your first game", icon: "📝", maxProgress: 1 },
+  { id: "first_scan", name: "Explorer", description: "Run your first system scan", icon: "🔍", maxProgress: 1 },
+  { id: "first_patch", name: "Enricher", description: "Patch metadata for a game", icon: "✨", maxProgress: 1 },
+  { id: "ten_hours", name: "Marathon", description: "Play for 10 hours total", icon: "⏰", maxProgress: 600 },
+  { id: "hundred_hours", name: "Centurion", description: "Play for 100 hours total", icon: "⌛", maxProgress: 6000 },
+  { id: "all_platforms", name: "United", description: "Have games from all 8 platforms", icon: "🌐", maxProgress: 8 },
+  { id: "first_edit", name: "Customizer", description: "Edit a game's details", icon: "⚙️", maxProgress: 1 },
+  { id: "first_collection", name: "Organizer", description: "Create your first collection", icon: "📁", maxProgress: 1 },
+  { id: "export_backup", name: "Safe Keeper", description: "Export your library", icon: "💾", maxProgress: 1 },
+  { id: "deep_scan", name: "Deep Diver", description: "Run a deep filesystem scan", icon: "🤿", maxProgress: 1 },
+];
+
+export function getAchievements(): Array<AchievementDef & { unlockedAt: string | null; progress: number }> {
+  const conn = db();
+  // Ensure all achievement defs exist in DB
+  for (const def of ACHIEVEMENT_DEFS) {
+    conn.prepare("INSERT OR IGNORE INTO achievements (id, name, description, icon, maxProgress) VALUES (?, ?, ?, ?, ?)").run(def.id, def.name, def.description, def.icon, def.maxProgress);
+  }
+  const rows = conn.prepare("SELECT * FROM achievements ORDER BY id").all() as Array<{ id: string; name: string; description: string; icon: string; unlockedAt: string | null; progress: number; maxProgress: number }>;
+  return rows;
+}
+
+export function unlockAchievement(id: string): boolean {
+  const conn = db();
+  const row = conn.prepare("SELECT unlockedAt FROM achievements WHERE id = ?").get(id) as { unlockedAt: string | null } | undefined;
+  if (row?.unlockedAt) return false; // already unlocked
+  conn.prepare("UPDATE achievements SET unlockedAt = datetime('now'), progress = maxProgress WHERE id = ?").run(id);
+  return true; // newly unlocked
+}
+
+export function updateAchievementProgress(id: string, progress: number): boolean {
+  const conn = db();
+  const row = conn.prepare("SELECT unlockedAt, maxProgress FROM achievements WHERE id = ?").get(id) as { unlockedAt: string | null; maxProgress: number } | undefined;
+  if (!row) return false;
+  if (row.unlockedAt) return false; // already unlocked
+  const newProgress = Math.min(progress, row.maxProgress);
+  conn.prepare("UPDATE achievements SET progress = ? WHERE id = ?").run(newProgress, id);
+  if (newProgress >= row.maxProgress) {
+    conn.prepare("UPDATE achievements SET unlockedAt = datetime('now') WHERE id = ?").run(id);
+    return true; // newly unlocked
+  }
+  return false;
+}
+
+/** Check all achievements against current library stats and unlock/update as needed.
+ *  Returns a list of newly unlocked achievement IDs. */
+export function checkAchievements(): string[] {
+  const stats = getStats();
+  const newlyUnlocked: string[] = [];
+  const games = listGames({ showHidden: true });
+  const completed = games.filter((g) => g.completionStatus === "completed").length;
+  const rated = games.filter((g) => g.userRating !== null).length;
+  const platforms = new Set(games.map((g) => g.platform)).size;
+
+  const checks: Array<{ id: string; progress: number; max: number }> = [
+    { id: "first_game", progress: Math.min(stats.totalGames, 1), max: 1 },
+    { id: "ten_games", progress: stats.totalGames, max: 10 },
+    { id: "fifty_games", progress: stats.totalGames, max: 50 },
+    { id: "ten_launches", progress: stats.totalLaunches, max: 10 },
+    { id: "hundred_launches", progress: stats.totalLaunches, max: 100 },
+    { id: "ten_favs", progress: stats.favorites, max: 10 },
+    { id: "ten_complete", progress: completed, max: 10 },
+    { id: "first_rating", progress: Math.min(rated, 1), max: 1 },
+    { id: "ten_hours", progress: Math.round(stats.totalPlaytimeSec / 60), max: 600 },
+    { id: "hundred_hours", progress: Math.round(stats.totalPlaytimeSec / 60), max: 6000 },
+    { id: "all_platforms", progress: platforms, max: 8 },
+  ];
+
+  for (const check of checks) {
+    if (updateAchievementProgress(check.id, check.progress)) {
+      newlyUnlocked.push(check.id);
+    }
+  }
+  return newlyUnlocked;
 }
