@@ -32,25 +32,25 @@ a{color:inherit;text-decoration:none}
 .bg-slide{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0;transition:opacity 1.2s cubic-bezier(.4,0,.2,1),transform 14s ease;transform:scale(1.06)}
 .bg-slide.active{opacity:1;transform:scale(1.1)}
 /* Lighter overlay: dark enough for text readability, not so dark it hides art */
-.bg-overlay{position:fixed;inset:0;z-index:1;pointer-events:none;background:linear-gradient(180deg,rgba(8,8,12,0.55) 0%,rgba(8,8,12,0.15) 30%,rgba(8,8,12,0.1) 55%,rgba(8,8,12,0.3) 80%,rgba(8,8,12,0.45) 100%)}
+.bg-overlay{position:fixed;inset:0;z-index:1;pointer-events:none;background:linear-gradient(180deg,rgba(6,6,10,0.7) 0%,rgba(6,6,10,0.3) 30%,rgba(6,6,10,0.2) 55%,rgba(6,6,10,0.5) 80%,rgba(6,6,10,0.7) 100%)}
 
 /* ============ APP SHELL ============ */
 .app{position:relative;z-index:2;display:flex;flex-direction:column;height:100vh}
 
 /* ============ TOP BAR ============ */
-.topbar{height:54px;flex-shrink:0;display:flex;align-items:center;gap:16px;padding:0 32px;z-index:20;background:linear-gradient(180deg,rgba(8,8,12,0.6),transparent);-webkit-app-region:drag}
+.topbar{height:54px;flex-shrink:0;display:flex;align-items:center;gap:16px;padding:0 32px;z-index:20;background:linear-gradient(180deg,rgba(6,6,10,0.85),rgba(6,6,10,0.3));-webkit-app-region:drag}
 .topbar button,.topbar input,.topbar select{-webkit-app-region:no-drag}
 .tb-brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .tb-logo{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#4ade80,#16a34a);display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px -3px rgba(74,222,128,0.4)}
 .tb-name{font-size:15px;font-weight:800;letter-spacing:-0.02em;color:#fff}
 .tb-sub{font-size:9px;color:var(--text-faint);margin-top:2px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600}
 .tb-search{position:relative;flex:1;max-width:380px;margin-left:auto}
-.tb-search input{width:100%;height:34px;border-radius:8px;border:1px solid var(--border);background:rgba(20,20,28,0.5);backdrop-filter:blur(14px);color:var(--text);padding:0 12px 0 34px;font-size:12.5px;outline:none;transition:all .15s}
-.tb-search input:focus{border-color:rgba(255,255,255,0.25);background:rgba(20,20,28,0.7)}
+.tb-search input{width:100%;height:34px;border-radius:8px;border:1px solid var(--border2);background:rgba(20,20,28,0.7);backdrop-filter:blur(14px);color:var(--text);padding:0 12px 0 34px;font-size:12.5px;outline:none;transition:all .15s}
+.tb-search input:focus{border-color:rgba(255,255,255,0.3);background:rgba(20,20,28,0.85)}
 .tb-search .icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text-faint);pointer-events:none}
-.tb-select{height:34px;padding:0 10px;border-radius:8px;border:1px solid var(--border);background:rgba(20,20,28,0.5);backdrop-filter:blur(14px);color:var(--text-dim);font-size:12px;font-weight:600;outline:none;cursor:pointer}
+.tb-select{height:34px;padding:0 10px;border-radius:8px;border:1px solid var(--border2);background:rgba(20,20,28,0.7);backdrop-filter:blur(14px);color:var(--text-dim);font-size:12px;font-weight:600;outline:none;cursor:pointer}
 .tb-select:hover{color:var(--text)}
-.tb-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text-dim);transition:all .12s;border:1px solid var(--border);background:rgba(20,20,28,0.5);backdrop-filter:blur(14px)}
+.tb-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text-dim);transition:all .12s;border:1px solid var(--border2);background:rgba(20,20,28,0.7);backdrop-filter:blur(14px)}
 .tb-icon:hover{background:rgba(255,255,255,0.1);color:var(--text)}
 .tb-icon.primary{background:linear-gradient(180deg,#4ade80,#16a34a);color:#04220e;border:none;box-shadow:0 4px 14px -4px rgba(74,222,128,0.35);font-weight:700;font-size:12px;padding:0 14px;width:auto;gap:6px}
 .tb-icon.primary:hover{transform:translateY(-1px)}
@@ -68,16 +68,15 @@ a{color:inherit;text-decoration:none}
 .enrich-banner .s{font-size:10.5px;color:var(--text-dim);margin-top:1px}
 
 /* ============ CAROUSEL (PS5 portrait tiles) ============ */
-/* Fixed-height carousel — tiles locked in place, no vertical drift.
-   Top padding is small (tiles near top), bottom has room for dashboard. */
-.carousel-wrap{flex:0 0 auto;display:flex;flex-direction:row;height:320px;overflow:visible;position:relative;align-items:center}
+/* Fixed-height carousel — tall enough for the focused tile (200px * 1.25 = 250px
+   + 36px top padding + 16px bottom = 302px. Set to 360px for safety margin). */
+.carousel-wrap{flex:0 0 auto;display:flex;flex-direction:row;height:360px;overflow:visible;position:relative;align-items:center}
 /* Left/right arrow buttons for mouse navigation */
-.carousel-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:10;width:40px;height:56px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.6);background:rgba(14,14,20,.6);backdrop-filter:blur(14px);border:1px solid var(--border);transition:all .2s;cursor:pointer;opacity:0}
-.carousel-arrow:hover{background:rgba(255,255,255,.12);color:#fff;opacity:1}
+.carousel-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:10;width:40px;height:56px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.8);background:rgba(20,20,28,.8);backdrop-filter:blur(14px);border:1px solid var(--border2);transition:all .2s;cursor:pointer;opacity:.6}
+.carousel-arrow:hover{background:rgba(255,255,255,.15);color:#fff;opacity:1}
 .carousel-arrow.left{left:4px}.carousel-arrow.right{right:4px}
-.carousel-wrap:hover .carousel-arrow{opacity:.7}
-/* CSS smooth scroll — GPU-accelerated. Fixed align-items:center + fixed height = no drift. */
-.carousel{display:flex;gap:12px;overflow-x:auto;overflow-y:visible;padding:36px 36px 8px;scroll-behavior:smooth;align-items:center;flex:1;contain:layout style;scrollbar-width:none}
+/* CSS smooth scroll — GPU-accelerated. */
+.carousel{display:flex;gap:12px;overflow-x:auto;overflow-y:visible;padding:50px 36px 16px;scroll-behavior:smooth;align-items:center;flex:1;contain:layout style;scrollbar-width:none}
 .carousel::-webkit-scrollbar{display:none}
 
 .tile{position:relative;flex-shrink:0;width:150px;height:200px;border-radius:12px;overflow:hidden;cursor:pointer;transition:transform .3s cubic-bezier(.2,.8,.2,1),filter .3s,box-shadow .3s,border-color .25s;border:2px solid transparent;background:var(--surface);will-change:transform,filter;contain:layout style paint}
@@ -88,8 +87,8 @@ a{color:inherit;text-decoration:none}
 .tile.focused{transform:scale(1.25);transform-origin:center center;border-color:#fff;box-shadow:0 0 0 1px rgba(255,255,255,.1),0 0 24px rgba(255,255,255,.12),0 18px 40px -10px rgba(0,0,0,.8);z-index:4}
 .tile.focused img,.tile.focused .tile-proc{transform:scale(1)}
 /* Non-focused: dimmed + slightly smaller (PS5 depth) */
-.tile:not(.focused){filter:brightness(0.52) saturate(0.7);transform:scale(0.92)}
-.tile:not(.focused):hover{filter:brightness(0.78) saturate(0.9);transform:scale(0.96)}
+.tile:not(.focused){filter:brightness(0.65) saturate(0.75);transform:scale(0.92)}
+.tile:not(.focused):hover{filter:brightness(0.85) saturate(0.9);transform:scale(0.96)}
 
 .tile-overlay{position:absolute;inset:0;background:linear-gradient(0deg,rgba(0,0,0,0.7) 0%,transparent 40%);pointer-events:none}
 .tile-chips{position:absolute;top:8px;left:8px;right:8px;display:flex;justify-content:space-between;align-items:flex-start;z-index:2;opacity:0;transition:opacity .3s}
@@ -146,9 +145,9 @@ a{color:inherit;text-decoration:none}
 /* Filter pills */
 .filter-row{display:flex;align-items:center;gap:6px;padding:0 0 4px;flex-shrink:0;overflow-x:auto;scrollbar-width:none}
 .filter-row::-webkit-scrollbar{display:none}
-.filter-pill{padding:5px 12px;border-radius:999px;font-size:11px;font-weight:600;transition:all .15s;white-space:nowrap;flex-shrink:0;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text-dim);display:inline-flex;align-items:center;gap:5px}
-.filter-pill:hover{background:rgba(255,255,255,0.08);color:var(--text)}
-.filter-pill.active{background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.2);color:#fff}
+.filter-pill{padding:5px 12px;border-radius:999px;font-size:11px;font-weight:600;transition:all .15s;white-space:nowrap;flex-shrink:0;border:1px solid var(--border2);background:rgba(20,20,28,0.65);color:var(--text-dim);display:inline-flex;align-items:center;gap:5px}
+.filter-pill:hover{background:rgba(255,255,255,0.1);color:var(--text)}
+.filter-pill.active{background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.3);color:#fff}
 .filter-pill .d{width:5px;height:5px;border-radius:50%;flex-shrink:0}
 .filter-sep{width:1px;height:16px;background:var(--border-2);margin:0 3px;flex-shrink:0}
 
@@ -352,7 +351,7 @@ textarea.field-input{height:auto;padding:11px 13px;resize:vertical;font-family:"
 /* ============ BOTTOM DASHBOARD ============ */
 .dashboard{flex:1;display:flex;gap:16px;padding:16px 28px 12px;min-height:0;overflow:hidden}
 .dash-col{flex:1;display:flex;flex-direction:column;gap:12px;min-width:0}
-.dash-card{background:rgba(14,14,20,.5);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:12px;padding:14px;overflow:hidden}
+.dash-card{background:rgba(14,14,20,.72);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:12px;padding:14px;overflow:hidden}
 .dash-card-title{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:10px;display:flex;align-items:center;gap:6px}
 .dash-stat-row{display:flex;align-items:center;justify-content:space-between;padding:5px 0}
 .dash-stat-row .name{font-size:12px;color:var(--dim)}
