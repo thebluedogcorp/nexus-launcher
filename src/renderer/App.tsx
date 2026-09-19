@@ -573,33 +573,16 @@ export function App() {
           <>
             {/* Carousel with arrow buttons for mouse navigation */}
             <div className="carousel-wrap" onMouseMove={(e) => {
-              // Edge-hover auto-scroll: mouse near left/right edge → scroll that direction
               const carousel = e.currentTarget.querySelector(".carousel") as HTMLElement;
               if (!carousel) return;
               const rect = carousel.getBoundingClientRect();
               const x = e.clientX - rect.left;
-              const edgeZone = 80; // px from edge
-              const scrollSpeed = 6;
-              if (x < edgeZone && carousel.scrollLeft > 0) {
-                carousel.scrollLeft -= scrollSpeed;
-              } else if (x > rect.width - edgeZone && carousel.scrollLeft < carousel.scrollWidth - carousel.clientWidth) {
-                carousel.scrollLeft += scrollSpeed;
-              }
+              if (x < 70 && carousel.scrollLeft > 0) carousel.scrollLeft -= 5;
+              else if (x > rect.width - 70 && carousel.scrollLeft < carousel.scrollWidth - carousel.clientWidth) carousel.scrollLeft += 5;
             }}>
-              {/* Left arrow */}
-              <button className="carousel-arrow left" onClick={() => {
-                const carousel = document.querySelector(".carousel") as HTMLElement;
-                if (carousel) carousel.scrollLeft -= 300;
-              }}>
-                <span style={{ display: "inline-flex", transform: "rotate(180deg)" }}><Icon.Chevron size={22} /></span>
-              </button>
-              {/* Right arrow */}
-              <button className="carousel-arrow right" onClick={() => {
-                const carousel = document.querySelector(".carousel") as HTMLElement;
-                if (carousel) carousel.scrollLeft += 300;
-              }}>
-                <Icon.Chevron size={22} />
-              </button>
+              <button className="carousel-arrow left" onClick={() => { const c = document.querySelector(".carousel") as HTMLElement; if (c) c.scrollBy({ left: -280, behavior: "smooth" }); }}><span style={{ display: "inline-flex", transform: "rotate(180deg)" }}><Icon.Chevron size={20} /></span></button>
+              <button className="carousel-arrow right" onClick={() => { const c = document.querySelector(".carousel") as HTMLElement; if (c) c.scrollBy({ left: 280, behavior: "smooth" }); }}><Icon.Chevron size={20} /></button>
+              <div className="carousel-outer">
               <div className="carousel">
                 {games.map((g, i) => (
                   <div key={g.id} className={i === focusedIdx ? "tile focused" : "tile"} onMouseEnter={() => { focusSourceRef.current = "mouse"; setFocusedIdx(i); }} onClick={() => openPage(g.id)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, game: g }); }}>
@@ -622,6 +605,7 @@ export function App() {
                     )}
                   </div>
                 ))}
+              </div>
               </div>
             </div>
 
