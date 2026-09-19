@@ -813,9 +813,64 @@ export function App() {
       {statsOpen && <StatsDashboard onClose={() => setStatsOpen(false)} onExport={handleExport} onImport={handleImportFile} onCheckMissing={handleCheckMissing} />}
 
       {controllerConnected && !pageGame && <div className="hints-bar"><span className="hint"><span className="k">↑↓</span> {gpZone === "topbar" ? "Top Bar" : gpZone === "filters" ? "Filters" : gpZone === "carousel" ? "Games" : "Actions"}</span><span className="hint"><span className="k">←→</span> Navigate</span><span className="hint"><span className="k r">A</span> Select</span><span className="hint"><span className="k r">X</span> Play</span><span className="hint"><span className="k r">Y</span> Details</span><span className="hint"><span className="k r">B</span> Back</span><span className="hint"><span className="k">☰</span> Settings</span></div>}
+
+      {/* Bottom panel — current download status (Hydra-style persistent footer) */}
+      <BottomPanel downloads={downloads} onOpenDownloads={() => setActiveTab("downloads")} version="3.8.0" />
+
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
+}
+
+// ===== Bottom panel — single-line download status =====
+function BottomPanel({ downloads, onOpenDownloads, version }: { downloads: DownloadEntry[]; onOpenDownloads: () => void; version: string }) {
+  const active = downloads.find((d) => d.status === "downloading" || d.status === "paused");
+  const completed = downloads.find((d) => d.status === "completed" && !d.libraryGameId);
+  const failed = downloads.find((d) => d.status === "failed");
+
+  let statusText = "No downloads in progress";
+  let statusIcon = <Icon.Download size={12} />;
+  let statusClass = "";
+
+  if (active) {
+    const pct = active.totalBytes > 0 ? Math.min(100, (active.downloadedBytes / active.totalBytes) * 100) : 0;
+    if (active.status === "downloading") {
+      const speed = active.speedBps > 0 ? ` · ${formatSpeedShort(active.speedBps)}/s` : "";
+      statusText = `Downloading ${active.gameTitle} ${pct.toFixed(0)}%${speed}`;
+      statusIcon = <Icon.Spinner size={12} />;
+      statusClass = "active";
+    } else {
+      statusText = `Paused ${active.gameTitle} ${pct.toFixed(0)}%`;
+      statusIcon = <Icon.Play size={12} />;
+      statusClass = "paused";
+    }
+  } else if (completed) {
+    statusText = `${completed.gameTitle} ready to install`;
+    statusIcon = <Icon.Download size={12} />;
+    statusClass = "ready";
+  } else if (failed) {
+    statusText = `${failed.gameTitle} failed: ${failed.error ?? "unknown error"}`;
+    statusIcon = <Icon.Close size={12} />;
+    statusClass = "failed";
+  }
+
+  return (
+    <div className="bottom-panel">
+      <button className="bottom-panel__status" onClick={onOpenDownloads} title="Open Downloads">
+        <span className={`bottom-panel__status-icon ${statusClass}`}>{statusIcon}</span>
+        <span className="bottom-panel__status-text">{statusText}</span>
+      </button>
+      <button className="bottom-panel__version" onClick={onOpenDownloads} title="NEXUS v3.8.0">
+        v{version}
+      </button>
+    </div>
+  );
+}
+
+function formatSpeedShort(bytesPerSec: number): string {
+  if (bytesPerSec >= 1_000_000) return `${(bytesPerSec / 1_000_000).toFixed(1)} MB`;
+  if (bytesPerSec >= 1_000) return `${(bytesPerSec / 1_000).toFixed(0)} KB`;
+  return `${bytesPerSec} B`;
 }
 
 function DynamicBackground({ games, focusedIdx, focusedGame }: { games: Game[]; focusedIdx: number; focusedGame: Game | null }) {

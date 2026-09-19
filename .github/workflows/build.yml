@@ -50,32 +50,38 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v3.7.1"
-          $title = "NEXUS v3.7.1 — Real Hydra-style game downloads in the Store"
+          $tag = "v3.8.0"
+          $title = "NEXUS v3.8.0 — Real Hydra-style game downloads in the Store"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
+          **v3.8.0 — Hydra Launcher-style store + downloads UI:**
+          - **FIXED "how games are patched".** Downloads no longer auto-add to the library on completion. The downloaded .nexuspkg file is just the "installer" — the user must now explicitly click "Install" on a completed download to register the executable path and add the game to the library. This matches Hydra Launcher's flow: Download → completed → user clicks "Install" → game appears in Library.
+          - **Hydra-style Catalogue page.** The Store tab is now a 2-column layout: a games list on the left (200×103 cover + title + genres + repack badges + hover "+" quick-add button) and a filter sidebar on the right with collapsible Genres + Download sources sections, each with per-category colored orbs (genres purple, sources orange).
+          - **Active filter chips** at the top of the catalogue show every active filter as a colored pill with a clear (×) button. Sort dropdown: Popularity / Newest / Oldest / Title A-Z / Title Z-A / Highest rating / Lowest rating.
+          - **Game detail dialog redesigned with Hydra hero panel.** Full-bleed hero image, translucent sticky 64px hero panel with Download/Play/Pause + favorite + options buttons, and a 3px progress bar at the bottom of the panel that fills as the download progresses. Body has a collapsible description (Show more/less) and a 280px right metadata sidebar with Stats + Details + Languages sections.
+          - **Repacks modal (Hydra-style "Open download options").** Triggered by clicking Download in the hero panel. Has a free-text "Filter repacks" input + a collapsible "Filter by source" drawer with checkboxes per repacker (Official / GOG / FitGirl / OnlineFix / Xatab / DODI). Each repack row shows: colored availability orb (green online / amber partial / red offline) + title + "New" badge (if created in last 14 days) + "Last downloaded" badge + `{fileSize} - {sourceName} - {uploadDate}` line + live progress bar with speed.
+          - **Downloads page redesigned with Hydra 3-section layout.** Three sections: "Download in progress" (active download shown as a big HeroDownloadView with blurred bg + cover + status + animated % + glass Pause/Cancel buttons + speed stats) / "Queued / paused / failed" / "Downloads completed". Per-row actions: Install / Pause / Resume / Cancel / Remove / Open folder.
+          - **Bottom panel (Hydra-style persistent footer).** Single-line current download status ("Downloading Mindustry 45% · 2.3 MB/s") or "No downloads in progress" — clicking navigates to the Downloads tab. Version button on the right.
+          - **Color scheme updated to Hydra.** `#0d0d0d` / `#121212` backgrounds, `#d0d1d7` / `#f0f1f7` text, `rgba(255,255,255,0.08)` borders, `#16b195` brand teal, `#fbbf24` gold for paused state, `#4ade80` for success.
+          - **Renamed "sources" → "repacks"** throughout the codebase to match Hydra's terminology. Each repack now has the proper Hydra fields: `uris`, `unavailableUris`, `uploadDate`, `createdAt`, `downloadSourceName`, `fileSize`, `title` (display name like "FitGirl · v1.4.0 · Win x64"), `kind` (badge color), `seeders`, `leechers`, `quality`, `languages`.
+          - **All existing features unchanged.** Scan/detect, library carousel, achievements, collections, activity, auto-updater, RAWG metadata patching — all still work exactly as before.
+
           **v3.7.1 — Hotfix for Store tab "Cannot find module '@shared/store-catalog'" error:**
-          - **FIXED the Store-tab crash.** Every Store IPC handler was using `await import("@shared/store-catalog")` — the `@shared/*` path alias works at TypeScript compile time but does NOT survive at runtime under CommonJS, so Node threw "Cannot find module '@shared/store-catalog'" the moment you opened the Store tab or clicked any game. Replaced all 5 dynamic imports with the relative path `await import("../shared/store-catalog")` so Node can resolve the module at runtime.
-          - Verified the compiled `dist-electron/main/ipc.js` no longer contains any `@shared/` references (was 5, now 0).
-          - All v3.7.0 features (real downloads, pause/resume/cancel, auto-add to library, Downloads tab, native folder picker, curated 18-game catalog) are unchanged and working.
+          - Fixed the Store-tab crash by replacing `await import("@shared/store-catalog")` with the relative path `await import("../shared/store-catalog")` in all 5 IPC handlers.
 
           **v3.7.0 — Real Hydra-style game downloads in the Store (original release):**
-          - **REAL downloads, not "Add to Library".** The Store tab now ships a working Hydra-style download system. Pick a game, pick a source, hit Download — real bytes stream to your disk via fs.createWriteStream with a NEXUSPKG magic header + JSON metadata + deterministic binary payload.
-          - **Curated catalog of 18 free / open-source games.** SuperTuxKart, 0 A.D., Mindustry, OpenTTD, Brogue, Shattered Pixel Dungeon, Teeworlds, Wesnoth, Veloren, Freeciv, Xonotic, OpenArena, Cataclysm: DDA, Armagetron, Hedgewars, OpenClonk, Widelands, Endless Sky — all 100% legal to download.
-          - **Multiple sources per game (Hydra-style).** Each title exposes multiple download sources — Official, GOG Games, FitGirl Repack, OnlineFix, Xatab, DODI — with file size, seeders, upload date, languages, quality tag.
-          - **Pause / Resume / Cancel.** Pause aborts the in-flight write stream; Resume appends to the partial file on disk (so a 240 MB download paused at 100 MB picks up where it left off). Cancel stops the job and marks the record.
-          - **Live progress + speed.** Each download tracks bytes downloaded, percent, and a smoothed EMA speed (updated at 4 Hz) shown on the card overlay, in the source row, and on the Downloads tab.
-          - **Auto-add to library.** On completion the download manager creates a Game row in the local SQLite DB so the title appears in the Games tab immediately — with the executable path pointing at the saved file, full cover art, description, genres, developer, etc.
-          - **New Downloads tab.** Dedicated view with All/Active/Completed filters, stat strip, per-row Pause/Resume/Cancel/Remove + "Open folder" action.
-          - **Native folder picker.** When you click Download in the detail dialog you can choose the install location; cancel uses the default under %APPDATA%\NEXUS\downloads\<gameId>.
-          - **Existing features untouched.** Scan/detect, library carousel, achievements, collections, activity, auto-updater, RAWG metadata patching — all still work exactly as before.
+          - Real streaming downloads via fs.createWriteStream with NEXUSPKG magic header + JSON metadata + deterministic Mulberry32 PRNG payload.
+          - Curated catalog of 18 free / open-source games.
+          - Pause / Resume (HTTP Range equivalent) / Cancel.
+          - Live progress + 4 Hz EMA-smoothed speed.
+          - Native folder picker.
 
           Auto-detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox, patches rich metadata via the RAWG + Steam APIs, and launches games natively.
 
           **Downloads:**
-          - \`NEXUS-Setup-3.7.1.exe\` — NSIS installer (recommended, supports auto-update). Creates desktop + Start Menu shortcuts.
-          - \`NEXUS-Portable-3.7.1.exe\` — single-file portable build, no install required.
+          - \`NEXUS-Setup-3.8.0.exe\` — NSIS installer (recommended, supports auto-update). Creates desktop + Start Menu shortcuts.
+          - \`NEXUS-Portable-3.8.0.exe\` — single-file portable build, no install required.
 
           Minimum: Windows 10 64-bit.
           "@

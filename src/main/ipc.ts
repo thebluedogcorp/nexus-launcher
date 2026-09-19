@@ -345,14 +345,20 @@ export function registerIpc(): void {
   // handlers above are KEPT for backward compatibility (in case any renderer
   // code still imports them) but the new StoreTab no longer calls them.
 
-  ipcMain.handle("store:catalog", async (_e, filters?: { query?: string; genre?: string; sort?: string }) => {
+  ipcMain.handle("store:catalog", async (_e, filters?: { query?: string; genre?: string; sources?: string[]; sort?: string }) => {
     const { searchStore } = await import("../shared/store-catalog");
     const list = searchStore({
       query: filters?.query ?? "",
       genre: filters?.genre ?? "",
-      sort: (filters?.sort as "trending" | "recent" | "rating" | "size" | "name") ?? "trending",
+      sources: filters?.sources ?? [],
+      sort: (filters?.sort as "popularity" | "newest" | "oldest" | "az" | "za" | "rating_high" | "rating_low") ?? "popularity",
     });
     return list;
+  });
+
+  ipcMain.handle("store:sourceNames", async () => {
+    const { STORE_SOURCE_NAMES } = await import("../shared/store-catalog");
+    return STORE_SOURCE_NAMES;
   });
 
   ipcMain.handle("store:getGame", async (_e, id: string) => {
@@ -395,7 +401,7 @@ export function registerIpc(): void {
     const { startDownload } = await import("./downloads/manager");
     const game = findStoreGame(gameId);
     if (!game) throw new Error(`Store game not found: ${gameId}`);
-    const source = game.sources.find((s) => s.id === sourceId) ?? game.sources[0];
+    const source = game.repacks.find((s) => s.id === sourceId) ?? game.repacks[0];
     if (!source) throw new Error(`Source ${sourceId} not found on game ${gameId}`);
     return startDownload(game, source, installDir ? { installDir } : undefined);
   });
@@ -411,7 +417,7 @@ export function registerIpc(): void {
     const { resumeDownload } = await import("./downloads/manager");
     const game = findStoreGame(gameId);
     if (!game) throw new Error(`Store game not found: ${gameId}`);
-    const source = game.sources.find((s) => s.id === sourceId) ?? game.sources[0];
+    const source = game.repacks.find((s) => s.id === sourceId) ?? game.repacks[0];
     if (!source) throw new Error(`Source ${sourceId} not found on game ${gameId}`);
     return resumeDownload(gameId, sourceId, game, source);
   });
@@ -431,6 +437,15 @@ export function registerIpc(): void {
   ipcMain.handle("downloads:list", async () => {
     const { listDownloads } = await import("./downloads/manager");
     return listDownloads();
+  });
+
+  // Install a completed download into the library — explicitly triggered by
+  // the user clicking "Install" on a completed download row. This is the
+  // "patch" step that mirrors Hydra Launcher's flow:
+  //   Download → completed → user clicks "Install" → game appears in Library.
+  ipcMain.handle("downloads:install", async (_e, gameId: string, sourceId: string) => {
+    const { installDownload } = await import("./downloads/manager");
+    return installDownload(gameId, sourceId);
   });
 
   ipcMain.handle("downloads:clearCompleted", async () => {

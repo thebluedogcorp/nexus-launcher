@@ -176,11 +176,12 @@ const api = {
     ipcRenderer.invoke("settings:set", s) as Promise<LauncherSettings>,
 
   // ===== NEXUS Store (curated catalog + real downloads) =====
-  storeCatalog: (filters?: { query?: string; genre?: string; sort?: StoreSortKey }) =>
+  storeCatalog: (filters?: { query?: string; genre?: string; sources?: string[]; sort?: StoreSortKey }) =>
     ipcRenderer.invoke("store:catalog", filters) as Promise<StoreGame[]>,
   getStoreGame: (id: string) =>
     ipcRenderer.invoke("store:getGame", id) as Promise<StoreGame | null>,
   storeGenres: () => ipcRenderer.invoke("store:genres") as Promise<string[]>,
+  storeSourceNames: () => ipcRenderer.invoke("store:sourceNames") as Promise<string[]>,
   pickInstallDir: () =>
     ipcRenderer.invoke("store:pickInstallDir") as Promise<{ ok: boolean; path: string | null; error?: string }>,
 
@@ -196,6 +197,8 @@ const api = {
   removeDownload: (gameId: string, sourceId: string) =>
     ipcRenderer.invoke("downloads:remove", gameId, sourceId) as Promise<boolean>,
   listDownloads: () => ipcRenderer.invoke("downloads:list") as Promise<DownloadEntry[]>,
+  installDownload: (gameId: string, sourceId: string) =>
+    ipcRenderer.invoke("downloads:install", gameId, sourceId) as Promise<{ ok: boolean; libraryGameId?: number; error?: string }>,
   clearCompletedDownloads: () =>
     ipcRenderer.invoke("downloads:clearCompleted") as Promise<boolean>,
   openDownloadFolder: (gameId: string, sourceId: string) =>

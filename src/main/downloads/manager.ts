@@ -18,7 +18,7 @@
 import { app, BrowserWindow } from "electron";
 import { createWriteStream, existsSync, mkdirSync, statSync } from "fs";
 import { join } from "path";
-import type { StoreGame, StoreSource } from "@shared/store-catalog";
+import type { StoreGame, StoreRepack } from "@shared/store-catalog";
 import { createGame } from "../db";
 
 // === Types ===
@@ -52,7 +52,7 @@ export interface DownloadEntry {
 interface ActiveJob {
   key: string;
   game: StoreGame;
-  source: StoreSource;
+  source: StoreRepack;
   controller: AbortController;
   speedTimer: ReturnType<typeof setInterval> | null;
   lastTickBytes: number;
@@ -150,14 +150,14 @@ function fillChunk(gameId: string, offset: number, length: number): Buffer {
 
 // Build the small fixed header: NEXUSPKG magic + JSON metadata + zero padding
 // to a 4 KiB block. The body starts at offset 4096.
-function buildHeader(game: StoreGame, source: StoreSource, totalBytes: number): Buffer {
+function buildHeader(game: StoreGame, source: StoreRepack, totalBytes: number): Buffer {
   const HEADER_SIZE = 4096;
   const magic = Buffer.from("NEXUSPKG\0", "utf-8");
   const meta = Buffer.from(
     JSON.stringify({
       gameId: game.id,
       title: game.title,
-      source: source.label,
+      source: source.downloadSourceName,
       totalBytes,
       packagedAt: new Date().toISOString(),
       format: "nexus-pkg/1",
@@ -207,7 +207,7 @@ export function removeDownload(gameId: string, sourceId: string): void {
 
 export async function startDownload(
   game: StoreGame,
-  source: StoreSource,
+  source: StoreRepack,
   opts?: { installDir?: string },
 ): Promise<DownloadEntry> {
   const key = makeKey(game.id, source.id);
@@ -244,9 +244,9 @@ export async function startDownload(
       gameId: game.id,
       gameTitle: game.title,
       sourceId: source.id,
-      sourceLabel: source.label,
+      sourceLabel: source.downloadSourceName,
       coverImage: game.coverImage,
-      totalBytes: source.sizeBytes,
+      totalBytes: source.fileSize,
       downloadedBytes: resumeFrom,
       status: "downloading",
       speedBps: 0,
@@ -308,7 +308,7 @@ export async function startDownload(
 
 async function runJob(job: ActiveJob, resumeFrom: number): Promise<void> {
   const { key, game, source, controller, filePath } = job;
-  const totalBytes = source.sizeBytes;
+  const totalBytes = source.fileSize;
   const HEADER_LEN = 4096;
   const header = buildHeader(game, source, totalBytes);
 
@@ -379,13 +379,48 @@ async function runJob(job: ActiveJob, resumeFrom: number): Promise<void> {
   const finalEntry = getEntry(key) as DownloadEntry;
   broadcastComplete(finalEntry);
 
-  // Auto-add to the local library so the game appears in the Games tab.
+  // NOTE: We intentionally do NOT auto-add the game to the library here.
+  // The downloaded .nexuspkg file is just the "installer" / archive — the user
+  // must explicitly click "Install" in the Downloads tab to register an
+  // executable path. This mirrors Hydra Launcher's flow:
+  //   Download → completed → user clicks "Install" → game appears in Library.
+  //
+  // The `installDownload` IPC handler does the actual library registration.
+}
+
+/**
+ * Install a completed download into the local library. Called explicitly by
+ * the renderer when the user clicks "Install" on a completed download row.
+ *
+ * Creates a Game row pointing at the downloaded .nexuspkg file as the
+ * executable path, with full metadata. Returns the new game's id so the
+ * renderer can mark the download as `installed` (libraryGameId set).
+ */
+export async function installDownload(
+  gameId: string,
+  sourceId: string,
+): Promise<{ ok: boolean; libraryGameId?: number; error?: string }> {
+  const { findStoreGame } = await import("@shared/store-catalog");
+  const game = findStoreGame(gameId);
+  if (!game) return { ok: false, error: `Store game not found: ${gameId}` };
+  const repack = game.repacks.find((r) => r.id === sourceId) ?? game.repacks[0];
+  if (!repack) return { ok: false, error: `Repack ${sourceId} not found on game ${gameId}` };
+
+  const key = makeKey(gameId, sourceId);
+  const entry = getEntry(key);
+  if (!entry) return { ok: false, error: "Download record not found" };
+  if (entry.status !== "completed") return { ok: false, error: "Download is not completed yet" };
+  if (entry.libraryGameId) return { ok: true, libraryGameId: entry.libraryGameId };
+
   try {
-    const libGame = await createGame({
+    const installDir = entry.installPath
+      ? entry.installPath.replace(/[\\/][^\\/]+\.nexuspkg$/, "")
+      : join(defaultInstallDir(), gameId);
+    const libGame = createGame({
       title: game.title,
       platform: "manual",
-      executable: filePath,
-      installDir: job.installDir,
+      executable: entry.installPath ?? join(installDir, `${gameId}-${sourceId}.nexuspkg`),
+      installDir,
       launchCommand: null,
       coverImage: game.coverImage ?? null,
       bannerImage: game.bannerImage ?? null,
@@ -398,15 +433,14 @@ async function runJob(job: ActiveJob, resumeFrom: number): Promise<void> {
       ratingCount: game.ratingCount,
       genres: game.genres,
       rawgId: null,
-      sizeBytes: totalBytes,
+      sizeBytes: repack.fileSize,
       source: "manual",
     });
     patchEntry(key, { libraryGameId: libGame.id });
     broadcasts("downloads:libraryAdded", { key, game: libGame });
+    return { ok: true, libraryGameId: libGame.id };
   } catch (err) {
-    // Best-effort — the file is on disk; we just couldn't add a library entry.
-    // eslint-disable-next-line no-console
-    console.warn("[downloads] failed to add to library:", err);
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -443,7 +477,7 @@ export async function resumeDownload(
   gameId: string,
   sourceId: string,
   game: StoreGame,
-  source: StoreSource,
+  source: StoreRepack,
 ): Promise<DownloadEntry | undefined> {
   const key = makeKey(gameId, sourceId);
   const cur = getEntry(key);

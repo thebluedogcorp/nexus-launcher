@@ -1,19 +1,31 @@
 // NEXUS Store catalog — curated free / open-source games that are 100% legal
 // to download. Mirrors the same catalog used by the Next.js web preview.
 //
-// Each entry exposes one or more "download sources" (repacks) like Hydra
-// Launcher. When the user picks a source, the main process streams real bytes
+// Each entry exposes one or more "repacks" (download sources) like Hydra
+// Launcher. When the user picks a repack, the main process streams real bytes
 // to disk via the download manager (src/main/downloads/manager.ts) with
 // pause/resume/cancel support.
+//
+// Terminology follows Hydra Launcher:
+//   - "repack"     = a single downloadable variant of a game (e.g. "FitGirl · v1.4.0")
+//   - "source"     = the repacker site (FitGirl, OnlineFix, GOG, Xatab, DODI, …)
+//   - "uris"       = the magnet/HTTP URIs the repack can be fetched from
+//   - "unavailableUris" = uris that are currently offline (for the availability orb)
 
-export interface StoreSource {
+export interface StoreRepack {
   id: string;
-  label: string;
+  /** Display title — e.g. "FitGirl · v1.4.0 · Win x64". */
+  title: string;
+  /** Reacker site id — drives the badge color in the UI. */
   kind: "official" | "onlinefix" | "gog" | "steamrip" | "xatab" | "dodi" | "fitgirl";
+  /** Reacker site display name — e.g. "FitGirl", "OnlineFix". */
+  downloadSourceName: string;
   /** File size in bytes — the download manager will write exactly this many bytes. */
-  sizeBytes: number;
-  /** ISO date the source was uploaded. */
-  uploadedAt: string;
+  fileSize: number;
+  /** ISO date the repack was uploaded. */
+  uploadDate: string;
+  /** ISO date the repack record was created in our catalog (for "New" badge logic). */
+  createdAt: string;
   /** Number of seeders in the swarm (decorative). */
   seeders: number;
   /** Number of leechers in the swarm (decorative). */
@@ -22,8 +34,10 @@ export interface StoreSource {
   quality: string;
   /** Languages supported. */
   languages: string[];
-  /** Optional magnet-style URN shown in UI for realism. */
-  urn?: string;
+  /** Magnet-style URIs the repack can be fetched from (decorative). */
+  uris: string[];
+  /** Subset of `uris` that are currently offline — drives the availability orb color. */
+  unavailableUris: string[];
 }
 
 export interface StoreGame {
@@ -41,20 +55,24 @@ export interface StoreGame {
   sizeBytes: number;
   coverImage?: string;
   bannerImage?: string;
+  heroImage?: string; // wide hero image for the detail page
+  logoImage?: string; // transparent Steam-style logo PNG
   screenshots?: string[];
-  sources: StoreSource[];
+  repacks: StoreRepack[];
   license: "free" | "open-source" | "freeware" | "demo";
   officialUrl: string;
 }
 
-export type StoreSortKey = "trending" | "recent" | "rating" | "size" | "name";
+export type StoreSortKey = "popularity" | "newest" | "oldest" | "az" | "za" | "rating_high" | "rating_low";
 
 export const STORE_SORT_LABELS: Record<StoreSortKey, string> = {
-  trending: "Trending",
-  recent: "Newest Uploads",
-  rating: "Top Rated",
-  size: "Largest First",
-  name: "Name (A–Z)",
+  popularity: "Popularity",
+  newest: "Newest releases",
+  oldest: "Oldest releases",
+  az: "Title (A-Z)",
+  za: "Title (Z-A)",
+  rating_high: "Highest rating",
+  rating_low: "Lowest rating",
 };
 
 const DAY = 86_400_000;
@@ -67,7 +85,35 @@ function urn(seed: string) {
     h = Math.imul(h, 16777619);
   }
   const hex = (h >>> 0).toString(16).padStart(8, "0");
-  return `urn:btih:${hex}NEXUS${seed.replace(/\s+/g, "").slice(0, 12).toUpperCase()}`;
+  return `magnet:?xt=urn:btih:${hex}${seed.replace(/\s+/g, "").slice(0, 32).toUpperCase()}`;
+}
+
+// Helper to build a repack with sensible defaults.
+function repack(
+  id: string,
+  title: string,
+  kind: StoreRepack["kind"],
+  downloadSourceName: string,
+  fileSize: number,
+  uploadedDaysAgo: number,
+  opts: Partial<Pick<StoreRepack, "seeders" | "leechers" | "quality" | "languages" | "uris" | "unavailableUris">> = {},
+): StoreRepack {
+  const baseUrn = urn(`${id}-${kind}`);
+  return {
+    id,
+    title,
+    kind,
+    downloadSourceName,
+    fileSize,
+    uploadDate: isoDaysAgo(uploadedDaysAgo),
+    createdAt: isoDaysAgo(uploadedDaysAgo),
+    seeders: opts.seeders ?? 500,
+    leechers: opts.leechers ?? 20,
+    quality: opts.quality ?? "Win x64",
+    languages: opts.languages ?? ["English"],
+    uris: opts.uris ?? [baseUrn, `https://${kind}.nexus-store.local/${id}`],
+    unavailableUris: opts.unavailableUris ?? [],
+  };
 }
 
 export const STORE_CATALOG: StoreGame[] = [
@@ -88,16 +134,17 @@ export const STORE_CATALOG: StoreGame[] = [
     sizeBytes: 1_250_000_000,
     coverImage: "https://cdn.cloudflare.steamstatic.com/steam/apps/391940/header.jpg",
     bannerImage: "https://cdn.cloudflare.steamstatic.com/steam/apps/391940/library_600x900.jpg",
+    heroImage: "https://cdn.cloudflare.steamstatic.com/steam/apps/391940/library_hero.jpg",
     screenshots: [
       "https://cdn.cloudflare.steamstatic.com/steam/apps/391940/ss_d36d85dbe1f8ebe89dbab1c04ffb2b1f6ee9c1df.1920x1080.jpg",
       "https://cdn.cloudflare.steamstatic.com/steam/apps/391940/ss_99d6c2b4ec1ebc8e8ec8c5dde40fa3e22b6a5b5e.1920x1080.jpg",
     ],
     license: "open-source",
     officialUrl: "https://supertuxkart.net",
-    sources: [
-      { id: "official", label: "Official", kind: "official", sizeBytes: 1_250_000_000, uploadedAt: isoDaysAgo(2), seeders: 1842, leechers: 56, quality: "v1.4.0 · Win/Mac/Linux x64", languages: ["English", "Multi-12"], urn: urn("SuperTuxKart official") },
-      { id: "gog", label: "GOG Games", kind: "gog", sizeBytes: 1_180_000_000, uploadedAt: isoDaysAgo(15), seeders: 920, leechers: 41, quality: "Goodie Pack · Win x64", languages: ["English", "Multi-8"], urn: urn("SuperTuxKart gog") },
-      { id: "onlinefix", label: "OnlineFix", kind: "onlinefix", sizeBytes: 1_090_000_000, uploadedAt: isoDaysAgo(28), seeders: 612, leechers: 19, quality: "Online-enabled · v1.4.0", languages: ["English", "Multi-5"], urn: urn("SuperTuxKart onlinefix") },
+    repacks: [
+      repack("stk-official", "Official · v1.4.0 · Win/Mac/Linux x64", "official", "Official", 1_250_000_000, 2, { seeders: 1842, leechers: 56, quality: "v1.4.0 · Win/Mac/Linux x64", languages: ["English", "Multi-12"] }),
+      repack("stk-gog", "GOG Goodie Pack · Win x64", "gog", "GOG Games", 1_180_000_000, 15, { seeders: 920, leechers: 41, quality: "Goodie Pack · Win x64", languages: ["English", "Multi-8"] }),
+      repack("stk-onlinefix", "OnlineFix · Online-enabled v1.4.0", "onlinefix", "OnlineFix", 1_090_000_000, 28, { seeders: 612, leechers: 19, quality: "Online-enabled · v1.4.0", languages: ["English", "Multi-5"] }),
     ],
   },
   {
@@ -117,11 +164,12 @@ export const STORE_CATALOG: StoreGame[] = [
     sizeBytes: 2_300_000_000,
     coverImage: "https://play0ad.com/wp-content/uploads/2016/01/0ad-logo.png",
     bannerImage: "https://play0ad.com/wp-content/uploads/2016/01/0ad-logo.png",
+    heroImage: "https://play0ad.com/wp-content/uploads/2016/01/0ad-logo.png",
     license: "open-source",
     officialUrl: "https://play0ad.com",
-    sources: [
-      { id: "official", label: "Official", kind: "official", sizeBytes: 2_300_000_000, uploadedAt: isoDaysAgo(5), seeders: 1340, leechers: 88, quality: "Alpha 26 · Win/Mac/Linux x64", languages: ["English", "Multi-20"], urn: urn("0ad official") },
-      { id: "dodi", label: "DODI Repack", kind: "dodi", sizeBytes: 1_690_000_000, uploadedAt: isoDaysAgo(21), seeders: 410, leechers: 22, quality: "Compressed · Win x64", languages: ["English", "Multi-7"], urn: urn("0ad dodi") },
+    repacks: [
+      repack("0ad-official", "Official · Alpha 26 · Win/Mac/Linux x64", "official", "Official", 2_300_000_000, 5, { seeders: 1340, leechers: 88, quality: "Alpha 26 · Win/Mac/Linux x64", languages: ["English", "Multi-20"] }),
+      repack("0ad-dodi", "DODI Repack · Compressed · Win x64", "dodi", "DODI", 1_690_000_000, 21, { seeders: 410, leechers: 22, quality: "Compressed · Win x64", languages: ["English", "Multi-7"] }),
     ],
   },
   {
@@ -141,12 +189,13 @@ export const STORE_CATALOG: StoreGame[] = [
     sizeBytes: 240_000_000,
     coverImage: "https://cdn.cloudflare.steamstatic.com/steam/apps/1127400/header.jpg",
     bannerImage: "https://cdn.cloudflare.steamstatic.com/steam/apps/1127400/library_600x900.jpg",
+    heroImage: "https://cdn.cloudflare.steamstatic.com/steam/apps/1127400/library_hero.jpg",
     screenshots: ["https://cdn.cloudflare.steamstatic.com/steam/apps/1127400/ss_95e7b503d3d7be14d06f1f9017d3c5b6b1c3a6e2.1920x1080.jpg"],
     license: "open-source",
     officialUrl: "https://mindustrygame.github.io",
-    sources: [
-      { id: "official", label: "Official", kind: "official", sizeBytes: 240_000_000, uploadedAt: isoDaysAgo(1), seeders: 2304, leechers: 42, quality: "v7.0 · Win/Mac/Linux/Android", languages: ["English", "Multi-10"], urn: urn("mindustry official") },
-      { id: "fitgirl", label: "FitGirl Repack", kind: "fitgirl", sizeBytes: 98_000_000, uploadedAt: isoDaysAgo(11), seeders: 1820, leechers: 71, quality: "Compressed · Win x64", languages: ["English"], urn: urn("mindustry fitgirl") },
+    repacks: [
+      repack("mindustry-official", "Official · v7.0 · Win/Mac/Linux/Android", "official", "Official", 240_000_000, 1, { seeders: 2304, leechers: 42, quality: "v7.0 · Win/Mac/Linux/Android", languages: ["English", "Multi-10"] }),
+      repack("mindustry-fitgirl", "FitGirl Repack · Compressed · Win x64", "fitgirl", "FitGirl", 98_000_000, 11, { seeders: 1820, leechers: 71, quality: "Compressed · Win x64", languages: ["English"] }),
     ],
   },
   {
@@ -166,11 +215,12 @@ export const STORE_CATALOG: StoreGame[] = [
     sizeBytes: 65_000_000,
     coverImage: "https://cdn.cloudflare.steamstatic.com/steam/apps/268010/header.jpg",
     bannerImage: "https://cdn.cloudflare.steamstatic.com/steam/apps/268010/library_600x900.jpg",
+    heroImage: "https://cdn.cloudflare.steamstatic.com/steam/apps/268010/library_hero.jpg",
     license: "open-source",
     officialUrl: "https://www.openttd.org",
-    sources: [
-      { id: "official", label: "Official", kind: "official", sizeBytes: 65_000_000, uploadedAt: isoDaysAgo(3), seeders: 740, leechers: 12, quality: "v14.0 · Win/Mac/Linux x64", languages: ["English", "Multi-50+"], urn: urn("openttd official") },
-      { id: "gog", label: "GOG Games", kind: "gog", sizeBytes: 58_000_000, uploadedAt: isoDaysAgo(18), seeders: 510, leechers: 8, quality: "Goodie Pack · Win x64", languages: ["English", "Multi-30"], urn: urn("openttd gog") },
+    repacks: [
+      repack("openttd-official", "Official · v14.0 · Win/Mac/Linux x64", "official", "Official", 65_000_000, 3, { seeders: 740, leechers: 12, quality: "v14.0 · Win/Mac/Linux x64", languages: ["English", "Multi-50+"] }),
+      repack("openttd-gog", "GOG Goodie Pack · Win x64", "gog", "GOG Games", 58_000_000, 18, { seeders: 510, leechers: 8, quality: "Goodie Pack · Win x64", languages: ["English", "Multi-30"] }),
     ],
   },
   {
@@ -190,8 +240,8 @@ export const STORE_CATALOG: StoreGame[] = [
     sizeBytes: 18_000_000,
     license: "open-source",
     officialUrl: "https://brogue.roguelikelikes.com",
-    sources: [
-      { id: "official", label: "Official", kind: "official", sizeBytes: 18_000_000, uploadedAt: isoDaysAgo(7), seeders: 412, leechers: 6, quality: "v1.13 · Win/Mac/Linux", languages: ["English"], urn: urn("brogue official") },
+    repacks: [
+      repack("brogue-official", "Official · v1.13 · Win/Mac/Linux", "official", "Official", 18_000_000, 7, { seeders: 412, leechers: 6, quality: "v1.13 · Win/Mac/Linux", languages: ["English"] }),
     ],
   },
   {
@@ -211,11 +261,12 @@ export const STORE_CATALOG: StoreGame[] = [
     sizeBytes: 32_000_000,
     coverImage: "https://cdn.cloudflare.steamstatic.com/steam/apps/302980/header.jpg",
     bannerImage: "https://cdn.cloudflare.steamstatic.com/steam/apps/302980/library_600x900.jpg",
+    heroImage: "https://cdn.cloudflare.steamstatic.com/steam/apps/302980/library_hero.jpg",
     license: "open-source",
     officialUrl: "https://shatteredpixel.com",
-    sources: [
-      { id: "official", label: "Official", kind: "official", sizeBytes: 32_000_000, uploadedAt: isoDaysAgo(4), seeders: 1320, leechers: 18, quality: "v2.5.2 · Win/Mac/Linux/Android", languages: ["English", "Multi-15"], urn: urn("shattered official") },
-      { id: "xatab", label: "Xatab Repack", kind: "xatab", sizeBytes: 24_000_000, uploadedAt: isoDaysAgo(25), seeders: 280, leechers: 9, quality: "Repack · Win x64", languages: ["English", "Russian"], urn: urn("shattered xatab") },
+    repacks: [
+      repack("shattered-official", "Official · v2.5.2 · Win/Mac/Linux/Android", "official", "Official", 32_000_000, 4, { seeders: 1320, leechers: 18, quality: "v2.5.2 · Win/Mac/Linux/Android", languages: ["English", "Multi-15"] }),
+      repack("shattered-xatab", "Xatab Repack · Win x64", "xatab", "Xatab", 24_000_000, 25, { seeders: 280, leechers: 9, quality: "Repack · Win x64", languages: ["English", "Russian"] }),
     ],
   },
   {
@@ -235,10 +286,11 @@ export const STORE_CATALOG: StoreGame[] = [
     sizeBytes: 28_000_000,
     coverImage: "https://teeworlds.com/images/teeworlds.png",
     bannerImage: "https://teeworlds.com/images/teeworlds.png",
+    heroImage: "https://teeworlds.com/images/teeworlds.png",
     license: "open-source",
     officialUrl: "https://teeworlds.com",
-    sources: [
-      { id: "official", label: "Official", kind: "official", sizeBytes: 28_000_000, uploadedAt: isoDaysAgo(9), seeders: 580, leechers: 7, quality: "v0.7.5 · Win/Mac/Linux", languages: ["English", "Multi-12"], urn: urn("teeworlds official") },
+    repacks: [
+      repack("teeworlds-official", "Official · v0.7.5 · Win/Mac/Linux", "official", "Official", 28_000_000, 9, { seeders: 580, leechers: 7, quality: "v0.7.5 · Win/Mac/Linux", languages: ["English", "Multi-12"] }),
     ],
   },
   {
@@ -258,11 +310,12 @@ export const STORE_CATALOG: StoreGame[] = [
     sizeBytes: 440_000_000,
     coverImage: "https://cdn.cloudflare.steamstatic.com/steam/apps/518540/header.jpg",
     bannerImage: "https://cdn.cloudflare.steamstatic.com/steam/apps/518540/library_600x900.jpg",
+    heroImage: "https://cdn.cloudflare.steamstatic.com/steam/apps/518540/library_hero.jpg",
     license: "open-source",
     officialUrl: "https://wesnoth.org",
-    sources: [
-      { id: "official", label: "Official", kind: "official", sizeBytes: 440_000_000, uploadedAt: isoDaysAgo(6), seeders: 920, leechers: 14, quality: "v1.18 · Win/Mac/Linux x64", languages: ["English", "Multi-50+"], urn: urn("wesnoth official") },
-      { id: "gog", label: "GOG Games", kind: "gog", sizeBytes: 412_000_000, uploadedAt: isoDaysAgo(22), seeders: 612, leechers: 12, quality: "Goodie Pack · Win x64", languages: ["English", "Multi-40"], urn: urn("wesnoth gog") },
+    repacks: [
+      repack("wesnoth-official", "Official · v1.18 · Win/Mac/Linux x64", "official", "Official", 440_000_000, 6, { seeders: 920, leechers: 14, quality: "v1.18 · Win/Mac/Linux x64", languages: ["English", "Multi-50+"] }),
+      repack("wesnoth-gog", "GOG Goodie Pack · Win x64", "gog", "GOG Games", 412_000_000, 22, { seeders: 612, leechers: 12, quality: "Goodie Pack · Win x64", languages: ["English", "Multi-40"] }),
     ],
   },
   {
@@ -282,9 +335,9 @@ export const STORE_CATALOG: StoreGame[] = [
     sizeBytes: 540_000_000,
     license: "open-source",
     officialUrl: "https://veloren.net",
-    sources: [
-      { id: "official", label: "Official", kind: "official", sizeBytes: 540_000_000, uploadedAt: isoDaysAgo(2), seeders: 740, leechers: 28, quality: "v0.16 · Win/Mac/Linux x64", languages: ["English", "Multi-8"], urn: urn("veloren official") },
-      { id: "dodi", label: "DODI Repack", kind: "dodi", sizeBytes: 412_000_000, uploadedAt: isoDaysAgo(14), seeders: 318, leechers: 11, quality: "Compressed · Win x64", languages: ["English"], urn: urn("veloren dodi") },
+    repacks: [
+      repack("veloren-official", "Official · v0.16 · Win/Mac/Linux x64", "official", "Official", 540_000_000, 2, { seeders: 740, leechers: 28, quality: "v0.16 · Win/Mac/Linux x64", languages: ["English", "Multi-8"] }),
+      repack("veloren-dodi", "DODI Repack · Compressed · Win x64", "dodi", "DODI", 412_000_000, 14, { seeders: 318, leechers: 11, quality: "Compressed · Win x64", languages: ["English"] }),
     ],
   },
   {
@@ -304,8 +357,8 @@ export const STORE_CATALOG: StoreGame[] = [
     sizeBytes: 58_000_000,
     license: "open-source",
     officialUrl: "https://www.freeciv.org",
-    sources: [
-      { id: "official", label: "Official", kind: "official", sizeBytes: 58_000_000, uploadedAt: isoDaysAgo(8), seeders: 410, leechers: 6, quality: "v3.1 · Win/Mac/Linux", languages: ["English", "Multi-50+"], urn: urn("freeciv official") },
+    repacks: [
+      repack("freeciv-official", "Official · v3.1 · Win/Mac/Linux", "official", "Official", 58_000_000, 8, { seeders: 410, leechers: 6, quality: "v3.1 · Win/Mac/Linux", languages: ["English", "Multi-50+"] }),
     ],
   },
   {
@@ -325,11 +378,12 @@ export const STORE_CATALOG: StoreGame[] = [
     sizeBytes: 980_000_000,
     coverImage: "https://xonotic.org/xonotic-1600x900-menu.jpg",
     bannerImage: "https://xonotic.org/xonotic-1600x900-menu.jpg",
+    heroImage: "https://xonotic.org/xonotic-1600x900-menu.jpg",
     license: "open-source",
     officialUrl: "https://xonotic.org",
-    sources: [
-      { id: "official", label: "Official", kind: "official", sizeBytes: 980_000_000, uploadedAt: isoDaysAgo(3), seeders: 920, leechers: 33, quality: "v0.8.6 · Win/Mac/Linux x64", languages: ["English", "Multi-15"], urn: urn("xonotic official") },
-      { id: "onlinefix", label: "OnlineFix", kind: "onlinefix", sizeBytes: 920_000_000, uploadedAt: isoDaysAgo(20), seeders: 410, leechers: 12, quality: "Online-enabled · v0.8.6", languages: ["English"], urn: urn("xonotic onlinefix") },
+    repacks: [
+      repack("xonotic-official", "Official · v0.8.6 · Win/Mac/Linux x64", "official", "Official", 980_000_000, 3, { seeders: 920, leechers: 33, quality: "v0.8.6 · Win/Mac/Linux x64", languages: ["English", "Multi-15"] }),
+      repack("xonotic-onlinefix", "OnlineFix · Online-enabled v0.8.6", "onlinefix", "OnlineFix", 920_000_000, 20, { seeders: 410, leechers: 12, quality: "Online-enabled · v0.8.6", languages: ["English"] }),
     ],
   },
   {
@@ -349,8 +403,8 @@ export const STORE_CATALOG: StoreGame[] = [
     sizeBytes: 420_000_000,
     license: "open-source",
     officialUrl: "https://openarena.ws",
-    sources: [
-      { id: "official", label: "Official", kind: "official", sizeBytes: 420_000_000, uploadedAt: isoDaysAgo(11), seeders: 380, leechers: 9, quality: "v0.8.8 · Win/Mac/Linux x64", languages: ["English", "Multi-5"], urn: urn("openarena official") },
+    repacks: [
+      repack("openarena-official", "Official · v0.8.8 · Win/Mac/Linux x64", "official", "Official", 420_000_000, 11, { seeders: 380, leechers: 9, quality: "v0.8.8 · Win/Mac/Linux x64", languages: ["English", "Multi-5"] }),
     ],
   },
   {
@@ -370,9 +424,9 @@ export const STORE_CATALOG: StoreGame[] = [
     sizeBytes: 120_000_000,
     license: "open-source",
     officialUrl: "https://cataclysmdda.org",
-    sources: [
-      { id: "official", label: "Official", kind: "official", sizeBytes: 120_000_000, uploadedAt: isoDaysAgo(4), seeders: 612, leechers: 8, quality: "0.G · Win/Mac/Linux x64", languages: ["English", "Multi-15"], urn: urn("cataclysm official") },
-      { id: "fitgirl", label: "FitGirl Repack", kind: "fitgirl", sizeBytes: 72_000_000, uploadedAt: isoDaysAgo(17), seeders: 410, leechers: 6, quality: "Compressed · Win x64", languages: ["English"], urn: urn("cataclysm fitgirl") },
+    repacks: [
+      repack("cataclysm-official", "Official · 0.G · Win/Mac/Linux x64", "official", "Official", 120_000_000, 4, { seeders: 612, leechers: 8, quality: "0.G · Win/Mac/Linux x64", languages: ["English", "Multi-15"] }),
+      repack("cataclysm-fitgirl", "FitGirl Repack · Compressed · Win x64", "fitgirl", "FitGirl", 72_000_000, 17, { seeders: 410, leechers: 6, quality: "Compressed · Win x64", languages: ["English"] }),
     ],
   },
   {
@@ -392,8 +446,8 @@ export const STORE_CATALOG: StoreGame[] = [
     sizeBytes: 22_000_000,
     license: "open-source",
     officialUrl: "https://www.armagetronad.org",
-    sources: [
-      { id: "official", label: "Official", kind: "official", sizeBytes: 22_000_000, uploadedAt: isoDaysAgo(13), seeders: 240, leechers: 4, quality: "v0.2.9 · Win/Mac/Linux", languages: ["English", "Multi-8"], urn: urn("armagetron official") },
+    repacks: [
+      repack("armagetron-official", "Official · v0.2.9 · Win/Mac/Linux", "official", "Official", 22_000_000, 13, { seeders: 240, leechers: 4, quality: "v0.2.9 · Win/Mac/Linux", languages: ["English", "Multi-8"] }),
     ],
   },
   {
@@ -413,8 +467,8 @@ export const STORE_CATALOG: StoreGame[] = [
     sizeBytes: 220_000_000,
     license: "open-source",
     officialUrl: "https://hedgewars.org",
-    sources: [
-      { id: "official", label: "Official", kind: "official", sizeBytes: 220_000_000, uploadedAt: isoDaysAgo(5), seeders: 410, leechers: 7, quality: "v1.0.2 · Win/Mac/Linux x64", languages: ["English", "Multi-30"], urn: urn("hedgewars official") },
+    repacks: [
+      repack("hedgewars-official", "Official · v1.0.2 · Win/Mac/Linux x64", "official", "Official", 220_000_000, 5, { seeders: 410, leechers: 7, quality: "v1.0.2 · Win/Mac/Linux x64", languages: ["English", "Multi-30"] }),
     ],
   },
   {
@@ -434,8 +488,8 @@ export const STORE_CATALOG: StoreGame[] = [
     sizeBytes: 320_000_000,
     license: "open-source",
     officialUrl: "https://www.widelands.org",
-    sources: [
-      { id: "official", label: "Official", kind: "official", sizeBytes: 320_000_000, uploadedAt: isoDaysAgo(7), seeders: 410, leechers: 8, quality: "Build 21 · Win/Mac/Linux x64", languages: ["English", "Multi-20"], urn: urn("widelands official") },
+    repacks: [
+      repack("widelands-official", "Official · Build 21 · Win/Mac/Linux x64", "official", "Official", 320_000_000, 7, { seeders: 410, leechers: 8, quality: "Build 21 · Win/Mac/Linux x64", languages: ["English", "Multi-20"] }),
     ],
   },
   {
@@ -455,15 +509,40 @@ export const STORE_CATALOG: StoreGame[] = [
     sizeBytes: 145_000_000,
     license: "open-source",
     officialUrl: "https://endless-sky.github.io",
-    sources: [
-      { id: "official", label: "Official", kind: "official", sizeBytes: 145_000_000, uploadedAt: isoDaysAgo(3), seeders: 580, leechers: 9, quality: "v0.10.2 · Win/Mac/Linux x64", languages: ["English", "Multi-10"], urn: urn("endless sky official") },
-      { id: "gog", label: "GOG Games", kind: "gog", sizeBytes: 130_000_000, uploadedAt: isoDaysAgo(19), seeders: 318, leechers: 7, quality: "Goodie Pack · Win x64", languages: ["English", "Multi-6"], urn: urn("endless sky gog") },
+    repacks: [
+      repack("endless-sky-official", "Official · v0.10.2 · Win/Mac/Linux x64", "official", "Official", 145_000_000, 3, { seeders: 580, leechers: 9, quality: "v0.10.2 · Win/Mac/Linux x64", languages: ["English", "Multi-10"] }),
+      repack("endless-sky-gog", "GOG Goodie Pack · Win x64", "gog", "GOG Games", 130_000_000, 19, { seeders: 318, leechers: 7, quality: "Goodie Pack · Win x64", languages: ["English", "Multi-6"] }),
     ],
   },
 ];
 
 const ALL_GENRES = Array.from(new Set(STORE_CATALOG.flatMap((g) => g.genres))).sort();
 export const STORE_GENRES = ALL_GENRES;
+
+// All distinct download source names (for the "Filter by source" drawer).
+const ALL_SOURCE_NAMES = Array.from(
+  new Set(STORE_CATALOG.flatMap((g) => g.repacks.map((r) => r.downloadSourceName))),
+).sort();
+export const STORE_SOURCE_NAMES = ALL_SOURCE_NAMES;
+
+// Per-category colors for filter orbs (Hydra-style distinct hues).
+export const FILTER_COLORS: Record<string, string> = {
+  Genres: "hsl(262 50% 47%)",
+  Tags: "hsl(95 50% 20%)",
+  Sources: "hsl(27 50% 40%)",
+  Developers: "hsl(340 50% 46%)",
+  Publishers: "hsl(200 50% 30%)",
+};
+
+// Per-source badge colors.
+export const SOURCE_BADGE_COLORS: Record<string, string> = {
+  Official: "rgba(74,222,128,.18);color:#86efac;border:1px solid rgba(74,222,128,.35)",
+  "GOG Games": "rgba(155,89,182,.18);color:#d8b4fe;border:1px solid rgba(155,89,182,.35)",
+  FitGirl: "rgba(244,63,94,.18);color:#fda4af;border:1px solid rgba(244,63,94,.35)",
+  OnlineFix: "rgba(34,211,238,.18);color:#7dd3fc;border:1px solid rgba(34,211,238,.35)",
+  Xatab: "rgba(249,115,22,.18);color:#fdba74;border:1px solid rgba(249,115,22,.35)",
+  DODI: "rgba(251,191,36,.18);color:#fde68a;border:1px solid rgba(251,191,36,.35)",
+};
 
 export function findStoreGame(id: string): StoreGame | undefined {
   return STORE_CATALOG.find((g) => g.id === id);
@@ -472,6 +551,7 @@ export function findStoreGame(id: string): StoreGame | undefined {
 export function searchStore(filters: {
   query: string;
   genre: string;
+  sources: string[]; // selected download source names
   sort: StoreSortKey;
 }): StoreGame[] {
   const q = filters.query.trim().toLowerCase();
@@ -481,18 +561,30 @@ export function searchStore(filters: {
       if (!hay.includes(q)) return false;
     }
     if (filters.genre && !g.genres.includes(filters.genre)) return false;
+    if (filters.sources.length > 0) {
+      const has = g.repacks.some((r) => filters.sources.includes(r.downloadSourceName));
+      if (!has) return false;
+    }
     return true;
   });
 
   const sorters: Record<StoreSortKey, (a: StoreGame, b: StoreGame) => number> = {
-    trending: (a, b) => (b.sources[0]?.seeders ?? 0) - (a.sources[0]?.seeders ?? 0),
-    recent: (a, b) =>
-      new Date(b.sources[0]?.uploadedAt ?? 0).getTime() -
-      new Date(a.sources[0]?.uploadedAt ?? 0).getTime(),
-    rating: (a, b) => b.rating - a.rating,
-    size: (a, b) => b.sizeBytes - a.sizeBytes,
-    name: (a, b) => a.title.localeCompare(b.title),
+    popularity: (a, b) => (b.repacks[0]?.seeders ?? 0) - (a.repacks[0]?.seeders ?? 0),
+    newest: (a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime(),
+    oldest: (a, b) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime(),
+    az: (a, b) => a.title.localeCompare(b.title),
+    za: (a, b) => b.title.localeCompare(a.title),
+    rating_high: (a, b) => b.rating - a.rating,
+    rating_low: (a, b) => a.rating - b.rating,
   };
   list.sort(sorters[filters.sort]);
   return list;
+}
+
+// Helper: compute the availability status of a repack based on its uris.
+// Returns "online" (all uris available), "partial" (some unavailable), or "offline" (all unavailable).
+export function repackAvailability(r: StoreRepack): "online" | "partial" | "offline" {
+  if (r.unavailableUris.length === 0) return "online";
+  if (r.unavailableUris.length >= r.uris.length) return "offline";
+  return "partial";
 }
