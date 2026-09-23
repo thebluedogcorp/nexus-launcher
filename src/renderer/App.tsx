@@ -51,6 +51,8 @@ export function App() {
   const [editorGame, setEditorGame] = useState<Game | null>(null);
   const [updateAvailable, setUpdateAvailable] = useState<{ version?: string; releaseUrl?: string; downloadUrl?: string; downloadSize?: number } | null>(null);
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
+  // Playtime tracking state — shows live playtime when a game is running.
+  const [activePlaytime, setActivePlaytime] = useState<{ gameId: number; gameTitle: string; elapsedSec: number; startedAt: number } | null>(null);
 
   const toast = useCallback((type: Toast["type"], title: string, desc?: string) => {
     setToasts((prev) => [...prev, { id: Date.now() + Math.random(), type, title, desc }]);
@@ -107,7 +109,21 @@ export function App() {
     const offP = (window as unknown as { nexus?: { onPatchProgress?: (cb: (p: { gameId: number; title: string; current: number; total: number }) => void) => () => void } }).nexus?.onPatchProgress?.((p) => { setPatching(true); setPatchProgress({ current: p.current, total: p.total, title: p.title }); });
     const offG = (window as unknown as { nexus?: { onPatchGameUpdated?: (cb: (p: { game: Game }) => void) => () => void } }).nexus?.onPatchGameUpdated?.(({ game }) => { setGames((prev) => prev.map((g) => (g.id === game.id ? game : g))); if (pageGame?.id === game.id) setPageGame(game); refreshStats(); });
     const offD = (window as unknown as { nexus?: { onPatchDone?: (cb: (p: { patched: number; attempted: number }) => void) => () => void } }).nexus?.onPatchDone?.(({ patched, attempted }) => { setPatching(false); setPatchProgress(null); if (patched > 0) toast("success", `Enriched ${patched} of ${attempted} games`, "Artwork fetched automatically."); refreshAll(); });
-    return () => { offP?.(); offG?.(); offD?.(); };
+
+    // ===== Playtime tracking — live updates when a game is running =====
+    const offPtStart = window.nexus.onPlaytimeStarted?.((p: { gameId: number; gameTitle: string; startedAt: number }) => {
+      setActivePlaytime({ gameId: p.gameId, gameTitle: p.gameTitle, elapsedSec: 0, startedAt: p.startedAt });
+    });
+    const offPtTick = window.nexus.onPlaytimeTick?.((p: { gameId: number; gameTitle: string; elapsedSec: number; startedAt: number }) => {
+      setActivePlaytime({ gameId: p.gameId, gameTitle: p.gameTitle, elapsedSec: p.elapsedSec, startedAt: p.startedAt });
+    });
+    const offPtStop = window.nexus.onPlaytimeStopped?.((p: { gameId: number; gameTitle: string; durationSec: number; startedAt: number; endedAt: number }) => {
+      setActivePlaytime(null);
+      toast("success", `Playtime recorded: ${p.gameTitle}`, `Played for ${Math.round(p.durationSec / 60)} minutes.`);
+      refreshAll();
+    });
+
+    return () => { offP?.(); offG?.(); offD?.(); offPtStart?.(); offPtTick?.(); offPtStop?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -115,9 +131,13 @@ export function App() {
 
   const openPage = useCallback(async (id: number) => setPageGame(await window.nexus.getGame(id)), []);
   const handleLaunch = useCallback(async (g: Game) => {
-    toast("info", `Launching ${g.title}…`);
+    toast("info", `Launching ${g.title}…`, "Playtime tracking started.");
     const res = await window.nexus.launchGame(g.id);
-    if (res.ok) { toast("success", `${g.title} is running`, "Play session recorded."); await refreshAll(); if (pageGame?.id === g.id) setPageGame(await window.nexus.getGame(g.id)); }
+    if (res.ok) {
+      toast("success", `${g.title} is running`, "Playtime is being tracked — close the game to stop.");
+      await refreshAll();
+      if (pageGame?.id === g.id) setPageGame(await window.nexus.getGame(g.id));
+    }
     else toast("error", "Launch failed", res.message);
   }, [refreshAll, toast, pageGame]);
   const handlePatch = useCallback(async (g: Game) => {
@@ -475,6 +495,21 @@ export function App() {
         {updateAvailable && (
           <button className="update-badge" onClick={() => setUpdateDialogOpen(true)} title={`NEXUS ${updateAvailable.version} available`}>
             <Icon.DownloadCloud size={13} /> {updateAvailable.version}
+          </button>
+        )}
+        {activePlaytime && (
+          <button
+            className="playtime-badge"
+            onClick={async () => {
+              await window.nexus.stopPlaytimeTracking(activePlaytime.gameId);
+              setActivePlaytime(null);
+            }}
+            title={`Click to stop tracking — ${activePlaytime.gameTitle}`}
+          >
+            <span className="playtime-badge__dot" />
+            <span className="playtime-badge__text">{activePlaytime.gameTitle}</span>
+            <span className="playtime-badge__time">{formatPlaytimeShort(activePlaytime.elapsedSec)}</span>
+            <span className="playtime-badge__stop">Stop</span>
           </button>
         )}
         <button className="tb-icon" onClick={() => setScanOpen(true)} title="Scan (S)"><Icon.Scan size={16} /></button>

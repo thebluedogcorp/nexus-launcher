@@ -50,8 +50,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v3.9.2"
-          $title = "NEXUS v3.9.2 — Fixed Steam game auto-detection"
+          $tag = "v3.10.0"
+          $title = "NEXUS v3.10.0 — Real gameplay playtime tracking"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
@@ -90,8 +90,8 @@ jobs:
           Auto-detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox, patches rich metadata via the RAWG + Steam APIs, and launches games natively.
 
           **Downloads:**
-          - NEXUS-Setup-3.9.2.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-3.9.2.exe — single-file portable build.
+          - NEXUS-Setup-3.10.0.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-3.10.0.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@

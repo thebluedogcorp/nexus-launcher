@@ -81,8 +81,40 @@ export function registerIpc(): void {
     const game = getGame(id);
     if (!game) return { ok: false, message: "Game not found", startedAt: new Date().toISOString() };
     const result = await launchGame(game);
-    if (result.ok) recordLaunch(id, 30);
+    if (result.ok) {
+      // Start real playtime tracking — the tracker monitors the game process
+      // and records actual elapsed time when it exits.
+      const { startTracking } = await import("./playtime/tracker");
+      startTracking(id, game.title, result.pid, game.executable);
+    }
     return result;
+  });
+
+  // ===== Playtime tracking =====
+  ipcMain.handle("playtime:stop", async (_e, gameId: number) => {
+    const { stopTracking } = await import("./playtime/tracker");
+    return stopTracking(gameId);
+  });
+
+  ipcMain.handle("playtime:getActive", async () => {
+    const { getActiveSessions } = await import("./playtime/tracker");
+    const sessions = getActiveSessions();
+    return sessions.map((s) => ({
+      gameId: s.gameId,
+      gameTitle: s.gameTitle,
+      startedAt: s.startedAt,
+      elapsedSec: Math.floor((Date.now() - s.startedAt) / 1000),
+    }));
+  });
+
+  ipcMain.handle("playtime:getSessions", async (_e, gameId: number) => {
+    const { getGameSessions } = await import("./playtime/tracker");
+    return getGameSessions(gameId);
+  });
+
+  ipcMain.handle("playtime:getSummaries", async () => {
+    const { getAllPlaytimeSummaries } = await import("./playtime/tracker");
+    return getAllPlaytimeSummaries();
   });
 
   ipcMain.handle(

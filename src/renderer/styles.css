@@ -713,3 +713,39 @@ textarea.field-input{height:auto;padding:11px 13px;resize:vertical;font-family:"
 .activity-item .time{font-size:11px;color:var(--text-faint);flex-shrink:0}
 .activity-item .icon{width:32px;height:32px;border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;background:rgba(45,212,191,.1);color:var(--accent);flex-shrink:0}
 
+
+/* ============ PLAYTIME TRACKING BADGE ============ */
+.playtime-badge{
+  display:inline-flex;align-items:center;gap:var(--s-2);
+  padding:var(--s-1) var(--s-3);
+  border-radius:var(--r-pill);
+  background:rgba(45,212,191,0.12);
+  border:1px solid rgba(45,212,191,0.35);
+  font-size:11px;color:var(--accent);
+  font-weight:600;cursor:pointer;
+  transition:background var(--t-fast), transform var(--t-fast);
+  -webkit-app-region:no-drag;
+}
+.playtime-badge:hover{background:rgba(45,212,191,0.22);transform:translateY(-1px)}
+.playtime-badge__dot{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--accent);
+  animation:playtime-pulse 1.5s ease-in-out infinite;
+  flex-shrink:0;
+}
+@keyframes playtime-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(0.8)}}
+.playtime-badge__text{
+  max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.playtime-badge__time{
+  font-variant-numeric:tabular-nums;font-weight:700;
+  color:var(--text);
+}
+.playtime-badge__stop{
+  padding:1px 6px;border-radius:var(--r-sm);
+  background:rgba(248,113,113,0.15);
+  color:var(--danger);
+  font-size:9px;font-weight:700;
+  text-transform:uppercase;
+  flex-shrink:0;
+}

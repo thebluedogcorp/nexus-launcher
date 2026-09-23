@@ -167,5 +167,21 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
+  // Stop all playtime tracking sessions before quitting — records final
+  // playtime to the database so no data is lost.
+  import("./playtime/tracker").then(({ stopAllTracking }) => {
+    stopAllTracking();
+    if (process.platform !== "darwin") app.quit();
+  });
+});
+
+app.on("before-quit", () => {
+  // Best-effort: stop all tracking even if the window-all-closed handler
+  // didn't fire (e.g. Ctrl+C, taskkill, system shutdown).
+  try {
+    const { stopAllTracking } = require("./playtime/tracker");
+    stopAllTracking();
+  } catch {
+    // ignore — best-effort
+  }
 });

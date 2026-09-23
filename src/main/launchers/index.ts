@@ -32,6 +32,7 @@ export interface LaunchResult {
   ok: boolean;
   message: string;
   startedAt: string;
+  pid?: number;  // Process ID of the launched game (for playtime tracking)
 }
 
 export interface ShortcutTarget {
@@ -184,16 +185,18 @@ export async function launchGame(game: Game): Promise<LaunchResult> {
       if (target && target.targetPath) {
         try {
           const args = target.arguments ? target.arguments.split(/\s+/).filter(Boolean) : [];
-          spawn(target.targetPath, args, {
+          const child = spawn(target.targetPath, args, {
             cwd: target.workingDir || undefined,
             detached: true,
             stdio: "ignore",
             windowsHide: false,
-          }).unref();
+          });
+          child.unref();
           return {
             ok: true,
             message: `Launched via shortcut: ${target.targetPath}`,
             startedAt,
+            pid: child.pid,
           };
         } catch (e) {
           return {
@@ -228,13 +231,14 @@ export async function launchGame(game: Game): Promise<LaunchResult> {
     // 2c. .bat / .cmd batch file — spawn via cmd.exe.
     if (lower.endsWith(".bat") || lower.endsWith(".cmd")) {
       try {
-        spawn("cmd.exe", ["/c", exePath], {
+        const child = spawn("cmd.exe", ["/c", exePath], {
           cwd: game.installDir ?? dirname(exePath),
           detached: true,
           stdio: "ignore",
           windowsHide: false,
-        }).unref();
-        return { ok: true, message: `Launched batch: ${exePath}`, startedAt };
+        });
+        child.unref();
+        return { ok: true, message: `Launched batch: ${exePath}`, startedAt, pid: child.pid };
       } catch (e) {
         return {
           ok: false,
@@ -246,13 +250,14 @@ export async function launchGame(game: Game): Promise<LaunchResult> {
 
     // 3. Direct .exe — spawn it directly.
     try {
-      spawn(exePath, {
+      const child = spawn(exePath, {
         cwd: game.installDir ?? undefined,
         detached: true,
         stdio: "ignore",
         windowsHide: false,
-      }).unref();
-      return { ok: true, message: `Started ${exePath}.`, startedAt };
+      });
+      child.unref();
+      return { ok: true, message: `Started ${exePath}.`, startedAt, pid: child.pid };
     } catch (e) {
       return {
         ok: false,

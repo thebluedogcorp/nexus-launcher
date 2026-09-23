@@ -145,6 +145,38 @@ const api = {
   getSettings: () => ipcRenderer.invoke("settings:get") as Promise<LauncherSettings>,
   setSettings: (s: Partial<LauncherSettings>) =>
     ipcRenderer.invoke("settings:set", s) as Promise<LauncherSettings>,
+
+  // ===== Playtime tracking =====
+  stopPlaytimeTracking: (gameId: number) =>
+    ipcRenderer.invoke("playtime:stop", gameId) as Promise<{ durationSec: number }>,
+  getActivePlaytimeSessions: () =>
+    ipcRenderer.invoke("playtime:getActive") as Promise<Array<{
+      gameId: number; gameTitle: string; startedAt: number; elapsedSec: number;
+    }>>,
+  getPlaytimeSessions: (gameId: number) =>
+    ipcRenderer.invoke("playtime:getSessions", gameId) as Promise<Array<{
+      id: number; gameId: number; gameTitle: string; startedAt: string; endedAt: string | null; durationSec: number;
+    }>>,
+  getPlaytimeSummaries: () =>
+    ipcRenderer.invoke("playtime:getSummaries") as Promise<Array<{
+      gameId: number; gameTitle: string; totalPlaytimeSec: number; totalLaunches: number;
+      lastPlayedAt: string | null; sessionsThisWeek: number; sessionsThisMonth: number;
+    }>>,
+  onPlaytimeStarted: (cb: (p: { gameId: number; gameTitle: string; startedAt: number }) => void) => {
+    const l = (_e: unknown, p: { gameId: number; gameTitle: string; startedAt: number }) => cb(p);
+    ipcRenderer.on("playtime:started", l);
+    return () => ipcRenderer.removeListener("playtime:started", l);
+  },
+  onPlaytimeTick: (cb: (p: { gameId: number; gameTitle: string; elapsedSec: number; startedAt: number }) => void) => {
+    const l = (_e: unknown, p: { gameId: number; gameTitle: string; elapsedSec: number; startedAt: number }) => cb(p);
+    ipcRenderer.on("playtime:tick", l);
+    return () => ipcRenderer.removeListener("playtime:tick", l);
+  },
+  onPlaytimeStopped: (cb: (p: { gameId: number; gameTitle: string; durationSec: number; startedAt: number; endedAt: number }) => void) => {
+    const l = (_e: unknown, p: { gameId: number; gameTitle: string; durationSec: number; startedAt: number; endedAt: number }) => cb(p);
+    ipcRenderer.on("playtime:stopped", l);
+    return () => ipcRenderer.removeListener("playtime:stopped", l);
+  },
 };
 
 contextBridge.exposeInMainWorld("nexus", api);
