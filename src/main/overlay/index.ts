@@ -60,20 +60,27 @@ function resolveOverlayHtml(): string | null {
 function createOverlayWindow(): BrowserWindow {
   const defaultConfig = getDefaultOverlayConfig();
 
+  // If no active config, use the default — the overlay should ALWAYS work
+  // even if no game is running.
+  if (!activeConfig) {
+    activeConfig = defaultConfig;
+    console.log("[overlay] No active config — using default. Overlay will work without a game running.");
+  }
+
   const win = new BrowserWindow({
-    width: defaultConfig.position.width,
-    height: defaultConfig.position.height,
-    x: defaultConfig.position.x,
-    y: defaultConfig.position.y,
+    width: 360,
+    height: 480,
+    x: 20,
+    y: 20,
     frame: false,
-    transparent: true,
+    transparent: false,           // CHANGED: transparent:true is unreliable on Windows
     resizable: true,
     alwaysOnTop: true,
     skipTaskbar: true,
-    hasShadow: false,
-    show: false, // We'll show it as soon as content loads
+    hasShadow: true,
+    show: true,                    // CHANGED: show immediately, don't wait for ready-to-show
     focusable: true,
-    backgroundColor: "#00000000",
+    backgroundColor: "#1a1a22",   // CHANGED: solid dark background, not transparent
     webPreferences: {
       preload: join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -92,31 +99,41 @@ function createOverlayWindow(): BrowserWindow {
     console.log("[overlay] Loading overlay from dev server: http://localhost:5173/overlay.html");
     win.loadURL("http://localhost:5173/overlay.html");
   } else {
-    const htmlPath = resolveOverlayHtml();
-    if (htmlPath) {
-      console.log("[overlay] Loading overlay from file:", htmlPath);
-      win.loadFile(htmlPath);
-    } else {
-      console.error("[overlay] No overlay.html found — overlay will be blank!");
+    // CHANGED: try loadFile directly without existsSync (which can fail inside asar)
+    const candidates = [
+      join(__dirname, "..", "dist-renderer", "overlay.html"),
+      join(__dirname, "..", "..", "dist-renderer", "overlay.html"),
+      join(process.resourcesPath || "", "app.asar", "dist-renderer", "overlay.html"),
+      join(process.resourcesPath || "", "dist-renderer", "overlay.html"),
+    ];
+    let loaded = false;
+    for (const p of candidates) {
+      try {
+        console.log("[overlay] Trying loadFile:", p);
+        win.loadFile(p);
+        loaded = true;
+        console.log("[overlay] loadFile accepted:", p);
+        break;
+      } catch (e) {
+        console.log("[overlay] loadFile failed for", p, ":", e);
+      }
+    }
+    if (!loaded) {
+      console.error("[overlay] Could not load overlay.html from any path!");
     }
   }
 
-  // Show the window as soon as content is ready
-  win.once("ready-to-show", () => {
-    console.log("[overlay] Window ready-to-show — displaying overlay.");
-    win.show();
-    win.focus();
-    isOverlayVisible = true;
+  isOverlayVisible = true;
+
+  // Send the config to the overlay immediately — don't wait for ready-to-show
+  win.webContents.on("did-finish-load", () => {
+    console.log("[overlay] did-finish-load — sending config to overlay.");
     sendToOverlay("overlay:shown", { config: activeConfig, gameId: activeGameId });
   });
 
-  // If the overlay fails to load, log the error + show a dialog
+  // If the overlay fails to load, show an error in the window
   win.webContents.on("did-fail-load", (_e, errorCode, errorDescription, validatedURL) => {
     console.error(`[overlay] did-fail-load: ${errorCode} ${errorDescription} for ${validatedURL}`);
-    // Show the window anyway so the user sees something — it'll just be
-    // a transparent window with the error in the console.
-    win.show();
-    isOverlayVisible = true;
   });
 
   // Log console messages from the overlay renderer
@@ -182,12 +199,14 @@ function unregisterHotkeys(): void {
 export function toggleOverlay(): void {
   console.log(`[overlay] toggleOverlay called. overlayWindow=${overlayWindow ? "exists" : "null"}, isOverlayVisible=${isOverlayVisible}`);
 
+  // If no window exists, create one — it shows immediately (show: true)
   if (!overlayWindow || overlayWindow.isDestroyed()) {
     console.log("[overlay] Creating new overlay window...");
     overlayWindow = createOverlayWindow();
     return;
   }
 
+  // Toggle visibility
   if (isOverlayVisible) {
     console.log("[overlay] Hiding overlay.");
     overlayWindow.hide();
@@ -197,6 +216,7 @@ export function toggleOverlay(): void {
     overlayWindow.show();
     overlayWindow.focus();
     isOverlayVisible = true;
+    // Re-send the config in case it changed while hidden
     sendToOverlay("overlay:shown", { config: activeConfig, gameId: activeGameId });
   }
 }

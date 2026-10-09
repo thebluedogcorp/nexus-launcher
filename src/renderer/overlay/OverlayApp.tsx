@@ -83,7 +83,7 @@ const DEFAULT_CONFIG: OverlayConfig = {
 };
 
 export function OverlayApp() {
-  const [config, setConfig] = useState<OverlayConfig | null>(null);
+  const [config, setConfig] = useState<OverlayConfig | null>(DEFAULT_CONFIG);
   const [gameId, setGameId] = useState<number | null>(null);
   const [game, setGame] = useState<ActiveGame | null>(null);
   const [stats, setStats] = useState<SystemStats | null>(null);
@@ -437,8 +437,9 @@ function CrosshairOverlay({ config }: { config: OverlayConfig["crosshair"] }) {
 
 function overlayContainerStyle(): React.CSSProperties {
   return {
-    width: "100vw",
-    height: "100vh",
+    width: "100%",
+    height: "100%",
+    background: "#1a1a22",
     display: "flex",
     alignItems: "flex-start",
     justifyContent: "flex-start",

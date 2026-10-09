@@ -9,15 +9,34 @@
     html, body, #root {
       width: 100%;
       height: 100%;
-      background: transparent;
+      background: #1a1a22;
       overflow: hidden;
       font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+      color: rgba(255,255,255,0.95);
     }
     body { user-select: none; -webkit-user-select: none; }
+    /* Fallback: if React fails to load, show a basic message */
+    #fallback {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      flex-direction: column;
+      gap: 8px;
+      color: #2dd4bf;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    #fallback .sub { color: rgba(255,255,255,0.4); font-size: 11px; font-weight: 400; }
   </style>
 </head>
 <body>
-  <div id="root"></div>
+  <div id="root">
+    <div id="fallback">
+      NEXUS Overlay
+      <div class="sub">Loading…</div>
+    </div>
+  </div>
   <script type="module" src="./overlay/main.tsx"></script>
 </body>
 </html>

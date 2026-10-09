@@ -50,8 +50,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v3.12.1"
-          $title = "NEXUS v3.12.1 — Fixed overlay not opening"
+          $tag = "v3.12.2"
+          $title = "NEXUS v3.12.2 — Overlay simplified — works without game detection"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
@@ -90,8 +90,8 @@ jobs:
           Auto-detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox, patches rich metadata via the RAWG + Steam APIs, and launches games natively.
 
           **Downloads:**
-          - NEXUS-Setup-3.12.1.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-3.12.1.exe — single-file portable build.
+          - NEXUS-Setup-3.12.2.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-3.12.2.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@
