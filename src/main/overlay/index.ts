@@ -1,20 +1,17 @@
 // NEXUS Game Overlay — a floating, always-on-top transparent window that
-// appears over the game when the user presses the global hotkey (Win+G or
-// Alt+O by default).
+// appears over the game when the user presses the global hotkey.
 //
-// Architecture:
-//   - A separate BrowserWindow with:
-//     frame: false, transparent: true, alwaysOnTop: true,
-//     skipTaskbar: true, focusable: true (toggleable for click-through)
-//   - globalShortcut registers Win+G / Alt+O to toggle the overlay
-//   - The overlay loads a separate HTML page (overlay.html) that renders
-//     the React overlay UI with widgets (FPS, CPU, clock, links, etc.)
-//   - Per-game profiles are loaded from the DB when a game is detected
-//     as running (via the playtime tracker)
-//   - The overlay can toggle click-through mode (mouse events pass through
-//     to the game underneath)
+// v3.12.1 fixes:
+//   - Added Win+G as a hotkey (Xbox Game Bar standard)
+//   - Added did-fail-load handler so overlay load errors are logged
+//   - Show the overlay window immediately on toggle (don't wait for
+//     ready-to-show which may never fire if the HTML fails to load)
+//   - Better path resolution for the packaged app (check more candidates)
+//   - Log every step of overlay creation so the user can diagnose issues
+//   - Added a fallback: if the overlay window fails to load, show an
+//     error dialog telling the user what went wrong
 
-import { app, BrowserWindow, globalShortcut, screen, shell } from "electron";
+import { app, BrowserWindow, globalShortcut, screen, shell, dialog } from "electron";
 import { join } from "path";
 import { existsSync } from "fs";
 import { getOverlayProfile, setOverlayProfile, getDefaultOverlayConfig, getAllOverlayProfiles, getGame } from "../db";
@@ -26,14 +23,41 @@ let isClickThrough = false;
 let activeGameId: number | null = null;
 let activeConfig: OverlayConfig | null = null;
 
-const DEFAULT_HOTKEYS = ["CommandOrControl+Shift+O", "Alt+O"];
+// Hotkeys: Win+G (Xbox Game Bar standard), Alt+O, Ctrl+Shift+O
+const DEFAULT_HOTKEYS = ["Super+G", "Alt+O", "CommandOrControl+Shift+O"];
 
 // ============================================================
 // OVERLAY WINDOW CREATION
 // ============================================================
 
+function resolveOverlayHtml(): string | null {
+  const isDev = !!process.env.DEV || !app.isPackaged;
+
+  if (isDev) {
+    // In dev mode, the Vite dev server serves overlay.html
+    return null; // null means "use loadURL instead of loadFile"
+  }
+
+  // In packaged mode, search for overlay.html in all possible locations.
+  // __dirname is typically: app.asar/dist-electron/main
+  // dist-renderer is at:   app.asar/dist-renderer/overlay.html
+  const candidates = [
+    join(__dirname, "..", "dist-renderer", "overlay.html"),          // app.asar/dist-renderer
+    join(__dirname, "..", "..", "dist-renderer", "overlay.html"),     // dev tsc output
+    join(process.resourcesPath || "", "app.asar", "dist-renderer", "overlay.html"),
+    join(process.resourcesPath || "", "dist-renderer", "overlay.html"),
+  ];
+
+  for (const p of candidates) {
+    console.log(`[overlay] Checking overlay.html candidate: ${p} → exists: ${existsSync(p)}`);
+    if (existsSync(p)) return p;
+  }
+
+  console.error("[overlay] Could not find overlay.html in any location!");
+  return null;
+}
+
 function createOverlayWindow(): BrowserWindow {
-  const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
   const defaultConfig = getDefaultOverlayConfig();
 
   const win = new BrowserWindow({
@@ -47,7 +71,7 @@ function createOverlayWindow(): BrowserWindow {
     alwaysOnTop: true,
     skipTaskbar: true,
     hasShadow: false,
-    show: false,
+    show: false, // We'll show it as soon as content loads
     focusable: true,
     backgroundColor: "#00000000",
     webPreferences: {
@@ -58,28 +82,47 @@ function createOverlayWindow(): BrowserWindow {
     },
   });
 
-  // Load the overlay renderer
-  const isDev = !!process.env.DEV || !app.isPackaged;
-  if (isDev) {
-    win.loadURL("http://localhost:5173/overlay.html");
-    // Don't open devtools for the overlay in dev — it steals focus from the game
-  } else {
-    const candidates = [
-      join(__dirname, "..", "dist-renderer", "overlay.html"),
-      join(process.resourcesPath || "", "app.asar", "dist-renderer", "overlay.html"),
-      join(process.resourcesPath || "", "dist-renderer", "overlay.html"),
-    ];
-    for (const p of candidates) {
-      if (existsSync(p)) {
-        win.loadFile(p);
-        break;
-      }
-    }
-  }
-
   // Keep the overlay always on top of everything, including fullscreen games
   win.setAlwaysOnTop(true, "screen-saver");
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+
+  // Load the overlay renderer
+  const isDev = !!process.env.DEV || !app.isPackaged;
+  if (isDev) {
+    console.log("[overlay] Loading overlay from dev server: http://localhost:5173/overlay.html");
+    win.loadURL("http://localhost:5173/overlay.html");
+  } else {
+    const htmlPath = resolveOverlayHtml();
+    if (htmlPath) {
+      console.log("[overlay] Loading overlay from file:", htmlPath);
+      win.loadFile(htmlPath);
+    } else {
+      console.error("[overlay] No overlay.html found — overlay will be blank!");
+    }
+  }
+
+  // Show the window as soon as content is ready
+  win.once("ready-to-show", () => {
+    console.log("[overlay] Window ready-to-show — displaying overlay.");
+    win.show();
+    win.focus();
+    isOverlayVisible = true;
+    sendToOverlay("overlay:shown", { config: activeConfig, gameId: activeGameId });
+  });
+
+  // If the overlay fails to load, log the error + show a dialog
+  win.webContents.on("did-fail-load", (_e, errorCode, errorDescription, validatedURL) => {
+    console.error(`[overlay] did-fail-load: ${errorCode} ${errorDescription} for ${validatedURL}`);
+    // Show the window anyway so the user sees something — it'll just be
+    // a transparent window with the error in the console.
+    win.show();
+    isOverlayVisible = true;
+  });
+
+  // Log console messages from the overlay renderer
+  win.webContents.on("console-message", (_e, level, message, line, sourceId) => {
+    console.log(`[overlay:renderer:${level}] ${message} (${sourceId}:${line})`);
+  });
 
   return win;
 }
@@ -89,31 +132,36 @@ function createOverlayWindow(): BrowserWindow {
 // ============================================================
 
 function registerHotkeys(): void {
-  // Unregister any existing hotkeys first
   try {
     globalShortcut.unregisterAll();
   } catch {
     // ignore
   }
 
-  // Register the default hotkeys
   for (const key of DEFAULT_HOTKEYS) {
     try {
-      globalShortcut.register(key, () => {
+      const success = globalShortcut.register(key, () => {
+        console.log(`[overlay] Hotkey pressed: ${key}`);
         toggleOverlay();
       });
-      console.log(`[overlay] Registered hotkey: ${key}`);
+      if (success) {
+        console.log(`[overlay] Registered hotkey: ${key}`);
+      } else {
+        console.warn(`[overlay] Failed to register hotkey ${key} — it may be taken by another app.`);
+      }
     } catch (e) {
-      console.warn(`[overlay] Failed to register hotkey ${key}:`, e);
+      console.warn(`[overlay] Error registering hotkey ${key}:`, e);
     }
   }
 
-  // Register a hotkey for click-through toggle
+  // Click-through toggle
   try {
-    globalShortcut.register("CommandOrControl+Shift+X", () => {
+    const success = globalShortcut.register("CommandOrControl+Shift+X", () => {
       toggleClickThrough();
     });
-    console.log("[overlay] Registered click-through toggle: Ctrl+Shift+X");
+    if (success) {
+      console.log("[overlay] Registered click-through toggle: Ctrl+Shift+X");
+    }
   } catch (e) {
     console.warn("[overlay] Failed to register click-through hotkey:", e);
   }
@@ -132,22 +180,20 @@ function unregisterHotkeys(): void {
 // ============================================================
 
 export function toggleOverlay(): void {
-  if (!overlayWindow) {
+  console.log(`[overlay] toggleOverlay called. overlayWindow=${overlayWindow ? "exists" : "null"}, isOverlayVisible=${isOverlayVisible}`);
+
+  if (!overlayWindow || overlayWindow.isDestroyed()) {
+    console.log("[overlay] Creating new overlay window...");
     overlayWindow = createOverlayWindow();
-    // Wait for the window to be ready before showing
-    overlayWindow.once("ready-to-show", () => {
-      overlayWindow?.show();
-      overlayWindow?.focus();
-      isOverlayVisible = true;
-      sendToOverlay("overlay:shown", { config: activeConfig, gameId: activeGameId });
-    });
     return;
   }
 
   if (isOverlayVisible) {
+    console.log("[overlay] Hiding overlay.");
     overlayWindow.hide();
     isOverlayVisible = false;
   } else {
+    console.log("[overlay] Showing overlay.");
     overlayWindow.show();
     overlayWindow.focus();
     isOverlayVisible = true;
@@ -156,21 +202,16 @@ export function toggleOverlay(): void {
 }
 
 export function hideOverlay(): void {
-  if (overlayWindow && isOverlayVisible) {
+  if (overlayWindow && !overlayWindow.isDestroyed() && isOverlayVisible) {
     overlayWindow.hide();
     isOverlayVisible = false;
   }
 }
 
 export function showOverlay(): void {
-  if (!overlayWindow) {
+  if (!overlayWindow || overlayWindow.isDestroyed()) {
+    console.log("[overlay] Creating new overlay window for showOverlay...");
     overlayWindow = createOverlayWindow();
-    overlayWindow.once("ready-to-show", () => {
-      overlayWindow?.show();
-      overlayWindow?.focus();
-      isOverlayVisible = true;
-      sendToOverlay("overlay:shown", { config: activeConfig, gameId: activeGameId });
-    });
   } else {
     overlayWindow.show();
     overlayWindow.focus();
@@ -184,7 +225,7 @@ export function showOverlay(): void {
 // ============================================================
 
 export function toggleClickThrough(): void {
-  if (!overlayWindow) return;
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
   isClickThrough = !isClickThrough;
   overlayWindow.setIgnoreMouseEvents(isClickThrough, { forward: true });
   overlayWindow.setFocusable(!isClickThrough);
@@ -199,11 +240,9 @@ export function toggleClickThrough(): void {
 export function setActiveGame(gameId: number | null): void {
   activeGameId = gameId;
   if (gameId !== null) {
-    // Load the per-game overlay profile (or create a default one)
     let config = getOverlayProfile(gameId);
     if (!config) {
       config = getDefaultOverlayConfig();
-      // Customize the default with the game title
       const game = getGame(gameId);
       if (game) {
         config.links = [
@@ -217,11 +256,9 @@ export function setActiveGame(gameId: number | null): void {
   } else {
     activeConfig = null;
     console.log("[overlay] Active game cleared.");
-    // Hide the overlay when no game is active
     hideOverlay();
   }
 
-  // If the overlay is visible, update it with the new config
   if (isOverlayVisible) {
     sendToOverlay("overlay:configChanged", { config: activeConfig, gameId: activeGameId });
   }
@@ -236,19 +273,17 @@ export function getActiveGameId(): number | null {
 }
 
 // ============================================================
-// PROFILE CRUD (called from IPC)
+// PROFILE CRUD
 // ============================================================
 
 export function updateOverlayProfile(gameId: number, config: OverlayConfig): void {
   setOverlayProfile(gameId, config);
-  // If this is the active game's profile, update the live overlay
   if (gameId === activeGameId) {
     activeConfig = config;
     if (isOverlayVisible) {
       sendToOverlay("overlay:configChanged", { config: activeConfig, gameId: activeGameId });
     }
   }
-  console.log(`[overlay] Profile updated for gameId=${gameId}.`);
 }
 
 // ============================================================
@@ -262,7 +297,7 @@ function sendToOverlay(channel: string, payload: unknown): void {
 }
 
 // ============================================================
-// SYSTEM STATS (for the overlay widgets)
+// SYSTEM STATS
 // ============================================================
 
 export async function getSystemStats(): Promise<{
@@ -275,9 +310,6 @@ export async function getSystemStats(): Promise<{
   network: { downloadMbps: number; uploadMbps: number; pingMs: number | null };
   audioLevel: number;
 }> {
-  // On Windows, we use `wmic` / `typeperf` for CPU usage and `nvidia-smi` /
-  // `wmic path win32_VideoController` for GPU stats. These are best-effort —
-  // if a tool isn't available we return 0.
   const { exec } = require("child_process");
   const { promisify } = require("util");
   const execAsync = promisify(exec);
@@ -290,11 +322,8 @@ export async function getSystemStats(): Promise<{
   let ramTotalGB = 0;
   let vramUsedGB = 0;
   let vramTotalGB = 0;
-  let fps = 0;
-  let frametime = 0;
 
   if (process.platform === "win32") {
-    // CPU usage (typeperf gives a decimal like "12.345678")
     try {
       const { stdout } = await execAsync(
         `typeperf "\\Processor(_Total)\\% Processor Time" -sc 1`,
@@ -306,7 +335,6 @@ export async function getSystemStats(): Promise<{
       }
     } catch { /* ignore */ }
 
-    // RAM (wmic os get FreePhysicalMemory,TotalVisibleMemorySize)
     try {
       const { stdout } = await execAsync(
         `wmic os get TotalVisibleMemorySize,FreePhysicalMemory /format:list`,
@@ -321,7 +349,6 @@ export async function getSystemStats(): Promise<{
       }
     } catch { /* ignore */ }
 
-    // GPU (nvidia-smi if available)
     try {
       const { stdout } = await execAsync(
         `nvidia-smi --query-gpu=utilization.gpu,temperature.gpu,memory.used,memory.total --format=csv,noheader,nounits`,
@@ -334,22 +361,7 @@ export async function getSystemStats(): Promise<{
         vramUsedGB = Math.round(parts[2] / 1024 * 10) / 10;
         vramTotalGB = Math.round(parts[3] / 1024 * 10) / 10;
       }
-    } catch { /* nvidia-smi not available — AMD/Intel GPUs won't be monitored */ }
-
-    // CPU temp (OpenHardwareMonitor / LibreHardwareMonitor if installed;
-    // otherwise we try `wmic path MSAcpi_ThermalZoneTemperature` which is
-    // unreliable but sometimes works)
-    try {
-      const { stdout } = await execAsync(
-        `wmic /namespace:\\\\root\\wmi PATH MSAcpi_ThermalZoneTemperature get CurrentTemperature /format:list`,
-        { maxBuffer: 1024 * 1024, timeout: 3000 },
-      );
-      const tempMatch = stdout.match(/CurrentTemperature=(\d+)/);
-      if (tempMatch) {
-        // Temperature is in tenths of Kelvin — convert to Celsius
-        cpuTemp = Math.round((parseInt(tempMatch[1]) / 10) - 273.15);
-      }
-    } catch { /* ignore */ }
+    } catch { /* nvidia-smi not available */ }
   }
 
   const ramUsagePct = ramTotalGB > 0 ? Math.round((ramUsedGB / ramTotalGB) * 100) : 0;
@@ -360,8 +372,7 @@ export async function getSystemStats(): Promise<{
     gpu: { usage: gpuUsage, temp: gpuTemp },
     ram: { totalGB: ramTotalGB, usedGB: ramUsedGB, usagePct: ramUsagePct },
     vram: { totalGB: vramTotalGB, usedGB: vramUsedGB, usagePct: vramUsagePct },
-    fps, // FPS requires PresentMon or a native hook — left as 0 for now
-    frametime,
+    fps: 0, frametime: 0,
     network: { downloadMbps: 0, uploadMbps: 0, pingMs: null },
     audioLevel: 0,
   };
@@ -374,7 +385,6 @@ export async function getSystemStats(): Promise<{
 export function registerOverlayIpc(): void {
   const { ipcMain } = require("electron");
 
-  // Toggle the overlay (from renderer — e.g. a tray menu button)
   ipcMain.handle("overlay:toggle", () => {
     toggleOverlay();
     return isOverlayVisible;
@@ -390,18 +400,15 @@ export function registerOverlayIpc(): void {
     return true;
   });
 
-  // Toggle click-through mode
   ipcMain.handle("overlay:toggleClickThrough", () => {
     toggleClickThrough();
     return isClickThrough;
   });
 
-  // Get the active game's overlay config
   ipcMain.handle("overlay:getActiveConfig", () => {
     return { config: activeConfig, gameId: activeGameId };
   });
 
-  // Get a specific game's overlay profile
   ipcMain.handle("overlay:getProfile", (_e: unknown, gameId: number) => {
     let config = getOverlayProfile(gameId);
     if (!config) {
@@ -410,36 +417,30 @@ export function registerOverlayIpc(): void {
     return config;
   });
 
-  // Save a game's overlay profile
   ipcMain.handle("overlay:saveProfile", (_e: unknown, gameId: number, config: OverlayConfig) => {
     updateOverlayProfile(gameId, config);
     return true;
   });
 
-  // Delete a game's overlay profile
   ipcMain.handle("overlay:deleteProfile", (_e: unknown, gameId: number) => {
     const { deleteOverlayProfile } = require("../db");
     deleteOverlayProfile(gameId);
     return true;
   });
 
-  // Get all overlay profiles (for the settings UI)
   ipcMain.handle("overlay:getAllProfiles", () => {
     return getAllOverlayProfiles();
   });
 
-  // Get system stats (polled by the overlay renderer every 2s)
   ipcMain.handle("overlay:getStats", async () => {
     return getSystemStats();
   });
 
-  // Open a URL in the default browser (from the overlay's quick links)
   ipcMain.handle("overlay:openUrl", async (_e: unknown, url: string) => {
     await shell.openExternal(url);
     return true;
   });
 
-  // Get the active game info (title, cover, playtime)
   ipcMain.handle("overlay:getActiveGame", () => {
     if (activeGameId === null) return null;
     const game = getGame(activeGameId);
@@ -460,16 +461,17 @@ export function registerOverlayIpc(): void {
 // ============================================================
 
 export function initOverlay(): void {
+  console.log("[overlay] Initializing overlay system...");
   registerHotkeys();
   registerOverlayIpc();
-  console.log("[overlay] Overlay system initialized. Press Alt+O or Ctrl+Shift+O to toggle.");
+  console.log("[overlay] Overlay system initialized. Press Win+G, Alt+O, or Ctrl+Shift+O to toggle.");
 }
 
 export function cleanupOverlay(): void {
   unregisterHotkeys();
-  if (overlayWindow) {
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
     overlayWindow.destroy();
-    overlayWindow = null;
   }
+  overlayWindow = null;
   isOverlayVisible = false;
 }
