@@ -177,6 +177,16 @@ const api = {
     ipcRenderer.on("playtime:stopped", l);
     return () => ipcRenderer.removeListener("playtime:stopped", l);
   },
+
+  // ===== Startup & Close Behavior =====
+  isLaunchOnStartupEnabled: () =>
+    ipcRenderer.invoke("startup:isEnabled") as Promise<boolean>,
+  setLaunchOnStartup: (enabled: boolean) =>
+    ipcRenderer.invoke("startup:setEnabled", enabled) as Promise<boolean>,
+  getCloseBehavior: () =>
+    ipcRenderer.invoke("close:getBehavior") as Promise<"exit" | "minimize" | "ask">,
+  setCloseBehavior: (behavior: "exit" | "minimize" | "ask") =>
+    ipcRenderer.invoke("close:setBehavior", behavior) as Promise<"exit" | "minimize" | "ask">,
 };
 
 contextBridge.exposeInMainWorld("nexus", api);

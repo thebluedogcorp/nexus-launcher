@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { LauncherSettings, SortKey } from "@shared/types";
 import { SORT_LABELS } from "@shared/types";
 import { Icon } from "./Icons";
@@ -20,6 +20,38 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
   const [haptics, setHaptics] = useState(localStorage.getItem("nx-haptics") !== "off");
   const [saving, setSaving] = useState(false);
 
+  // Startup & Close behavior state
+  const [launchOnStartup, setLaunchOnStartup] = useState(initial.launchOnStartup);
+  const [closeBehavior, setCloseBehavior] = useState<"exit" | "minimize" | "ask">(initial.closeBehavior);
+  const [startupLoading, setStartupLoading] = useState(false);
+
+  // On mount, query the actual registry state for launch-on-startup
+  useEffect(() => {
+    void window.nexus.isLaunchOnStartupEnabled().then((enabled: boolean) => {
+      setLaunchOnStartup(enabled);
+    }).catch(() => {});
+  }, []);
+
+  const toggleStartup = async () => {
+    setStartupLoading(true);
+    try {
+      const newState = await window.nexus.setLaunchOnStartup(!launchOnStartup);
+      setLaunchOnStartup(newState);
+    } catch (e) {
+      console.error("Failed to toggle startup:", e);
+    }
+    setStartupLoading(false);
+  };
+
+  const toggleCloseBehavior = async (behavior: "exit" | "minimize" | "ask") => {
+    setCloseBehavior(behavior);
+    try {
+      await window.nexus.setCloseBehavior(behavior);
+    } catch (e) {
+      console.error("Failed to set close behavior:", e);
+    }
+  };
+
   const save = async () => {
     setSaving(true);
     localStorage.setItem("nx-accent", accentColor);
@@ -27,7 +59,7 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
     localStorage.setItem("nx-transition", String(transitionSpeed));
     localStorage.setItem("nx-haptics", haptics ? "on" : "off");
     document.documentElement.style.setProperty("--accent", accentColor);
-    await onSave({ autoScanOnStart: autoScan, defaultSort, scanPaths });
+    await onSave({ autoScanOnStart: autoScan, defaultSort, scanPaths, launchOnStartup, closeBehavior });
     setSaving(false);
   };
 
@@ -93,6 +125,84 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
             <select className="field-input" value={defaultSort} onChange={(e) => setDefaultSort(e.target.value as SortKey)}>
               {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => <option key={k} value={k}>{SORT_LABELS[k]}</option>)}
             </select>
+          </div>
+        </div>
+
+        {/* Startup & Close Behavior */}
+        <div className="gp-section-title"><span className="bar" /> Startup & Close Behavior</div>
+        <div style={{ display: "grid", gap: 14, marginBottom: 28 }}>
+          {/* Launch on System Startup */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: 14, borderRadius: 10, border: "1px solid var(--border)", background: "rgba(255,255,255,.02)" }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>Launch on System Startup</div>
+              <div style={{ fontSize: 11, color: "var(--dim)" }}>Automatically start NEXUS when your computer boots.</div>
+            </div>
+            <button
+              onClick={toggleStartup}
+              disabled={startupLoading}
+              style={{
+                width: 42, height: 22, borderRadius: 999, padding: 2,
+                background: launchOnStartup ? "var(--accent)" : "rgba(255,255,255,.1)",
+                position: "relative",
+                transition: "background .15s",
+                opacity: startupLoading ? 0.5 : 1,
+                cursor: startupLoading ? "wait" : "pointer",
+              }}
+            >
+              <span style={{
+                position: "absolute", top: 2,
+                left: launchOnStartup ? 22 : 2,
+                width: 18, height: 18, borderRadius: "50%",
+                background: "#fff", transition: "left .15s",
+              }} />
+            </button>
+          </div>
+
+          {/* Close Behavior */}
+          <div style={{ padding: 14, borderRadius: 10, border: "1px solid var(--border)", background: "rgba(255,255,255,.02)" }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#fff", marginBottom: 4 }}>When I close NEXUS</div>
+            <div style={{ fontSize: 11, color: "var(--dim)", marginBottom: 12 }}>Choose what happens when you click the close button.</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {([
+                { value: "exit" as const, label: "Exit Completely", desc: "Close entirely" },
+                { value: "minimize" as const, label: "Minimize to Tray", desc: "Run in background" },
+                { value: "ask" as const, label: "Ask Every Time", desc: "Show a prompt" },
+              ]).map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => toggleCloseBehavior(opt.value)}
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: 8,
+                    border: closeBehavior === opt.value
+                      ? "1px solid var(--accent)"
+                      : "1px solid var(--border)",
+                    background: closeBehavior === opt.value
+                      ? "rgba(45,212,191,0.10)"
+                      : "rgba(255,255,255,0.02)",
+                    color: closeBehavior === opt.value ? "var(--accent)" : "var(--dim)",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    transition: "all .15s",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 2,
+                    textAlign: "left",
+                    minWidth: 120,
+                  }}
+                >
+                  <span>{opt.label}</span>
+                  <span style={{ fontSize: 10, fontWeight: 400, opacity: 0.7 }}>{opt.desc}</span>
+                </button>
+              ))}
+            </div>
+            {closeBehavior !== "exit" && (
+              <div style={{ marginTop: 10, fontSize: 10, color: "var(--faint)", display: "flex", alignItems: "center", gap: 5 }}>
+                <Icon.Info size={11} />
+                <span>The app will keep running in the system tray. Click the tray icon to reopen, or right-click for Quit.</span>
+              </div>
+            )}
           </div>
         </div>
 

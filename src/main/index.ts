@@ -7,6 +7,8 @@ import { app, BrowserWindow, shell, dialog } from "electron";
 import { join } from "path";
 import { existsSync } from "fs";
 import { registerIpc } from "./ipc";
+import { createTray, registerStartupCloseIpc, handleCloseRequest, getIsQuitting, destroyTray } from "./startup-close";
+import { getAllSettings } from "./db";
 
 // Prevent garbage collection of the main window.
 let mainWindow: BrowserWindow | null = null;
@@ -124,15 +126,42 @@ app.whenReady().then(() => {
   try {
     registerIpc();
   } catch (err) {
-    // The IPC layer touches better-sqlite3 (native module). If it fails to
-    // load (e.g. ABI mismatch after an Electron upgrade), surface it clearly.
     dialog.showErrorBox(
       "NEXUS — Database initialization failed",
       `NEXUS could not initialize its local database.\n\n${err instanceof Error ? err.stack || err.message : String(err)}\n\n` +
         `If better-sqlite3 reports an ABI mismatch, the app was built against a different Electron version. Re-download the latest release.`,
     );
   }
+
+  // Register startup-close IPC handlers (launch-on-startup, close behavior)
+  try {
+    registerStartupCloseIpc(mainWindow ?? new BrowserWindow({ show: false }));
+  } catch (err) {
+    console.warn("[startup-close] Failed to register IPC:", err);
+  }
+
   createWindow();
+
+  // Create the system tray icon (for minimize-to-tray behavior)
+  try {
+    if (mainWindow) {
+      createTray(mainWindow);
+
+      // Intercept the window close event — the close behavior setting
+      // determines whether we exit, minimize to tray, or ask.
+      mainWindow.on("close", async (e: Electron.Event) => {
+        if (getIsQuitting()) return; // Already quitting — let it close.
+        const settings = getAllSettings();
+        const preventClose = await handleCloseRequest(mainWindow!, settings);
+        if (preventClose) {
+          e.preventDefault();
+        }
+      });
+    }
+  } catch (err) {
+    console.warn("[startup-close] Failed to create tray:", err);
+  }
+
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -167,12 +196,18 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
-  // Stop all playtime tracking sessions before quitting — records final
-  // playtime to the database so no data is lost.
-  import("./playtime/tracker").then(({ stopAllTracking }) => {
-    stopAllTracking();
-    if (process.platform !== "darwin") app.quit();
-  });
+  // If the app is quitting (via tray Quit or close behavior=exit), proceed.
+  if (getIsQuitting()) {
+    destroyTray();
+    // Stop all playtime tracking sessions before quitting.
+    import("./playtime/tracker").then(({ stopAllTracking }) => {
+      stopAllTracking();
+      if (process.platform !== "darwin") app.quit();
+    });
+    return;
+  }
+  // Otherwise (minimize-to-tray), don't quit — the tray keeps the app alive.
+  // On macOS, keep the app running too (standard behavior).
 });
 
 app.on("before-quit", () => {

@@ -121,6 +121,9 @@ export interface LauncherSettings {
   autoScanOnStart: boolean;
   defaultSort: SortKey;
   scanPaths: string;
+  // Startup & close behavior (v3.11.0)
+  launchOnStartup: boolean;
+  closeBehavior: "exit" | "minimize" | "ask";
 }
 
 export type SortKey = "recent" | "name" | "playtime" | "rating";

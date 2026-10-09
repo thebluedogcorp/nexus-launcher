@@ -684,6 +684,8 @@ export function getAllSettings(): LauncherSettings {
     autoScanOnStart: getSetting("autoScanOnStart") === "true",
     defaultSort: (getSetting("defaultSort") as LauncherSettings["defaultSort"]) ?? "recent",
     scanPaths: getSetting("scanPaths") ?? "",
+    launchOnStartup: getSetting("launchOnStartup") === "true",
+    closeBehavior: (getSetting("closeBehavior") as LauncherSettings["closeBehavior"]) ?? "ask",
   };
 }
 
@@ -693,6 +695,8 @@ export function setAllSettings(s: Partial<LauncherSettings>): LauncherSettings {
     setSetting("autoScanOnStart", String(s.autoScanOnStart));
   if (s.defaultSort !== undefined) setSetting("defaultSort", s.defaultSort);
   if (s.scanPaths !== undefined) setSetting("scanPaths", s.scanPaths);
+  if (s.launchOnStartup !== undefined) setSetting("launchOnStartup", String(s.launchOnStartup));
+  if (s.closeBehavior !== undefined) setSetting("closeBehavior", s.closeBehavior);
   return getAllSettings();
 }
 
