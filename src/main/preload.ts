@@ -187,6 +187,46 @@ const api = {
     ipcRenderer.invoke("close:getBehavior") as Promise<"exit" | "minimize" | "ask">,
   setCloseBehavior: (behavior: "exit" | "minimize" | "ask") =>
     ipcRenderer.invoke("close:setBehavior", behavior) as Promise<"exit" | "minimize" | "ask">,
+
+  // ===== Game Overlay =====
+  overlayToggle: () => ipcRenderer.invoke("overlay:toggle") as Promise<boolean>,
+  overlayShow: () => ipcRenderer.invoke("overlay:show") as Promise<boolean>,
+  overlayHide: () => ipcRenderer.invoke("overlay:hide") as Promise<boolean>,
+  overlayToggleClickThrough: () => ipcRenderer.invoke("overlay:toggleClickThrough") as Promise<boolean>,
+  overlayGetActiveConfig: () => ipcRenderer.invoke("overlay:getActiveConfig") as Promise<{ config: unknown | null; gameId: number | null }>,
+  overlayGetProfile: (gameId: number) => ipcRenderer.invoke("overlay:getProfile", gameId) as Promise<unknown>,
+  overlaySaveProfile: (gameId: number, config: unknown) => ipcRenderer.invoke("overlay:saveProfile", gameId, config) as Promise<boolean>,
+  overlayDeleteProfile: (gameId: number) => ipcRenderer.invoke("overlay:deleteProfile", gameId) as Promise<boolean>,
+  overlayGetAllProfiles: () => ipcRenderer.invoke("overlay:getAllProfiles") as Promise<Array<{ gameId: number; gameTitle: string; config: unknown }>>,
+  overlayGetStats: () => ipcRenderer.invoke("overlay:getStats") as Promise<{
+    cpu: { usage: number; temp: number | null };
+    gpu: { usage: number; temp: number | null };
+    ram: { totalGB: number; usedGB: number; usagePct: number };
+    vram: { totalGB: number; usedGB: number; usagePct: number };
+    fps: number; frametime: number;
+    network: { downloadMbps: number; uploadMbps: number; pingMs: number | null };
+    audioLevel: number;
+  }>,
+  overlayOpenUrl: (url: string) => ipcRenderer.invoke("overlay:openUrl", url) as Promise<boolean>,
+  overlayGetActiveGame: () => ipcRenderer.invoke("overlay:getActiveGame") as Promise<{
+    id: number; title: string; platform: string;
+    coverImage: string | null; playtimeSec: number; launchCount: number;
+  } | null>,
+  onOverlayShown: (cb: (p: { config: unknown; gameId: number | null }) => void) => {
+    const l = (_e: unknown, p: { config: unknown; gameId: number | null }) => cb(p);
+    ipcRenderer.on("overlay:shown", l);
+    return () => ipcRenderer.removeListener("overlay:shown", l);
+  },
+  onOverlayConfigChanged: (cb: (p: { config: unknown; gameId: number | null }) => void) => {
+    const l = (_e: unknown, p: { config: unknown; gameId: number | null }) => cb(p);
+    ipcRenderer.on("overlay:configChanged", l);
+    return () => ipcRenderer.removeListener("overlay:configChanged", l);
+  },
+  onOverlayClickThrough: (cb: (isClickThrough: boolean) => void) => {
+    const l = (_e: unknown, isClickThrough: boolean) => cb(isClickThrough);
+    ipcRenderer.on("overlay:clickThrough", l);
+    return () => ipcRenderer.removeListener("overlay:clickThrough", l);
+  },
 };
 
 contextBridge.exposeInMainWorld("nexus", api);

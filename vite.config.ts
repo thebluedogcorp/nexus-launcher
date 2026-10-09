@@ -30,7 +30,10 @@ export default defineConfig({
     emptyOutDir: true,
     target: "chrome120",
     rollupOptions: {
-      input: resolve(__dirname, "src/renderer/index.html"),
+      input: {
+        main: resolve(__dirname, "src/renderer/index.html"),
+        overlay: resolve(__dirname, "src/renderer/overlay.html"),
+      },
     },
   },
   server: {

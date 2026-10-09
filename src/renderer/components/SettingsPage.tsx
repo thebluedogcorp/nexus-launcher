@@ -229,6 +229,59 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
           </button>
           <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
         </div>
+
+        {/* Game Overlay */}
+        <div className="gp-section-title"><span className="bar" /> Game Overlay</div>
+        <div style={{ display: "grid", gap: 14, marginBottom: 28 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: 14, borderRadius: 10, border: "1px solid var(--border)", background: "rgba(255,255,255,.02)" }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>In-Game Overlay</div>
+              <div style={{ fontSize: 11, color: "var(--dim)" }}>
+                Press <strong style={{ color: "var(--accent)" }}>Alt+O</strong> while playing to toggle the overlay.
+                Press <strong style={{ color: "var(--accent)" }}>Ctrl+Shift+X</strong> to toggle click-through mode.
+              </div>
+            </div>
+            <button className="btn btn-outline btn-sm" onClick={() => { void window.nexus.overlayToggle?.(); }}>
+              <Icon.Gamepad size={13} /> Test Overlay
+            </button>
+          </div>
+
+          {/* Overlay features list */}
+          <div style={{ padding: 14, borderRadius: 10, border: "1px solid var(--border)", background: "rgba(255,255,255,.02)" }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#fff", marginBottom: 8 }}>Available Overlay Widgets</div>
+            <div style={{ fontSize: 11, color: "var(--dim)", marginBottom: 12 }}>
+              Each game can have a customized overlay with different widgets enabled.
+              Configure per-game overlays from the game detail page.
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+              {[
+                "FPS Counter", "CPU/GPU Monitor", "RAM/VRAM Usage", "FPS Graph",
+                "Network/Ping", "Clock", "Session Timer", "Game Info",
+                "Audio Level", "Notes Scratchpad", "Crosshair Overlay", "Quick Links",
+              ].map((feature) => (
+                <div key={feature} style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "6px 8px", borderRadius: 6,
+                  background: "rgba(255,255,255,0.02)",
+                  fontSize: 11, color: "var(--dim)",
+                }}>
+                  <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--accent)", flexShrink: 0 }} />
+                  {feature}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Per-game profiles info */}
+          <div style={{ padding: 14, borderRadius: 10, border: "1px solid var(--border)", background: "rgba(255,255,255,.02)" }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#fff", marginBottom: 4 }}>Per-Game Profiles</div>
+            <div style={{ fontSize: 11, color: "var(--dim)", display: "flex", alignItems: "center", gap: 5 }}>
+              <Icon.Info size={12} />
+              <span>When you launch a game, the overlay automatically detects it and loads the profile you configured for that specific game — custom links, notes, crosshair settings, enabled widgets, and more.</span>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   );

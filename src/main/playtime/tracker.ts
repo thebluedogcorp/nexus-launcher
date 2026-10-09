@@ -184,6 +184,16 @@ export function startTracking(
   });
   broadcastSessionUpdate(gameId);
 
+  // Notify the overlay system that this game is now active — loads its
+  // per-game overlay profile so the user gets the right widgets when they
+  // press the overlay hotkey (Alt+O).
+  try {
+    const { setActiveGame } = require("../overlay");
+    setActiveGame(gameId);
+  } catch {
+    // overlay module not loaded — ignore
+  }
+
   // Also update the game's lastPlayedAt + launchCount immediately
   try {
     const game = getGame(gameId);
@@ -238,6 +248,14 @@ export function stopTracking(gameId: number): { durationSec: number } {
 
   // Remove from active sessions
   activeSessions.delete(gameId);
+
+  // Notify the overlay system that no game is active — hides the overlay.
+  try {
+    const { setActiveGame } = require("../overlay");
+    setActiveGame(null);
+  } catch {
+    // overlay module not loaded — ignore
+  }
 
   // Broadcast the end
   broadcast("playtime:stopped", {

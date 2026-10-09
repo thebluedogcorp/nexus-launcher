@@ -9,6 +9,7 @@ import { existsSync } from "fs";
 import { registerIpc } from "./ipc";
 import { createTray, registerStartupCloseIpc, handleCloseRequest, getIsQuitting, destroyTray } from "./startup-close";
 import { getAllSettings } from "./db";
+import { initOverlay, cleanupOverlay, setActiveGame } from "./overlay";
 
 // Prevent garbage collection of the main window.
 let mainWindow: BrowserWindow | null = null;
@@ -162,6 +163,13 @@ app.whenReady().then(() => {
     console.warn("[startup-close] Failed to create tray:", err);
   }
 
+  // Initialize the game overlay (global hotkey + transparent window)
+  try {
+    initOverlay();
+  } catch (err) {
+    console.warn("[overlay] Failed to initialize overlay:", err);
+  }
+
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -211,11 +219,15 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
-  // Best-effort: stop all tracking even if the window-all-closed handler
-  // didn't fire (e.g. Ctrl+C, taskkill, system shutdown).
+  // Best-effort: stop all tracking + clean up overlay
   try {
     const { stopAllTracking } = require("./playtime/tracker");
     stopAllTracking();
+  } catch {
+    // ignore — best-effort
+  }
+  try {
+    cleanupOverlay();
   } catch {
     // ignore — best-effort
   }

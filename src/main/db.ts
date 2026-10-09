@@ -174,6 +174,13 @@ function migrate(conn: import("better-sqlite3").Database) {
       progress INTEGER DEFAULT 0,
       maxProgress INTEGER DEFAULT 1
     );
+    CREATE TABLE IF NOT EXISTS overlay_profiles (
+      gameId INTEGER PRIMARY KEY,
+      config TEXT NOT NULL DEFAULT '{}',
+      createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+      updatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (gameId) REFERENCES games(id) ON DELETE CASCADE
+    );
   `);
   addColumnIfMissing(conn, "games", "completionStatus", "TEXT");
   addColumnIfMissing(conn, "games", "userRating", "INTEGER");
@@ -990,4 +997,148 @@ export function checkAchievements(): string[] {
     }
   }
   return newlyUnlocked;
+}
+
+// ===== Overlay Profiles (per-game overlay configuration) =====
+
+export interface OverlayProfile {
+  gameId: number;
+  config: OverlayConfig;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OverlayConfig {
+  // Which widgets are enabled for this game
+  widgets: {
+    fps: boolean;
+    cpuGpu: boolean;
+    ramVram: boolean;
+    perfGraph: boolean;
+    network: boolean;
+    clock: boolean;
+    sessionTimer: boolean;
+    gameInfo: boolean;
+    audioLevel: boolean;
+    notes: boolean;
+    crosshair: boolean;
+    quickLinks: boolean;
+  };
+  // Per-game custom links
+  links: Array<{ label: string; url: string; icon?: string }>;
+  // Per-game notes
+  notes: string;
+  // Crosshair settings
+  crosshair: {
+    enabled: boolean;
+    style: "cross" | "dot" | "circle" | "t-cross";
+    color: string;
+    size: number;
+    opacity: number;
+    posX: number; // 0-100 (percentage of screen)
+    posY: number;
+  };
+  // Overlay position + size
+  position: {
+    x: number; // pixels from left
+    y: number; // pixels from top
+    width: number;
+    height: number;
+  };
+  // Overlay appearance
+  appearance: {
+    opacity: number;     // 0-100
+    compact: boolean;     // compact mode (smaller widgets)
+    accentColor: string;  // hex color
+    showLabels: boolean;  // show widget labels
+  };
+  // Hotkey (game-specific override, empty = use global default)
+  hotkey: string;
+}
+
+export function getOverlayProfile(gameId: number): OverlayConfig | null {
+  const conn = db();
+  const row = conn.prepare("SELECT config FROM overlay_profiles WHERE gameId = ?").get(gameId) as
+    | { config?: string }
+    | undefined;
+  if (!row?.config) return null;
+  try {
+    return JSON.parse(row.config) as OverlayConfig;
+  } catch {
+    return null;
+  }
+}
+
+export function setOverlayProfile(gameId: number, config: OverlayConfig): void {
+  const conn = db();
+  const configStr = JSON.stringify(config);
+  conn.prepare(`
+    INSERT INTO overlay_profiles (gameId, config, updatedAt)
+    VALUES (?, ?, datetime('now'))
+    ON CONFLICT(gameId) DO UPDATE SET config = excluded.config, updatedAt = datetime('now')
+  `).run(gameId, configStr);
+}
+
+export function deleteOverlayProfile(gameId: number): void {
+  db().prepare("DELETE FROM overlay_profiles WHERE gameId = ?").run(gameId);
+}
+
+export function getAllOverlayProfiles(): Array<{ gameId: number; gameTitle: string; config: OverlayConfig }> {
+  const conn = db();
+  const rows = conn.prepare(`
+    SELECT op.gameId, op.config, g.title as gameTitle
+    FROM overlay_profiles op
+    LEFT JOIN games g ON op.gameId = g.id
+    ORDER BY g.title
+  `).all() as Array<{ gameId: number; config: string; gameTitle: string | null }>;
+  const result: Array<{ gameId: number; gameTitle: string; config: OverlayConfig }> = [];
+  for (const row of rows) {
+    try {
+      const config = JSON.parse(row.config) as OverlayConfig;
+      result.push({ gameId: row.gameId, gameTitle: row.gameTitle ?? "Unknown", config });
+    } catch {
+      // skip invalid profiles
+    }
+  }
+  return result;
+}
+
+export function getDefaultOverlayConfig(): OverlayConfig {
+  return {
+    widgets: {
+      fps: true,
+      cpuGpu: true,
+      ramVram: false,
+      perfGraph: false,
+      network: false,
+      clock: true,
+      sessionTimer: true,
+      gameInfo: true,
+      audioLevel: false,
+      notes: false,
+      crosshair: false,
+      quickLinks: true,
+    },
+    links: [
+      { label: "Game Wiki", url: "https://www.google.com/search?q={game}+wiki" },
+    ],
+    notes: "",
+    crosshair: {
+      enabled: false,
+      style: "cross",
+      color: "#00ff00",
+      size: 20,
+      opacity: 80,
+      posX: 50,
+      posY: 50,
+    },
+    position: { x: 20, y: 20, width: 320, height: 400 },
+    appearance: {
+      opacity: 85,
+      compact: false,
+      accentColor: "#2dd4bf",
+      showLabels: true,
+    },
+    hotkey: "",
+  };
 }
