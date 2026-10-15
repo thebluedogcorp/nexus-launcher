@@ -50,46 +50,34 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v4.1.0"
-          $title = "NEXUS v4.1.0 — Redesigned Desktop Mode (Epic-style) + pure black/white theme: Console/ Desktop mode toggle, dark Epic-inspired theme, sidebar settings"
+          $tag = "v4.2.0"
+          $title = "NEXUS v4.2.0 — UI polish: fixed mode-toggle, pure black/white + single accent, minimal N lettermark logo + icon"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
-          **v4.0.0 — Complete UI overhaul.** A full redesign of the launcher UI with a darker, more minimal aesthetic inspired by the Epic Games store, plus a brand new Desktop mode alongside the existing PS5-style Console carousel.
+          **v4.2.0 — UI polish & minimalism pass.** Every button, badge, and bar cleaned up so the whole launcher follows ONE design rule: pure black + white + a single user-configurable accent color.
 
-          **What's new:**
+          **What's fixed / changed:**
 
-          1. **Mode toggle (Console ↔ Desktop)** — a new segmented toggle in the top bar switches instantly between:
-             * **Console Mode** — the existing PS5-style portrait carousel with controller-friendly navigation. Cards scroll by arrow buttons or gamepad only (the broken mouse-move / mouse-wheel horizontal-scroll detection has been removed, so cards no longer skip around under your cursor).
-             * **Desktop Mode** — a brand-new responsive grid view (Steam / Epic-style). Each card shows cover art, title, platform badge, playtime, and last-played. Normal mouse wheel scroll. Click any card to open the game detail page.
+          1. **Mode toggle bug fixed** — the Console/Desktop switch in the top bar had a hardcoded "active" state on the Desktop button, so it always looked selected (even in Console mode). The active class is now driven by the actual `uiMode` state via a dedicated `<ModeToggle>` component, so the switch reflects the real layout every time. Both topbars (Console and Desktop) share the same component.
 
-             The mode is persisted to localStorage (nx-uimode) and to the database (settings.uiMode), and toggles instantly with no restart required.
+          2. **Single accent color, everywhere live** — introduced a `--accent-rgb` token. Every teal tint (favorites, ratings, status pills, progress bars, badges, focus rings, scan sweep, hover-play, toast borders, etc.) is now `rgba(var(--accent-rgb), …)` so when you pick a new accent in Settings → Appearance it propagates to the whole UI instantly — and survives a restart (the saved accent is applied on startup, before the first paint). The old gold/blue second hues are gone; favorites and ratings now use the accent.
 
-          2. **Darker, sleeker color scheme** — inspired by Epic Games' dark UI:
-             * Background `#0a0a0c` (near black)
-             * Surface `#141418` (cards)
-             * Surface hover `#1c1c22`
-             * Borders `rgba(255,255,255,0.06)`
-             * Text `rgba(255,255,255,0.92)`
-             * Subtle teal accent (`#2dd4bf`) — used sparingly so the UI feels mostly monochrome.
+          3. **No gradients on fills** — the logo, the primary "Add" button, the "Play" CTA, progress bars, the empty-state box, the about card, achievement unlocked cards, the enrichment banner, and all stat/dash/progress bars are now SOLID. Backgrounds are pure black (`#000`) with near-black surface lifts. Buttons lift on hover with subtle elevation, no glow.
 
-          3. **Settings reorganized with a left sidebar** — Settings is no longer a single long scroll. Tabs:
-             * **General** — auto-scan, default sort, scan paths
-             * **Appearance** — accent color, tile size, animation speed, haptics, UI mode
-             * **Library** — export/import, check missing games
-             * **Startup & Close** — launch on startup, close behavior
-             * **Overlay** — overlay info + test button + widget list
-             * **About** — version info + update check
+          4. **Minimal N lettermark logo** — replaced the Gamepad icon with a crisp geometric "N" drawn from a single SVG path (`NexusMark`). Used identically in the top bar (accent on black), the desktop sidebar header, the Settings → About card, and the app icon. The old gradient logo tile is gone.
 
-             Each tab shows only the relevant settings.
+          5. **New app icon** — regenerated `resources/icon.ico` (multi-res 16–256) and `resources/icon.png` (1024) as a solid black rounded square with the single accent "N" — matching the in-app logo exactly.
 
-          4. **Removed broken mousemove scroll** — In console mode the carousel's mousemove-based scroll detection (which moved tiles under the cursor and caused cascading hover on the wrong tile) and the mouse-wheel → horizontal scroll conversion are both gone. Console mode is now strictly arrow-button + keyboard + controller, as it should be. Desktop mode is strictly mouse.
+          6. **Sleek desktop sidebar** — added a compact brand header (black tile + accent N + "LIBRARY" label) and a crisp left accent bar on the active nav item (like VS Code / Epic). Mode-toggle active state is now an accent-tinted pill.
 
-          All existing functionality is preserved: controller navigation, achievements, activity, playtime tracking, overlay, game detail page, collections, scan dialog, add-game dialog, stats dashboard, etc.
+          7. **Broken `var(--nx-accent)` references fixed** — AddGameDialog, ScanDialog, UpdateDialog, and SettingsDialog referenced an undefined `--nx-accent` CSS variable; all now use the real `--accent` token.
+
+          All existing functionality preserved: Console carousel + controller nav, Desktop grid, achievements, activity, real playtime tracking, in-game overlay, game detail page, collections, scan wizard, add-game dialog, RAWG metadata patch, stats dashboard, enrich-all, startup & close behavior.
 
           **Downloads:**
-          - NEXUS-Setup-4.1.0.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-4.1.0.exe — single-file portable build.
+          - NEXUS-Setup-4.2.0.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-4.2.0.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@

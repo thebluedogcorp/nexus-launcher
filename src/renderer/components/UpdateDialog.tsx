@@ -80,7 +80,7 @@ export function UpdateDialog({ info, onClose }: Props) {
       <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
         <div className="modal-header">
           <div className="modal-title">
-            <span style={{ color: "var(--nx-accent)" }}><Icon.DownloadCloud size={18} /></span>
+            <span style={{ color: "var(--accent)" }}><Icon.DownloadCloud size={18} /></span>
             Update NEXUS
           </div>
           {phase !== "downloading" && phase !== "installing" && (
@@ -96,7 +96,7 @@ export function UpdateDialog({ info, onClose }: Props) {
                   width: 56, height: 56, borderRadius: 14, flexShrink: 0,
                   background: "linear-gradient(135deg, rgba(52,211,153,0.2), rgba(52,211,153,0.02))",
                   border: "1px solid rgba(52,211,153,0.3)",
-                  display: "flex", alignItems: "center", justifyContent: "center", color: "var(--nx-accent)",
+                  display: "flex", alignItems: "center", justifyContent: "center", color: "var(--accent)",
                 }}>
                   <Icon.DownloadCloud size={28} />
                 </div>
@@ -145,7 +145,7 @@ export function UpdateDialog({ info, onClose }: Props) {
                   width: `${phase === "installing" ? 100 : progress.percent}%`,
                   background: "linear-gradient(90deg, #34d399, #2dd4bf)",
                   height: "100%", borderRadius: 999,
-                  boxShadow: "0 0 12px var(--nx-accent-glow)",
+                  boxShadow: "0 0 12px rgba(var(--accent-rgb),0.4)",
                   transition: "width .3s ease",
                 }} />
               </div>
@@ -160,7 +160,7 @@ export function UpdateDialog({ info, onClose }: Props) {
               <div style={{
                 width: 56, height: 56, borderRadius: 14, margin: "0 auto 16px",
                 background: "rgba(52,211,153,0.15)", border: "1px solid rgba(52,211,153,0.3)",
-                display: "flex", alignItems: "center", justifyContent: "center", color: "var(--nx-accent)",
+                display: "flex", alignItems: "center", justifyContent: "center", color: "var(--accent)",
               }}>
                 <Icon.CheckCircle size={28} />
               </div>

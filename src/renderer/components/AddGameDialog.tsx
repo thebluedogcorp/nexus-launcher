@@ -79,7 +79,7 @@ export function AddGameDialog({ onClose, onAdd }: Props) {
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div className="modal-title">
-            <span style={{ color: "var(--nx-accent)" }}><Icon.Plus size={18} /></span>
+            <span style={{ color: "var(--accent)" }}><Icon.Plus size={18} /></span>
             Add Game Manually
           </div>
           <button className="modal-close" onClick={onClose}><Icon.Close size={16} /></button>
@@ -214,7 +214,7 @@ export function AddGameDialog({ onClose, onAdd }: Props) {
               onClick={() => setAutoPatch(!autoPatch)}
               style={{
                 width: 40, height: 22, borderRadius: 999, padding: 2,
-                background: autoPatch ? "var(--nx-accent)" : "rgba(255,255,255,0.1)",
+                background: autoPatch ? "var(--accent)" : "rgba(255,255,255,0.1)",
                 transition: "background .15s", position: "relative",
               }}
             >

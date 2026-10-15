@@ -2,6 +2,8 @@ import { useState, useEffect, type ReactNode } from "react";
 import type { LauncherSettings, SortKey } from "@shared/types";
 import { SORT_LABELS } from "@shared/types";
 import { Icon } from "./Icons";
+import { applyAccent } from "../lib/accent";
+import { NexusMark } from "./Logo";
 
 interface Props {
   initial: LauncherSettings;
@@ -148,7 +150,7 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
       localStorage.setItem("nx-transition", String(transitionSpeed));
       localStorage.setItem("nx-haptics", haptics ? "on" : "off");
       localStorage.setItem("nx-uimode", uiMode);
-      document.documentElement.style.setProperty("--accent", accentColor);
+      applyAccent(accentColor);
       await onSave({ autoScanOnStart: autoScan, defaultSort, scanPaths, launchOnStartup, closeBehavior, uiMode });
       flash("success", "Settings saved.");
     } catch (e) {
@@ -272,7 +274,7 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
                           style={{ background: c.color }}
                           onClick={() => {
                             setAccentColor(c.color);
-                            document.documentElement.style.setProperty("--accent", c.color);
+                            applyAccent(c.color);
                           }}
                           title={c.name}
                         />
@@ -457,10 +459,10 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
                 <div className="settings-section">
                   <div className="settings-section-title"><span className="bar" />About NEXUS</div>
                   <div className="about-card">
-                    <div className="logo"><Icon.Gamepad size={28} /></div>
+                    <div className="logo"><NexusMark size={28} /></div>
                     <div>
                       <div className="name">NEXUS Launcher</div>
-                      <div className="ver">Version 4.0.0 — Universal Game Launcher for Windows</div>
+                      <div className="ver">Version 4.2.0 — Universal Game Launcher for Windows</div>
                       <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 6 }}>
                         Auto-detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox. Patches rich metadata via RAWG + Steam APIs. Launches natively.
                       </div>

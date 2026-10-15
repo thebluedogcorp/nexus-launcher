@@ -97,7 +97,7 @@ export function ScanDialog({ onClose, onRunScan, onImport, onDeepScan }: Props) 
       <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div className="modal-title">
-            <span style={{ color: "var(--nx-accent)" }}><Icon.Scan size={18} /></span>
+            <span style={{ color: "var(--accent)" }}><Icon.Scan size={18} /></span>
             {mode === "platforms" ? "Scan Platforms" : "Deep Filesystem Scan"}
           </div>
           <button className="modal-close" onClick={onClose}><Icon.Close size={16} /></button>

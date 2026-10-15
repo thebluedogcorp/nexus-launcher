@@ -43,7 +43,7 @@ export function SettingsDialog({ initial, onClose, onSave, onCheckUpdates }: Pro
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div className="modal-title">
-            <span style={{ color: "var(--nx-accent)" }}><Icon.Settings size={18} /></span>
+            <span style={{ color: "var(--accent)" }}><Icon.Settings size={18} /></span>
             Settings
           </div>
           <button className="modal-close" onClick={onClose}><Icon.Close size={16} /></button>
@@ -59,7 +59,7 @@ export function SettingsDialog({ initial, onClose, onSave, onCheckUpdates }: Pro
             <div style={{
               width: 38, height: 38, borderRadius: 10, flexShrink: 0,
               background: "rgba(52,211,153,0.15)", display: "flex", alignItems: "center", justifyContent: "center",
-              color: "var(--nx-accent)",
+              color: "var(--accent)",
             }}>
               <Icon.Shield size={20} />
             </div>
@@ -87,7 +87,7 @@ export function SettingsDialog({ initial, onClose, onSave, onCheckUpdates }: Pro
             </div>
             <button
               onClick={() => setAutoScan(!autoScan)}
-              style={{ width: 40, height: 22, borderRadius: 999, padding: 2, background: autoScan ? "var(--nx-accent)" : "rgba(255,255,255,0.1)", transition: "background .15s", position: "relative" }}
+              style={{ width: 40, height: 22, borderRadius: 999, padding: 2, background: autoScan ? "var(--accent)" : "rgba(255,255,255,0.1)", transition: "background .15s", position: "relative" }}
             >
               <span style={{ position: "absolute", top: 2, left: autoScan ? 20 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
             </button>

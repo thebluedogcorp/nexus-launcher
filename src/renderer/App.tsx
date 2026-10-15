@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DetectedGame, Game, LauncherSettings, PlatformId, SortKey, Stats } from "@shared/types";
 import { PLATFORM_LIST } from "@shared/types";
 import { Icon } from "./components/Icons";
+import { NexusMark } from "./components/Logo";
+import { ModeToggle } from "./components/ModeToggle";
 import { GamePage } from "./components/GamePage";
 import { AddGameDialog } from "./components/AddGameDialog";
 import { ScanDialog } from "./components/ScanDialog";
@@ -10,6 +12,7 @@ import { UpdateDialog } from "./components/UpdateDialog";
 import { ToastContainer, type Toast } from "./components/Toast";
 import { useGamepadController } from "./lib/useGamepad";
 import { formatPlaytime, formatPlaytimeShort, formatSize, platformColor, platformLabel, gradientFor, initials, relativeTime } from "./lib/helpers";
+import { applyAccent } from "./lib/accent";
 
 interface Filters { platform: string; favOnly: boolean; query: string; sort: SortKey }
 const DEFAULT_FILTERS: Filters = { platform: "all", favOnly: false, query: "", sort: "recent" };
@@ -73,6 +76,10 @@ export function App() {
   }, [refreshGames, refreshStats]);
 
   useEffect(() => {
+    // v4.2.0 — Apply the saved accent color on startup BEFORE painting the
+    // library so the very first frame uses the user's chosen accent (not the
+    // default teal). localStorage is the source of truth for appearance.
+    applyAccent(localStorage.getItem("nx-accent") || "#2dd4bf");
     (async () => {
       try {
         const s = await window.nexus.getSettings();
@@ -188,6 +195,8 @@ export function App() {
       setUiMode(next.uiMode);
       localStorage.setItem("nx-uimode", next.uiMode);
     }
+    // v4.2.0 — re-apply accent in case the user changed it in Appearance
+    applyAccent(localStorage.getItem("nx-accent") || "#2dd4bf");
     toast("success", "Settings saved");
     return next;
   }, [toast]);
@@ -492,7 +501,7 @@ export function App() {
         {/* Top bar */}
         <header className="topbar">
           <div className="tb-brand">
-            <div className="tb-logo"><Icon.Gamepad size={16} /></div>
+            <div className="tb-logo"><NexusMark size={18} /></div>
             <div><div className="tb-name">NEXUS</div><div className="tb-sub">Launcher</div></div>
           </div>
           <div className="tb-search">
@@ -519,14 +528,7 @@ export function App() {
               <span className="playtime-badge__stop">Stop</span>
             </button>
           )}
-          <div className="mode-toggle" title="Switch launcher layout">
-            <button className="mode-toggle-btn" onClick={() => setUiModeAndPersist("console")}>
-              <Icon.Gamepad size={14} /> Console
-            </button>
-            <button className="mode-toggle-btn active" onClick={() => setUiModeAndPersist("desktop")}>
-              <Icon.Grid size={14} /> Desktop
-            </button>
-          </div>
+          <ModeToggle current={uiMode} onSwitch={setUiModeAndPersist} />
           <button className="tb-icon" onClick={() => setScanOpen(true)} title="Scan"><Icon.Scan size={16} /></button>
           <button className="tb-icon primary" onClick={() => setAddOpen(true)} title="Add"><Icon.Plus size={15} /> Add</button>
           <button className="tb-icon" onClick={() => setSettingsOpen(true)} title="Settings"><Icon.Settings size={16} /></button>
@@ -536,6 +538,10 @@ export function App() {
         <div className="desktop-layout">
           {/* Left sidebar */}
           <aside className="dt-sidebar">
+            <div className="dt-sidebar-brand">
+              <span className="dt-sidebar-mark"><NexusMark size={16} /></span>
+              <span className="dt-sidebar-title">Library</span>
+            </div>
             <div className="dt-sidebar-nav">
               <button className={filters.platform === "all" && !filters.favOnly ? "dt-nav-item active" : "dt-nav-item"} onClick={() => setFilters((f) => ({ ...f, platform: "all", favOnly: false }))}>
                 <Icon.Library size={16} /> <span>All Games</span>
@@ -732,7 +738,7 @@ export function App() {
       {/* Top bar */}
       <header className="topbar">
         <div className="tb-brand">
-          <div className="tb-logo"><Icon.Gamepad size={16} /></div>
+          <div className="tb-logo"><NexusMark size={18} /></div>
           <div><div className="tb-name">NEXUS</div><div className="tb-sub">Launcher</div></div>
         </div>
         <div className="tb-search">
@@ -763,20 +769,7 @@ export function App() {
           </button>
         )}
         {/* v4.0.0 — Mode toggle: Console carousel ↔ Desktop grid */}
-        <div className="mode-toggle" title="Switch launcher layout">
-          <button
-            className="mode-toggle-btn"
-            onClick={() => setUiModeAndPersist("console")}
-          >
-            <Icon.Gamepad size={14} /> Console
-          </button>
-          <button
-            className="mode-toggle-btn active"
-            onClick={() => setUiModeAndPersist("desktop")}
-          >
-            <Icon.Grid size={14} /> Desktop
-          </button>
-        </div>
+        <ModeToggle current={uiMode} onSwitch={setUiModeAndPersist} />
         <button className="tb-icon" onClick={() => setScanOpen(true)} title="Scan (S)"><Icon.Scan size={16} /></button>
         <button className="tb-icon primary" onClick={() => setAddOpen(true)} title="Add (A)"><Icon.Plus size={15} /> Add</button>
         <button className="tb-icon" onClick={() => setStatsOpen(true)} title="Stats dashboard"><Icon.TrendingUp size={16} /></button>
