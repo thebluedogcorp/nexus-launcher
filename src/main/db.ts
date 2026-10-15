@@ -693,6 +693,7 @@ export function getAllSettings(): LauncherSettings {
     scanPaths: getSetting("scanPaths") ?? "",
     launchOnStartup: getSetting("launchOnStartup") === "true",
     closeBehavior: (getSetting("closeBehavior") as LauncherSettings["closeBehavior"]) ?? "ask",
+    uiMode: (getSetting("uiMode") as LauncherSettings["uiMode"]) ?? "console",
   };
 }
 
@@ -704,6 +705,7 @@ export function setAllSettings(s: Partial<LauncherSettings>): LauncherSettings {
   if (s.scanPaths !== undefined) setSetting("scanPaths", s.scanPaths);
   if (s.launchOnStartup !== undefined) setSetting("launchOnStartup", String(s.launchOnStartup));
   if (s.closeBehavior !== undefined) setSetting("closeBehavior", s.closeBehavior);
+  if (s.uiMode !== undefined) setSetting("uiMode", s.uiMode);
   return getAllSettings();
 }
 

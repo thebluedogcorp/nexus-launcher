@@ -124,6 +124,8 @@ export interface LauncherSettings {
   // Startup & close behavior (v3.11.0)
   launchOnStartup: boolean;
   closeBehavior: "exit" | "minimize" | "ask";
+  // v4.0.0 — UI mode (console carousel vs desktop grid)
+  uiMode: "console" | "desktop";
 }
 
 export type SortKey = "recent" | "name" | "playtime" | "rating";

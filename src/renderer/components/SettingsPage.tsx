@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import type { LauncherSettings, SortKey } from "@shared/types";
 import { SORT_LABELS } from "@shared/types";
 import { Icon } from "./Icons";
@@ -10,35 +10,75 @@ interface Props {
   onCheckUpdates: () => void;
 }
 
+type TabId = "general" | "appearance" | "library" | "startup" | "overlay" | "about";
+
+interface TabDef { id: TabId; label: string; icon: ReactNode }
+const TABS: TabDef[] = [
+  { id: "general", label: "General", icon: <Icon.Settings size={15} /> },
+  { id: "appearance", label: "Appearance", icon: <Icon.Sparkles size={15} /> },
+  { id: "library", label: "Library", icon: <Icon.Library size={15} /> },
+  { id: "startup", label: "Startup & Close", icon: <Icon.Shield size={15} /> },
+  { id: "overlay", label: "Overlay", icon: <Icon.Gamepad size={15} /> },
+  { id: "about", label: "About", icon: <Icon.Info size={15} /> },
+];
+
+const ACCENT_COLORS = [
+  { name: "Teal", color: "#2dd4bf" },
+  { name: "Green", color: "#4ade80" },
+  { name: "Blue", color: "#38bdf8" },
+  { name: "Purple", color: "#c084fc" },
+  { name: "Pink", color: "#f472b6" },
+  { name: "Orange", color: "#fb923c" },
+  { name: "Red", color: "#f87171" },
+  { name: "Cyan", color: "#22d3ee" },
+  { name: "Yellow", color: "#facc15" },
+];
+
+const OVERLAY_FEATURES = [
+  "FPS Counter", "CPU/GPU Monitor", "RAM/VRAM Usage", "FPS Graph",
+  "Network/Ping", "Clock", "Session Timer", "Game Info",
+  "Audio Level", "Notes Scratchpad", "Crosshair Overlay", "Quick Links",
+];
+
 export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props) {
+  // Local form state — synced to db + localStorage on Save
   const [autoScan, setAutoScan] = useState(initial.autoScanOnStart);
   const [defaultSort, setDefaultSort] = useState<SortKey>(initial.defaultSort);
   const [scanPaths, setScanPaths] = useState(initial.scanPaths);
-  const [accentColor, setAccentColor] = useState(localStorage.getItem("nx-accent") || "#4ade80");
+  const [accentColor, setAccentColor] = useState(localStorage.getItem("nx-accent") || "#2dd4bf");
   const [tileSize, setTileSize] = useState(Number(localStorage.getItem("nx-tile-size")) || 150);
   const [transitionSpeed, setTransitionSpeed] = useState(Number(localStorage.getItem("nx-transition")) || 300);
   const [haptics, setHaptics] = useState(localStorage.getItem("nx-haptics") !== "off");
-  const [saving, setSaving] = useState(false);
-
-  // Startup & Close behavior state
+  const [uiMode, setUiMode] = useState<"console" | "desktop">(
+    (localStorage.getItem("nx-uimode") as "console" | "desktop") || initial.uiMode || "console"
+  );
   const [launchOnStartup, setLaunchOnStartup] = useState(initial.launchOnStartup);
   const [closeBehavior, setCloseBehavior] = useState<"exit" | "minimize" | "ask">(initial.closeBehavior);
   const [startupLoading, setStartupLoading] = useState(false);
+  const [tab, setTab] = useState<TabId>("general");
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState<{ type: "info" | "success" | "error"; msg: string } | null>(null);
 
-  // On mount, query the actual registry state for launch-on-startup
+  // Read the actual registry state for launch-on-startup on mount
   useEffect(() => {
     void window.nexus.isLaunchOnStartupEnabled().then((enabled: boolean) => {
       setLaunchOnStartup(enabled);
     }).catch(() => {});
   }, []);
 
+  const flash = (type: "info" | "success" | "error", msg: string) => {
+    setNotice({ type, msg });
+    setTimeout(() => setNotice(null), 4000);
+  };
+
   const toggleStartup = async () => {
     setStartupLoading(true);
     try {
       const newState = await window.nexus.setLaunchOnStartup(!launchOnStartup);
       setLaunchOnStartup(newState);
+      flash("success", newState ? "NEXUS will launch on system startup" : "Startup launch disabled");
     } catch (e) {
-      console.error("Failed to toggle startup:", e);
+      flash("error", "Couldn't toggle startup: " + (e instanceof Error ? e.message : String(e)));
     }
     setStartupLoading(false);
   };
@@ -47,241 +87,411 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
     setCloseBehavior(behavior);
     try {
       await window.nexus.setCloseBehavior(behavior);
+      flash("success", `Close behavior set to: ${behavior === "exit" ? "Exit completely" : behavior === "minimize" ? "Minimize to tray" : "Ask every time"}`);
     } catch (e) {
-      console.error("Failed to set close behavior:", e);
+      flash("error", "Couldn't set close behavior: " + (e instanceof Error ? e.message : String(e)));
+    }
+  };
+
+  const switchUiMode = async (mode: "console" | "desktop") => {
+    setUiMode(mode);
+    localStorage.setItem("nx-uimode", mode);
+    try {
+      await onSave({ uiMode: mode });
+      flash("success", `Switched to ${mode === "console" ? "Console" : "Desktop"} mode — toggle instantly without restart`);
+    } catch {
+      /* flash already shown by parent toast */
+    }
+  };
+
+  const exportLibrary = async () => {
+    try {
+      const json = await window.nexus.exportLibrary();
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `nexus-library-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      flash("success", "Library exported — downloaded as JSON backup.");
+    } catch (e) {
+      flash("error", "Export failed: " + (e instanceof Error ? e.message : String(e)));
+    }
+  };
+
+  const importLibrary = async (file: File) => {
+    try {
+      const text = await file.text();
+      const res = await window.nexus.importLibrary(text);
+      flash("success", `Imported ${res.imported} game${res.imported === 1 ? "" : "s"}${res.skipped > 0 ? ` (${res.skipped} already existed)` : ""}`);
+    } catch (e) {
+      flash("error", "Import failed: " + (e instanceof Error ? e.message : String(e)));
+    }
+  };
+
+  const checkMissing = async () => {
+    try {
+      const missing = await window.nexus.checkMissingGames();
+      if (missing.length === 0) flash("success", "All games installed — no missing games found.");
+      else flash("info", `${missing.length} game${missing.length === 1 ? "" : "s"} missing — ${missing.slice(0, 3).map((m: { title: string }) => m.title).join(", ")}${missing.length > 3 ? "…" : ""}`);
+    } catch (e) {
+      flash("error", "Check failed: " + (e instanceof Error ? e.message : String(e)));
     }
   };
 
   const save = async () => {
     setSaving(true);
-    localStorage.setItem("nx-accent", accentColor);
-    localStorage.setItem("nx-tile-size", String(tileSize));
-    localStorage.setItem("nx-transition", String(transitionSpeed));
-    localStorage.setItem("nx-haptics", haptics ? "on" : "off");
-    document.documentElement.style.setProperty("--accent", accentColor);
-    await onSave({ autoScanOnStart: autoScan, defaultSort, scanPaths, launchOnStartup, closeBehavior });
+    try {
+      localStorage.setItem("nx-accent", accentColor);
+      localStorage.setItem("nx-tile-size", String(tileSize));
+      localStorage.setItem("nx-transition", String(transitionSpeed));
+      localStorage.setItem("nx-haptics", haptics ? "on" : "off");
+      localStorage.setItem("nx-uimode", uiMode);
+      document.documentElement.style.setProperty("--accent", accentColor);
+      await onSave({ autoScanOnStart: autoScan, defaultSort, scanPaths, launchOnStartup, closeBehavior, uiMode });
+      flash("success", "Settings saved.");
+    } catch (e) {
+      flash("error", "Couldn't save: " + (e instanceof Error ? e.message : String(e)));
+    }
     setSaving(false);
   };
 
-  const accentColors = [
-    { name: "Green", color: "#4ade80" },
-    { name: "Blue", color: "#38bdf8" },
-    { name: "Purple", color: "#c084fc" },
-    { name: "Pink", color: "#f472b6" },
-    { name: "Orange", color: "#fb923c" },
-    { name: "Red", color: "#f87171" },
-    { name: "Cyan", color: "#22d3ee" },
-    { name: "Yellow", color: "#facc15" },
-  ];
-
   return (
     <div className="game-page">
-      <button className="gp-back" onClick={onClose}><span style={{ display: "inline-flex", transform: "rotate(180deg)" }}><Icon.Chevron size={18} /></span></button>
-      <div style={{ padding: "40px 48px", maxWidth: 800, margin: "0 auto" }}>
+      <button className="gp-back" onClick={onClose}>
+        <span style={{ display: "inline-flex", transform: "rotate(180deg)" }}><Icon.Chevron size={18} /></span>
+      </button>
+      <div style={{ padding: "40px 48px 80px", maxWidth: 1080, margin: "0 auto" }}>
         <h1 style={{ fontSize: 32, fontWeight: 800, color: "#fff", letterSpacing: "-0.03em", marginBottom: 28 }}>Settings</h1>
 
-        {/* Appearance */}
-        <div className="gp-section-title"><span className="bar" /> Appearance</div>
-        <div style={{ display: "grid", gap: 16, marginBottom: 28 }}>
-          <div className="editor-field">
-            <label>Accent Color</label>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {accentColors.map((c) => (
-                <button key={c.color} onClick={() => setAccentColor(c.color)} style={{
-                  width: 36, height: 36, borderRadius: 10, background: c.color,
-                  border: accentColor === c.color ? "3px solid #fff" : "3px solid transparent",
-                  transition: "all .15s", cursor: "pointer",
-                }} title={c.name} />
-              ))}
-            </div>
-          </div>
-          <div className="editor-field">
-            <label>Tile Size: {tileSize}px</label>
-            <input type="range" min={120} max={200} step={10} value={tileSize} onChange={(e) => setTileSize(Number(e.target.value))} style={{ width: "100%" }} />
-          </div>
-          <div className="editor-field">
-            <label>Animation Speed: {transitionSpeed}ms</label>
-            <input type="range" min={100} max={600} step={50} value={transitionSpeed} onChange={(e) => setTransitionSpeed(Number(e.target.value))} style={{ width: "100%" }} />
-          </div>
-        </div>
+        <div className="settings-layout">
+          {/* ===== LEFT SIDEBAR ===== */}
+          <aside className="settings-sidebar">
+            {TABS.map((t) => (
+              <button key={t.id} className={tab === t.id ? "settings-tab active" : "settings-tab"} onClick={() => setTab(t.id)}>
+                {t.icon}
+                {t.label}
+              </button>
+            ))}
+          </aside>
 
-        {/* Behavior */}
-        <div className="gp-section-title"><span className="bar" /> Behavior</div>
-        <div style={{ display: "grid", gap: 14, marginBottom: 28 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: 14, borderRadius: 10, border: "1px solid var(--border)", background: "rgba(255,255,255,.02)" }}>
-            <div><div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>Auto-scan on startup</div><div style={{ fontSize: 11, color: "var(--dim)" }}>Detect newly installed games when NEXUS launches.</div></div>
-            <button onClick={() => setAutoScan(!autoScan)} style={{ width: 42, height: 22, borderRadius: 999, padding: 2, background: autoScan ? "var(--accent)" : "rgba(255,255,255,.1)", position: "relative", transition: "background .15s" }}>
-              <span style={{ position: "absolute", top: 2, left: autoScan ? 22 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
-            </button>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: 14, borderRadius: 10, border: "1px solid var(--border)", background: "rgba(255,255,255,.02)" }}>
-            <div><div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>Controller haptics</div><div style={{ fontSize: 11, color: "var(--dim)" }}>Vibrate on navigation and button presses.</div></div>
-            <button onClick={() => setHaptics(!haptics)} style={{ width: 42, height: 22, borderRadius: 999, padding: 2, background: haptics ? "var(--accent)" : "rgba(255,255,255,.1)", position: "relative", transition: "background .15s" }}>
-              <span style={{ position: "absolute", top: 2, left: haptics ? 22 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
-            </button>
-          </div>
-          <div className="editor-field">
-            <label>Default Sort</label>
-            <select className="field-input" value={defaultSort} onChange={(e) => setDefaultSort(e.target.value as SortKey)}>
-              {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => <option key={k} value={k}>{SORT_LABELS[k]}</option>)}
-            </select>
-          </div>
-        </div>
-
-        {/* Startup & Close Behavior */}
-        <div className="gp-section-title"><span className="bar" /> Startup & Close Behavior</div>
-        <div style={{ display: "grid", gap: 14, marginBottom: 28 }}>
-          {/* Launch on System Startup */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: 14, borderRadius: 10, border: "1px solid var(--border)", background: "rgba(255,255,255,.02)" }}>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>Launch on System Startup</div>
-              <div style={{ fontSize: 11, color: "var(--dim)" }}>Automatically start NEXUS when your computer boots.</div>
-            </div>
-            <button
-              onClick={toggleStartup}
-              disabled={startupLoading}
-              style={{
-                width: 42, height: 22, borderRadius: 999, padding: 2,
-                background: launchOnStartup ? "var(--accent)" : "rgba(255,255,255,.1)",
-                position: "relative",
-                transition: "background .15s",
-                opacity: startupLoading ? 0.5 : 1,
-                cursor: startupLoading ? "wait" : "pointer",
-              }}
-            >
-              <span style={{
-                position: "absolute", top: 2,
-                left: launchOnStartup ? 22 : 2,
-                width: 18, height: 18, borderRadius: "50%",
-                background: "#fff", transition: "left .15s",
-              }} />
-            </button>
-          </div>
-
-          {/* Close Behavior */}
-          <div style={{ padding: 14, borderRadius: 10, border: "1px solid var(--border)", background: "rgba(255,255,255,.02)" }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#fff", marginBottom: 4 }}>When I close NEXUS</div>
-            <div style={{ fontSize: 11, color: "var(--dim)", marginBottom: 12 }}>Choose what happens when you click the close button.</div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {([
-                { value: "exit" as const, label: "Exit Completely", desc: "Close entirely" },
-                { value: "minimize" as const, label: "Minimize to Tray", desc: "Run in background" },
-                { value: "ask" as const, label: "Ask Every Time", desc: "Show a prompt" },
-              ]).map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => toggleCloseBehavior(opt.value)}
-                  style={{
-                    padding: "10px 14px",
-                    borderRadius: 8,
-                    border: closeBehavior === opt.value
-                      ? "1px solid var(--accent)"
-                      : "1px solid var(--border)",
-                    background: closeBehavior === opt.value
-                      ? "rgba(45,212,191,0.10)"
-                      : "rgba(255,255,255,0.02)",
-                    color: closeBehavior === opt.value ? "var(--accent)" : "var(--dim)",
-                    fontSize: 12,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    transition: "all .15s",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 2,
-                    textAlign: "left",
-                    minWidth: 120,
-                  }}
-                >
-                  <span>{opt.label}</span>
-                  <span style={{ fontSize: 10, fontWeight: 400, opacity: 0.7 }}>{opt.desc}</span>
-                </button>
-              ))}
-            </div>
-            {closeBehavior !== "exit" && (
-              <div style={{ marginTop: 10, fontSize: 10, color: "var(--faint)", display: "flex", alignItems: "center", gap: 5 }}>
-                <Icon.Info size={11} />
-                <span>The app will keep running in the system tray. Click the tray icon to reopen, or right-click for Quit.</span>
+          {/* ===== RIGHT CONTENT ===== */}
+          <div className="settings-content">
+            {notice && (
+              <div style={{
+                marginBottom: 16, padding: "10px 14px", borderRadius: 8,
+                border: `1px solid ${notice.type === "error" ? "rgba(248,113,113,0.32)" : notice.type === "success" ? "rgba(45,212,191,0.32)" : "var(--border-2)"}`,
+                background: notice.type === "error" ? "rgba(248,113,113,0.08)" : notice.type === "success" ? "rgba(45,212,191,0.08)" : "rgba(255,255,255,0.02)",
+                color: notice.type === "error" ? "var(--danger)" : notice.type === "success" ? "var(--accent)" : "var(--text-dim)",
+                fontSize: 12, display: "flex", alignItems: "center", gap: 8,
+              }}>
+                {notice.type === "success" ? <Icon.CheckCircle size={14} /> : notice.type === "error" ? <Icon.Info size={14} /> : <Icon.Info size={14} />}
+                <span>{notice.msg}</span>
               </div>
             )}
-          </div>
-        </div>
 
-        {/* Scan Paths */}
-        <div className="gp-section-title"><span className="bar" /> Custom Scan Paths</div>
-        <div className="editor-field" style={{ marginBottom: 28 }}>
-          <textarea className="field-input" value={scanPaths} onChange={(e) => setScanPaths(e.target.value)} placeholder={"C:\\Games\nD:\\SteamLibrary"} rows={3} style={{ fontFamily: "Cascadia Code, Consolas, monospace", fontSize: 12 }} />
-          <div className="field-hint"><Icon.Info size={12} /><span>One path per line. NEXUS also probes these during a deep scan.</span></div>
-        </div>
-
-        {/* Updates */}
-        <div className="gp-section-title"><span className="bar" /> Updates</div>
-        <div style={{ padding: 14, borderRadius: 10, border: "1px solid var(--border)", background: "rgba(255,255,255,.02)", marginBottom: 28 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div><div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>Check for updates</div><div style={{ fontSize: 11, color: "var(--dim)" }}>Download and install the latest version from GitHub.</div></div>
-            <button className="btn btn-outline btn-sm" onClick={onCheckUpdates}><Icon.Refresh size={13} /> Check Now</button>
-          </div>
-        </div>
-
-        {/* Save */}
-        <div style={{ display: "flex", gap: 10, marginBottom: 40 }}>
-          <button className="btn btn-primary" onClick={save} disabled={saving}>
-            {saving ? <Icon.Spinner size={14} /> : <Icon.Check size={14} />} Save Settings
-          </button>
-          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-        </div>
-
-        {/* Game Overlay */}
-        <div className="gp-section-title"><span className="bar" /> Game Overlay</div>
-        <div style={{ display: "grid", gap: 14, marginBottom: 28 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: 14, borderRadius: 10, border: "1px solid var(--border)", background: "rgba(255,255,255,.02)" }}>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>In-Game Overlay</div>
-              <div style={{ fontSize: 11, color: "var(--dim)" }}>
-                Press <strong style={{ color: "var(--accent)" }}>Alt+O</strong> while playing to toggle the overlay.
-                Press <strong style={{ color: "var(--accent)" }}>Ctrl+Shift+X</strong> to toggle click-through mode.
-              </div>
-            </div>
-            <button className="btn btn-outline btn-sm" onClick={() => { void window.nexus.overlayToggle?.(); }}>
-              <Icon.Gamepad size={13} /> Test Overlay
-            </button>
-          </div>
-
-          {/* Overlay features list */}
-          <div style={{ padding: 14, borderRadius: 10, border: "1px solid var(--border)", background: "rgba(255,255,255,.02)" }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#fff", marginBottom: 8 }}>Available Overlay Widgets</div>
-            <div style={{ fontSize: 11, color: "var(--dim)", marginBottom: 12 }}>
-              Each game can have a customized overlay with different widgets enabled.
-              Configure per-game overlays from the game detail page.
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-              {[
-                "FPS Counter", "CPU/GPU Monitor", "RAM/VRAM Usage", "FPS Graph",
-                "Network/Ping", "Clock", "Session Timer", "Game Info",
-                "Audio Level", "Notes Scratchpad", "Crosshair Overlay", "Quick Links",
-              ].map((feature) => (
-                <div key={feature} style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  padding: "6px 8px", borderRadius: 6,
-                  background: "rgba(255,255,255,0.02)",
-                  fontSize: 11, color: "var(--dim)",
-                }}>
-                  <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--accent)", flexShrink: 0 }} />
-                  {feature}
+            {/* ===== GENERAL TAB ===== */}
+            {tab === "general" && (
+              <>
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />Scanning</div>
+                  <div className="settings-row">
+                    <div className="label-stack">
+                      <div className="t">Auto-scan on startup</div>
+                      <div className="d">Detect newly installed games every time NEXUS launches.</div>
+                    </div>
+                    <button onClick={() => setAutoScan(!autoScan)} className={`settings-toggle ${autoScan ? "on" : ""}`}>
+                      <span className="knob" />
+                    </button>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
 
-          {/* Per-game profiles info */}
-          <div style={{ padding: 14, borderRadius: 10, border: "1px solid var(--border)", background: "rgba(255,255,255,.02)" }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#fff", marginBottom: 4 }}>Per-Game Profiles</div>
-            <div style={{ fontSize: 11, color: "var(--dim)", display: "flex", alignItems: "center", gap: 5 }}>
-              <Icon.Info size={12} />
-              <span>When you launch a game, the overlay automatically detects it and loads the profile you configured for that specific game — custom links, notes, crosshair settings, enabled widgets, and more.</span>
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />Default Sort</div>
+                  <div className="settings-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 10 }}>
+                    <div className="label-stack">
+                      <div className="t">Sort library by</div>
+                      <div className="d">Applies when NEXUS starts and as the default filter.</div>
+                    </div>
+                    <div className="settings-choice-row">
+                      {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
+                        <button key={k} className={`settings-choice ${defaultSort === k ? "active" : ""}`} onClick={() => setDefaultSort(k)}>
+                          {SORT_LABELS[k]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />Custom Scan Paths</div>
+                  <div className="editor-field" style={{ marginBottom: 0 }}>
+                    <textarea className="field-input" value={scanPaths} onChange={(e) => setScanPaths(e.target.value)} placeholder={"C:\\Games\nD:\\SteamLibrary"} rows={4} style={{ fontFamily: "Cascadia Code, Consolas, monospace", fontSize: 12 }} />
+                    <div className="field-hint"><Icon.Info size={12} /><span>One path per line. NEXUS probes these during a deep filesystem scan in addition to detected platform libraries.</span></div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* ===== APPEARANCE TAB ===== */}
+            {tab === "appearance" && (
+              <>
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />UI Mode</div>
+                  <div className="settings-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 10 }}>
+                    <div className="label-stack">
+                      <div className="t">Launcher layout</div>
+                      <div className="d">Console mode is the PS5-style carousel — controller-friendly, scrolls by arrow buttons. Desktop mode is a grid view like Steam/Epic — mouse-friendly with normal wheel scroll.</div>
+                    </div>
+                    <div className="settings-choice-row">
+                      <button className={`settings-choice ${uiMode === "console" ? "active" : ""}`} onClick={() => switchUiMode("console")}>
+                        <span>Console Mode</span>
+                        <span className="desc">PS5-style carousel — controller-friendly</span>
+                      </button>
+                      <button className={`settings-choice ${uiMode === "desktop" ? "active" : ""}`} onClick={() => switchUiMode("desktop")}>
+                        <span>Desktop Mode</span>
+                        <span className="desc">Steam/Epic-style grid — mouse-friendly</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />Accent Color</div>
+                  <div className="settings-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 12 }}>
+                    <div className="label-stack">
+                      <div className="t">Highlight color</div>
+                      <div className="d">Used for focused tiles, action buttons, links, and accents throughout the launcher.</div>
+                    </div>
+                    <div className="settings-accent-row">
+                      {ACCENT_COLORS.map((c) => (
+                        <button
+                          key={c.color}
+                          className={`settings-accent-swatch ${accentColor === c.color ? "active" : ""}`}
+                          style={{ background: c.color }}
+                          onClick={() => {
+                            setAccentColor(c.color);
+                            document.documentElement.style.setProperty("--accent", c.color);
+                          }}
+                          title={c.name}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />Carousel Tile Size</div>
+                  <div className="editor-field" style={{ marginBottom: 0 }}>
+                    <label>Tile width: {tileSize}px</label>
+                    <input className="settings-range" type="range" min={120} max={200} step={10} value={tileSize} onChange={(e) => setTileSize(Number(e.target.value))} />
+                  </div>
+                </div>
+
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />Animation Speed</div>
+                  <div className="editor-field" style={{ marginBottom: 0 }}>
+                    <label>Transition duration: {transitionSpeed}ms</label>
+                    <input className="settings-range" type="range" min={100} max={600} step={50} value={transitionSpeed} onChange={(e) => setTransitionSpeed(Number(e.target.value))} />
+                  </div>
+                </div>
+
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />Haptics</div>
+                  <div className="settings-row">
+                    <div className="label-stack">
+                      <div className="t">Controller haptics</div>
+                      <div className="d">Vibrate on navigation and button presses when a controller is connected.</div>
+                    </div>
+                    <button onClick={() => setHaptics(!haptics)} className={`settings-toggle ${haptics ? "on" : ""}`}>
+                      <span className="knob" />
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* ===== LIBRARY TAB ===== */}
+            {tab === "library" && (
+              <>
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />Backup & Restore</div>
+                  <div className="settings-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 12 }}>
+                    <div className="label-stack">
+                      <div className="t">Export library</div>
+                      <div className="d">Download a JSON backup of your entire library — games, collections, play sessions.</div>
+                    </div>
+                    <div className="settings-choice-row">
+                      <button className="settings-choice" style={{ minWidth: 0 }} onClick={exportLibrary}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Icon.Download size={14} /> Export Library</span>
+                      </button>
+                      <label className="settings-choice" style={{ minWidth: 0, cursor: "pointer" }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Icon.DownloadCloud size={14} /> Import Library</span>
+                        <input type="file" accept=".json" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) importLibrary(f); }} />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />Maintenance</div>
+                  <div className="settings-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 12 }}>
+                    <div className="label-stack">
+                      <div className="t">Check missing games</div>
+                      <div className="d">Verify that every game in your library is still installed at its recorded path. Reports any missing installs.</div>
+                    </div>
+                    <div className="settings-choice-row">
+                      <button className="settings-choice" style={{ minWidth: 0 }} onClick={checkMissing}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Icon.Scan size={14} /> Check Missing Games</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* ===== STARTUP & CLOSE TAB ===== */}
+            {tab === "startup" && (
+              <>
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />System Startup</div>
+                  <div className="settings-row">
+                    <div className="label-stack">
+                      <div className="t">Launch on system startup</div>
+                      <div className="d">Automatically start NEXUS when your computer boots.</div>
+                    </div>
+                    <button
+                      onClick={toggleStartup}
+                      disabled={startupLoading}
+                      className={`settings-toggle ${launchOnStartup ? "on" : ""}`}
+                      style={{ opacity: startupLoading ? 0.5 : 1, cursor: startupLoading ? "wait" : "pointer" }}
+                    >
+                      <span className="knob" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />Close Behavior</div>
+                  <div className="settings-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 12 }}>
+                    <div className="label-stack">
+                      <div className="t">When I close NEXUS</div>
+                      <div className="d">Choose what happens when you click the close button.</div>
+                    </div>
+                    <div className="settings-choice-row">
+                      {([
+                        { value: "exit" as const, label: "Exit Completely", desc: "Close entirely" },
+                        { value: "minimize" as const, label: "Minimize to Tray", desc: "Run in background" },
+                        { value: "ask" as const, label: "Ask Every Time", desc: "Show a prompt" },
+                      ]).map((opt) => (
+                        <button key={opt.value} className={`settings-choice ${closeBehavior === opt.value ? "active" : ""}`} onClick={() => toggleCloseBehavior(opt.value)}>
+                          <span>{opt.label}</span>
+                          <span className="desc">{opt.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                    {closeBehavior !== "exit" && (
+                      <div style={{ fontSize: 10, color: "var(--text-faint)", display: "flex", alignItems: "center", gap: 5 }}>
+                        <Icon.Info size={11} />
+                        <span>The app keeps running in the system tray. Click the tray icon to reopen, or right-click for Quit.</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* ===== OVERLAY TAB ===== */}
+            {tab === "overlay" && (
+              <>
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />In-Game Overlay</div>
+                  <div className="settings-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 12 }}>
+                    <div className="label-stack">
+                      <div className="t">Quick toggle</div>
+                      <div className="d">
+                        Press <strong style={{ color: "var(--accent)" }}>Alt+O</strong> while playing to toggle the overlay.
+                        Press <strong style={{ color: "var(--accent)" }}>Ctrl+Shift+X</strong> to toggle click-through mode.
+                      </div>
+                    </div>
+                    <div className="settings-choice-row">
+                      <button className="settings-choice" style={{ minWidth: 0 }} onClick={() => { void window.nexus.overlayToggle?.(); }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Icon.Gamepad size={14} /> Test Overlay</span>
+                      </button>
+                      <button className="settings-choice" style={{ minWidth: 0 }} onClick={() => { void window.nexus.overlayToggleClickThrough?.(); }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Icon.Refresh size={14} /> Toggle Click-Through</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />Available Widgets</div>
+                  <div className="settings-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 10 }}>
+                    <div className="label-stack">
+                      <div className="t">Per-game profiles</div>
+                      <div className="d">Each game can have a customized overlay with different widgets enabled. Configure per-game overlays from the game detail page.</div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                      {OVERLAY_FEATURES.map((feature) => (
+                        <div key={feature} style={{
+                          display: "flex", alignItems: "center", gap: 6,
+                          padding: "6px 8px", borderRadius: 6,
+                          background: "rgba(255,255,255,0.02)",
+                          fontSize: 11, color: "var(--text-dim)",
+                        }}>
+                          <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--accent)", flexShrink: 0 }} />
+                          {feature}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* ===== ABOUT TAB ===== */}
+            {tab === "about" && (
+              <>
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />About NEXUS</div>
+                  <div className="about-card">
+                    <div className="logo"><Icon.Gamepad size={28} /></div>
+                    <div>
+                      <div className="name">NEXUS Launcher</div>
+                      <div className="ver">Version 4.0.0 — Universal Game Launcher for Windows</div>
+                      <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 6 }}>
+                        Auto-detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox. Patches rich metadata via RAWG + Steam APIs. Launches natively.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />Updates</div>
+                  <div className="settings-row">
+                    <div className="label-stack">
+                      <div className="t">Check for updates</div>
+                      <div className="d">Download and install the latest version from GitHub.</div>
+                    </div>
+                    <button className="settings-choice" style={{ minWidth: 0 }} onClick={onCheckUpdates}>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Icon.Refresh size={14} /> Check Now</span>
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Sticky Save / Cancel */}
+            <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
+              <button className="btn btn-primary" onClick={save} disabled={saving}>
+                {saving ? <Icon.Spinner size={14} /> : <Icon.Check size={14} />} Save Settings
+              </button>
+              <button className="btn btn-ghost" onClick={onClose}>Close</button>
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );

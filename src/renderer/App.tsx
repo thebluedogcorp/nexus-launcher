@@ -24,6 +24,10 @@ export function App() {
   const [games, setGames] = useState<Game[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [settings, setSettings] = useState<LauncherSettings | null>(null);
+  // v4.0.0 — UI mode (console carousel vs desktop grid). localStorage is the source of truth.
+  const [uiMode, setUiMode] = useState<"console" | "desktop">(
+    () => (localStorage.getItem("nx-uimode") as "console" | "desktop") || "console"
+  );
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [loading, setLoading] = useState(true);
   const [pageGame, setPageGame] = useState<Game | null>(null);
@@ -74,6 +78,11 @@ export function App() {
         const s = await window.nexus.getSettings();
         setSettings(s);
         setFilters((f) => ({ ...f, sort: s.defaultSort }));
+        // v4.0.0 — sync uiMode from db if localStorage is empty (first run after upgrade)
+        if (!localStorage.getItem("nx-uimode") && s.uiMode) {
+          localStorage.setItem("nx-uimode", s.uiMode);
+          setUiMode(s.uiMode);
+        }
         await refreshAll();
         if (s.autoScanOnStart) {
           try {
@@ -171,7 +180,24 @@ export function App() {
     await refreshAll();
     return imported;
   }, [refreshAll, toast]);
-  const handleSaveSettings = useCallback(async (s: Partial<LauncherSettings>) => { const next = await window.nexus.setSettings(s); setSettings(next); toast("success", "Settings saved"); return next; }, [toast]);
+  const handleSaveSettings = useCallback(async (s: Partial<LauncherSettings>) => {
+    const next = await window.nexus.setSettings(s);
+    setSettings(next);
+    // v4.0.0 — sync uiMode state if it was part of the save (e.g., from SettingsPage)
+    if (next.uiMode) {
+      setUiMode(next.uiMode);
+      localStorage.setItem("nx-uimode", next.uiMode);
+    }
+    toast("success", "Settings saved");
+    return next;
+  }, [toast]);
+  // v4.0.0 — Toggle the launcher layout between Console carousel and Desktop grid.
+  // Persists to localStorage (instant toggle, no restart) AND to the database (for cross-session).
+  const setUiModeAndPersist = useCallback(async (mode: "console" | "desktop") => {
+    setUiMode(mode);
+    localStorage.setItem("nx-uimode", mode);
+    try { await window.nexus.setSettings({ uiMode: mode }); } catch {}
+  }, []);
   const handleCheckUpdates = useCallback(async () => {
     toast("info", "Checking for updates…");
     try {
@@ -431,26 +457,11 @@ export function App() {
   // (e.g. hover 7th → scroll → 9th lands under cursor → 9th focused → skip).
   const focusSourceRef = useRef<"mouse" | "nav">("mouse");
 
-  // Mouse wheel → horizontal scroll for the carousel.
-  // Most mice don't have a horizontal wheel, so we convert vertical wheel
-  // events to horizontal scroll. This lets mouse-only users scroll through
-  // all tiles without needing the keyboard.
-  useEffect(() => {
-    const carousel = document.querySelector(".carousel") as HTMLElement | null;
-    if (!carousel) return;
-    const onWheel = (e: WheelEvent) => {
-      // If the user is scrolling vertically (most common), convert to horizontal.
-      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-        e.preventDefault();
-        carousel.scrollLeft += e.deltaY;
-      }
-    };
-    carousel.addEventListener("wheel", onWheel, { passive: false });
-    return () => carousel.removeEventListener("wheel", onWheel);
-  }, []);
-
-  // Instantly scroll the focused tile to CENTER — but ONLY for keyboard/controller
-  // navigation, NOT for mouse hover. Mouse users scroll with the wheel/drag.
+  // v4.0.0 — Removed the broken mouse-wheel → horizontal-scroll conversion.
+  // In console mode the carousel scrolls ONLY via arrow buttons or keyboard/controller —
+  // mouse users who want normal wheel scroll should use Desktop mode (grid view).
+  // The "Instantly scroll the focused tile to CENTER" effect below remains — it's keyboard/
+  // controller only (gated by focusSourceRef) so it never fights mouse hover.
   useEffect(() => {
     if (focusSourceRef.current === "mouse") return; // skip auto-scroll on hover
     const carousel = document.querySelector(".carousel") as HTMLElement | null;
@@ -512,6 +523,21 @@ export function App() {
             <span className="playtime-badge__stop">Stop</span>
           </button>
         )}
+        {/* v4.0.0 — Mode toggle: Console carousel ↔ Desktop grid */}
+        <div className="mode-toggle" title="Switch launcher layout">
+          <button
+            className={uiMode === "console" ? "mode-toggle-btn active" : "mode-toggle-btn"}
+            onClick={() => setUiModeAndPersist("console")}
+          >
+            <Icon.Gamepad size={14} /> Console
+          </button>
+          <button
+            className={uiMode === "desktop" ? "mode-toggle-btn active" : "mode-toggle-btn"}
+            onClick={() => setUiModeAndPersist("desktop")}
+          >
+            <Icon.Grid size={14} /> Desktop
+          </button>
+        </div>
         <button className="tb-icon" onClick={() => setScanOpen(true)} title="Scan (S)"><Icon.Scan size={16} /></button>
         <button className="tb-icon primary" onClick={() => setAddOpen(true)} title="Add (A)"><Icon.Plus size={15} /> Add</button>
         <button className="tb-icon" onClick={() => setStatsOpen(true)} title="Stats dashboard"><Icon.TrendingUp size={16} /></button>
@@ -598,11 +624,25 @@ export function App() {
           </div>
         )}
 
-        {/* Carousel + Info zone */}
+        {/* Library view — Desktop grid (mouse-friendly) OR Console carousel + info-zone */}
         {loading ? (
-          <div style={{ display: "flex", gap: 14, overflow: "hidden", padding: "60px 0 40px", alignItems: "center", justifyContent: "center", flex: 1 }}>
-            {Array.from({ length: 8 }).map((_, i) => <div key={i} className="shimmer" style={{ width: 160, aspectRatio: "3/4", borderRadius: 14, flexShrink: 0 }} />)}
-          </div>
+          uiMode === "desktop" ? (
+            <div className="desktop-grid">
+              {Array.from({ length: 12 }).map((_, i) => (
+                <div key={i} className="gc">
+                  <div className="gc-cover" style={{ position: "relative" }}><div className="shimmer" style={{ position: "absolute", inset: 0 }} /></div>
+                  <div className="gc-footer">
+                    <div className="shimmer" style={{ height: 12, borderRadius: 4, marginBottom: 6 }} />
+                    <div className="shimmer" style={{ height: 10, width: "60%", borderRadius: 4 }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ display: "flex", gap: 14, overflow: "hidden", padding: "60px 0 40px", alignItems: "center", justifyContent: "center", flex: 1 }}>
+              {Array.from({ length: 8 }).map((_, i) => <div key={i} className="shimmer" style={{ width: 160, aspectRatio: "3/4", borderRadius: 14, flexShrink: 0 }} />)}
+            </div>
+          )
         ) : games.length === 0 ? (
           <div className="empty">
             <div className="box"><Icon.Gamepad size={34} /></div>
@@ -610,17 +650,58 @@ export function App() {
             <p>{filters.query ? "Try a different search." : "Scan your system to auto-detect installed games. NEXUS fetches cover art automatically."}</p>
             {!filters.query && <div className="empty-actions"><button className="btn btn-primary" onClick={() => setScanOpen(true)}><Icon.Scan size={17} /> Scan System</button><button className="btn btn-ghost" onClick={() => setAddOpen(true)}><Icon.Plus size={16} /> Add Manually</button></div>}
           </div>
+        ) : uiMode === "desktop" ? (
+          /* ===== v4.0.0 — DESKTOP GRID VIEW (Steam/Epic-style, mouse-friendly) ===== */
+          <div className="desktop-grid">
+            {games.map((g, i) => {
+              const banner = g.coverImage || g.bannerImage;
+              const grad = gradientFor(g.title);
+              return (
+                <div
+                  key={g.id}
+                  className="gc"
+                  style={{ animationDelay: `${Math.min(i * 25, 400)}ms` }}
+                  onClick={() => openPage(g.id)}
+                  onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, game: g }); }}
+                >
+                  <div className="gc-cover">
+                    {banner ? (
+                      <img src={banner} alt={g.title} loading="lazy" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                    ) : (
+                      <div className="gc-proc" style={{ background: `radial-gradient(120% 120% at 20% 0%, ${grad.from} 0%, ${grad.to} 70%, #050505 100%)` }}>
+                        <span className="mono">{initials(g.title)}</span>
+                      </div>
+                    )}
+                    <div className="gc-overlay" />
+                    <div className="gc-chips">
+                      <span className="gc-platform"><span className="dot" style={{ background: platformColor(g.platform) }} />{platformLabel(g.platform)}</span>
+                      <button className={g.favorite ? "gc-fav on" : "gc-fav"} onClick={(e) => { e.stopPropagation(); handleToggleFav(g); }} title={g.favorite ? "Remove favorite" : "Add favorite"}>
+                        <Icon.Star size={13} filled={g.favorite} />
+                      </button>
+                    </div>
+                    <div className="gc-hover-play">
+                      <button className="gc-play-btn" onClick={(e) => { e.stopPropagation(); handleLaunch(g); }} title={`Play ${g.title}`}>
+                        <Icon.Play size={20} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="gc-footer">
+                    <div className="gc-title" title={g.title}>{g.title}</div>
+                    <div className="gc-meta">
+                      <span>{g.playtimeSec > 0 ? formatPlaytimeShort(g.playtimeSec) : "New"}</span>
+                      {g.lastPlayedAt
+                        ? <span className="v">Played {relativeTime(g.lastPlayedAt)}</span>
+                        : <span style={{ color: "var(--text-faint)" }}>Never played</span>}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         ) : (
           <>
             {/* Carousel with arrow buttons for mouse navigation */}
-            <div className="carousel-wrap" onMouseMove={(e) => {
-              const carousel = e.currentTarget.querySelector(".carousel") as HTMLElement;
-              if (!carousel) return;
-              const rect = carousel.getBoundingClientRect();
-              const x = e.clientX - rect.left;
-              if (x < 70 && carousel.scrollLeft > 0) carousel.scrollLeft -= 5;
-              else if (x > rect.width - 70 && carousel.scrollLeft < carousel.scrollWidth - carousel.clientWidth) carousel.scrollLeft += 5;
-            }}>
+            <div className="carousel-wrap">
               <button className="carousel-arrow left" onClick={() => { const c = document.querySelector(".carousel") as HTMLElement; if (c) c.scrollBy({ left: -280, behavior: "smooth" }); }}><span style={{ display: "inline-flex", transform: "rotate(180deg)" }}><Icon.Chevron size={20} /></span></button>
               <button className="carousel-arrow right" onClick={() => { const c = document.querySelector(".carousel") as HTMLElement; if (c) c.scrollBy({ left: 280, behavior: "smooth" }); }}><Icon.Chevron size={20} /></button>
               <div className="carousel">

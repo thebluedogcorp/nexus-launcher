@@ -50,48 +50,46 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v3.12.3"
-          $title = "NEXUS v3.12.3 — Overlay renders content (inline HTML, no external files) — works without game detection"
+          $tag = "v4.0.0"
+          $title = "NEXUS v4.0.0 — Complete UI overhaul: Console/ Desktop mode toggle, dark Epic-inspired theme, sidebar settings"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
-          **v3.9.2 — Fixed Steam game auto-detection** (user reported Steam games not being detected automatically, had to add them manually).
+          **v4.0.0 — Complete UI overhaul.** A full redesign of the launcher UI with a darker, more minimal aesthetic inspired by the Epic Games store, plus a brand new Desktop mode alongside the existing PS5-style Console carousel.
 
-          The Steam detector was rewritten with 5 fallback methods for finding the Steam install, plus extensive logging so you can see exactly what's happening when detection fails:
+          **What's new:**
 
-          **5 methods to find the Steam install directory:**
-          1. Registry HKCU Software Valve Steam SteamPath (with /reg:32 and /reg:64 fallbacks for 32/64-bit view issues)
-          2. Registry HKLM SOFTWARE WOW6432Node Valve Steam InstallPath (and the 32-bit SOFTWARE Valve Steam path)
-          3. Running process detection — wmic finds steam.exe and gets its directory (works if Steam is currently running)
-          4. Filesystem scan of common default locations on ALL drive letters (C, D, E, F, G) — catches Steam installed on D: Steam or F: Games SteamLibrary etc.
-          5. Last resort — checks if a steamapps folder exists anywhere on C/D/E/F/G drives
+          1. **Mode toggle (Console ↔ Desktop)** — a new segmented toggle in the top bar switches instantly between:
+             * **Console Mode** — the existing PS5-style portrait carousel with controller-friendly navigation. Cards scroll by arrow buttons or gamepad only (the broken mouse-move / mouse-wheel horizontal-scroll detection has been removed, so cards no longer skip around under your cursor).
+             * **Desktop Mode** — a brand-new responsive grid view (Steam / Epic-style). Each card shows cover art, title, platform badge, playtime, and last-played. Normal mouse wheel scroll. Click any card to open the game detail page.
 
-          **2 methods to read library folders:**
-          A. libraryfolders.vdf (modern Steam) — the primary source
-          B. config.vdf BaseInstallFolder entries — fallback if libraryfolders.vdf is missing or doesn't list all libraries
+             The mode is persisted to localStorage (nx-uimode) and to the database (settings.uiMode), and toggles instantly with no restart required.
 
-          **Also fixed:**
-          - SteamPath from registry uses forward slashes — now normalized to backslashes before the existsSync check.
-          - Library folder paths from VDF also normalized (forward slashes to backslashes).
-          - Library folder paths from config.vdf also normalized.
-          - The steamapps subdirectory is now correctly resolved for library folders that don't end in steamapps — the detector checks if the library path ends in steamapps and if not, appends steamapps automatically. This fixes detection when Steam libraries are on D: SteamLibrary (where manifests are at D: SteamLibrary steamapps).
-          - Added extensive console.log / console.warn logging throughout the detection flow so the user can see exactly what's happening (Steam install found at..., Found N library folder(s), Found N manifest(s), Detected: game name, etc.). These logs appear in the Electron main process console / dev tools.
+          2. **Darker, sleeker color scheme** — inspired by Epic Games' dark UI:
+             * Background `#0a0a0c` (near black)
+             * Surface `#141418` (cards)
+             * Surface hover `#1c1c22`
+             * Borders `rgba(255,255,255,0.06)`
+             * Text `rgba(255,255,255,0.92)`
+             * Subtle teal accent (`#2dd4bf`) — used sparingly so the UI feels mostly monochrome.
 
-          **Before this fix:**
-          - The detector only checked C: Program Files (x86) Steam and C: Program Files Steam as fallbacks — if Steam was on D: drive, detection failed silently.
-          - No logging — the user had no way to know WHY Steam detection wasn't working.
-          - No config.vdf fallback — if libraryfolders.vdf was missing or incomplete, some Steam libraries were missed.
+          3. **Settings reorganized with a left sidebar** — Settings is no longer a single long scroll. Tabs:
+             * **General** — auto-scan, default sort, scan paths
+             * **Appearance** — accent color, tile size, animation speed, haptics, UI mode
+             * **Library** — export/import, check missing games
+             * **Startup & Close** — launch on startup, close behavior
+             * **Overlay** — overlay info + test button + widget list
+             * **About** — version info + update check
 
-          **After this fix:**
-          - Steam install is found via 5 different methods — registry, 32/64-bit view, running process, filesystem scan across 5 drives, and last-resort steamapps existence check.
-          - Library folders are read from BOTH libraryfolders.vdf AND config.vdf — if one is missing or incomplete, the other fills the gap.
-          - Every step is logged so the user can see exactly what's happening in the console.
+             Each tab shows only the relevant settings.
 
-          Auto-detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox, patches rich metadata via the RAWG + Steam APIs, and launches games natively.
+          4. **Removed broken mousemove scroll** — In console mode the carousel's mousemove-based scroll detection (which moved tiles under the cursor and caused cascading hover on the wrong tile) and the mouse-wheel → horizontal scroll conversion are both gone. Console mode is now strictly arrow-button + keyboard + controller, as it should be. Desktop mode is strictly mouse.
+
+          All existing functionality is preserved: controller navigation, achievements, activity, playtime tracking, overlay, game detail page, collections, scan dialog, add-game dialog, stats dashboard, etc.
 
           **Downloads:**
-          - NEXUS-Setup-3.12.3.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-3.12.3.exe — single-file portable build.
+          - NEXUS-Setup-4.0.0.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-4.0.0.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@
