@@ -485,7 +485,246 @@ export function App() {
     );
   }
 
-  // Main PS5 UI
+  // Main UI — Console mode (PS5 carousel) or Desktop mode (Epic-style grid + sidebar)
+  if (uiMode === "desktop" && !pageGame) {
+    return (
+      <div className="app desktop-mode">
+        {/* Top bar */}
+        <header className="topbar">
+          <div className="tb-brand">
+            <div className="tb-logo"><Icon.Gamepad size={16} /></div>
+            <div><div className="tb-name">NEXUS</div><div className="tb-sub">Launcher</div></div>
+          </div>
+          <div className="tb-search">
+            <span className="icon"><Icon.Search size={15} /></span>
+            <input value={filters.query} onChange={(e) => setFilters((f) => ({ ...f, query: e.target.value }))} placeholder="Search library…" />
+          </div>
+          <select className="tb-select" value={filters.sort} onChange={(e) => setFilters((f) => ({ ...f, sort: e.target.value as SortKey }))}>
+            {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+          {updateAvailable && (
+            <button className="update-badge" onClick={() => setUpdateDialogOpen(true)} title={`NEXUS ${updateAvailable.version} available`}>
+              <Icon.DownloadCloud size={13} /> {updateAvailable.version}
+            </button>
+          )}
+          {activePlaytime && (
+            <button
+              className="playtime-badge"
+              onClick={async () => { await window.nexus.stopPlaytimeTracking(activePlaytime.gameId); setActivePlaytime(null); }}
+              title={`Click to stop tracking — ${activePlaytime.gameTitle}`}
+            >
+              <span className="playtime-badge__dot" />
+              <span className="playtime-badge__text">{activePlaytime.gameTitle}</span>
+              <span className="playtime-badge__time">{formatPlaytimeShort(activePlaytime.elapsedSec)}</span>
+              <span className="playtime-badge__stop">Stop</span>
+            </button>
+          )}
+          <div className="mode-toggle" title="Switch launcher layout">
+            <button className="mode-toggle-btn" onClick={() => setUiModeAndPersist("console")}>
+              <Icon.Gamepad size={14} /> Console
+            </button>
+            <button className="mode-toggle-btn active" onClick={() => setUiModeAndPersist("desktop")}>
+              <Icon.Grid size={14} /> Desktop
+            </button>
+          </div>
+          <button className="tb-icon" onClick={() => setScanOpen(true)} title="Scan"><Icon.Scan size={16} /></button>
+          <button className="tb-icon primary" onClick={() => setAddOpen(true)} title="Add"><Icon.Plus size={15} /> Add</button>
+          <button className="tb-icon" onClick={() => setSettingsOpen(true)} title="Settings"><Icon.Settings size={16} /></button>
+        </header>
+
+        {/* Desktop layout: left sidebar + main content */}
+        <div className="desktop-layout">
+          {/* Left sidebar */}
+          <aside className="dt-sidebar">
+            <div className="dt-sidebar-nav">
+              <button className={filters.platform === "all" && !filters.favOnly ? "dt-nav-item active" : "dt-nav-item"} onClick={() => setFilters((f) => ({ ...f, platform: "all", favOnly: false }))}>
+                <Icon.Library size={16} /> <span>All Games</span>
+                {stats && <span className="dt-nav-count">{stats.totalGames}</span>}
+              </button>
+              <button className={filters.favOnly ? "dt-nav-item active" : "dt-nav-item"} onClick={() => setFilters((f) => ({ ...f, favOnly: !f.favOnly }))}>
+                <Icon.Star size={16} /> <span>Favorites</span>
+                {stats && <span className="dt-nav-count">{stats.favorites}</span>}
+              </button>
+            </div>
+            <div className="dt-sidebar-section">
+              <div className="dt-sidebar-label">Platforms</div>
+              {PLATFORM_LIST.filter((p) => p.id !== "custom").map((p) => {
+                const count = stats?.byPlatform?.[p.id] ?? 0;
+                return (
+                  <button key={p.id} className={filters.platform === p.id ? "dt-nav-item active" : "dt-nav-item"} onClick={() => setFilters((f) => ({ ...f, platform: p.id, favOnly: false }))}>
+                    <span className="dt-plat-dot" style={{ background: p.accent }} />
+                    <span>{p.label}</span>
+                    {count > 0 && <span className="dt-nav-count">{count}</span>}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="dt-sidebar-section">
+              <div className="dt-sidebar-label">Library Stats</div>
+              <div className="dt-stat-mini"><span>Playtime</span><strong>{stats ? formatPlaytimeShort(stats.totalPlaytimeSec) : "—"}</strong></div>
+              <div className="dt-stat-mini"><span>Launches</span><strong>{stats?.totalLaunches ?? "—"}</strong></div>
+              <div className="dt-stat-mini"><span>Disk</span><strong>{stats ? formatSize(stats.totalSizeBytes) : "—"}</strong></div>
+            </div>
+          </aside>
+
+          {/* Main content area */}
+          <main className="dt-main">
+            {/* Enrichment banner */}
+            {patching && patchProgress && (
+              <div className="enrich-banner">
+                <div className="iw"><Icon.Spinner size={14} /></div>
+                <div><div className="t">Enriching library <span className="c">{patchProgress.current}/{patchProgress.total || "…"}</span></div><div className="s">{patchProgress.title}</div></div>
+              </div>
+            )}
+
+            {/* Nav tabs */}
+            <div className="nav-tabs">
+              <button className={activeTab === "games" ? "nav-tab active" : "nav-tab"} onClick={() => setActiveTab("games")}>Games</button>
+              <button className={activeTab === "achievements" ? "nav-tab active" : "nav-tab"} onClick={() => setActiveTab("achievements")}>Achievements {achievements.filter((a) => a.unlockedAt).length > 0 && <span className="nav-tab-badge">{achievements.filter((a) => a.unlockedAt).length}</span>}</button>
+              <button className={activeTab === "activity" ? "nav-tab active" : "nav-tab"} onClick={() => setActiveTab("activity")}>Activity</button>
+            </div>
+
+            {/* Tab content */}
+            {activeTab === "achievements" ? (
+              <div className="dt-scroll">
+                <div className="ach-grid">
+                  {achievements.map((a) => {
+                    const unlocked = !!a.unlockedAt;
+                    const pct = a.maxProgress > 0 ? Math.round((a.progress / a.maxProgress) * 100) : 0;
+                    return (
+                      <div key={a.id} className={`ach-card ${unlocked ? "unlocked" : "locked"}`}>
+                        <div className={`ach-icon ${unlocked ? "unlocked" : "locked"}`}>{a.icon}</div>
+                        <div className="ach-body">
+                          <div className="ach-name">{a.name}</div>
+                          <div className="ach-desc">{a.description}</div>
+                          {!unlocked && a.maxProgress > 1 && (<><div className="ach-progress"><div style={{ width: `${pct}%` }} /></div><div className="ach-pct">{a.progress} / {a.maxProgress} ({pct}%)</div></>)}
+                          {unlocked && <div className="ach-pct" style={{ color: "var(--accent)" }}>✓ Unlocked</div>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : activeTab === "activity" ? (
+              <div className="dt-scroll">
+                <div className="activity-list">
+                  <div style={{ fontSize: 18, fontWeight: 700, color: "#fff", marginBottom: 16, letterSpacing: "-0.02em" }}>Recent Activity</div>
+                  {games.filter((g) => g.lastPlayedAt).sort((a, b) => (b.lastPlayedAt ?? "").localeCompare(a.lastPlayedAt ?? "")).slice(0, 20).map((g) => (
+                    <div key={g.id} className="activity-item" onClick={() => openPage(g.id)} style={{ cursor: "pointer" }}>
+                      <div className="icon"><Icon.Play size={14} /></div>
+                      <span className="title">{g.title}</span>
+                      <span className="time">{relativeTime(g.lastPlayedAt)}</span>
+                    </div>
+                  ))}
+                  {games.filter((g) => g.lastPlayedAt).length === 0 && (
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: 40, textAlign: "center" }}>
+                      <div style={{ width: 64, height: 64, borderRadius: 16, background: "rgba(255,255,255,.04)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", marginBottom: 14 }}><Icon.Gamepad size={28} /></div>
+                      <p style={{ fontSize: 14, color: "var(--text-dim)" }}>No activity yet. Launch a game to get started!</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* Games tab — grid view */
+              <div className="dt-scroll">
+                {loading ? (
+                  <div className="desktop-grid">
+                    {Array.from({ length: 12 }).map((_, i) => (
+                      <div key={i} className="gc">
+                        <div className="gc-cover" style={{ position: "relative" }}><div className="shimmer" style={{ position: "absolute", inset: 0 }} /></div>
+                        <div className="gc-footer">
+                          <div className="shimmer" style={{ height: 12, borderRadius: 4, marginBottom: 6 }} />
+                          <div className="shimmer" style={{ height: 10, width: "60%", borderRadius: 4 }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : games.length === 0 ? (
+                  <div className="empty">
+                    <div className="box"><Icon.Gamepad size={34} /></div>
+                    <h3>{filters.query ? "No matches found" : "Your library is empty"}</h3>
+                    <p>{filters.query ? "Try a different search." : "Scan your system to auto-detect installed games."}</p>
+                    {!filters.query && <div className="empty-actions"><button className="btn btn-primary" onClick={() => setScanOpen(true)}><Icon.Scan size={17} /> Scan System</button><button className="btn btn-ghost" onClick={() => setAddOpen(true)}><Icon.Plus size={16} /> Add Manually</button></div>}
+                  </div>
+                ) : (
+                  <div className="desktop-grid">
+                    {games.map((g, i) => {
+                      const banner = g.coverImage || g.bannerImage;
+                      const grad = gradientFor(g.title);
+                      return (
+                        <div
+                          key={g.id}
+                          className="gc"
+                          style={{ animationDelay: `${Math.min(i * 25, 400)}ms` }}
+                          onClick={() => openPage(g.id)}
+                          onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, game: g }); }}
+                        >
+                          <div className="gc-cover">
+                            {banner ? (
+                              <img src={banner} alt={g.title} loading="lazy" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                            ) : (
+                              <div className="gc-proc" style={{ background: `radial-gradient(120% 120% at 20% 0%, ${grad.from} 0%, ${grad.to} 70%, #050505 100%)` }}>
+                                <span className="mono">{initials(g.title)}</span>
+                              </div>
+                            )}
+                            <div className="gc-overlay" />
+                            <div className="gc-chips">
+                              <span className="gc-platform"><span className="dot" style={{ background: platformColor(g.platform) }} />{platformLabel(g.platform)}</span>
+                              <button className={g.favorite ? "gc-fav on" : "gc-fav"} onClick={(e) => { e.stopPropagation(); handleToggleFav(g); }} title={g.favorite ? "Remove favorite" : "Add favorite"}>
+                                <Icon.Star size={13} filled={g.favorite} />
+                              </button>
+                            </div>
+                            <div className="gc-hover-play">
+                              <button className="gc-play-btn" onClick={(e) => { e.stopPropagation(); handleLaunch(g); }} title={`Play ${g.title}`}>
+                                <Icon.Play size={20} />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="gc-footer">
+                            <div className="gc-title" title={g.title}>{g.title}</div>
+                            <div className="gc-meta">
+                              <span>{g.playtimeSec > 0 ? formatPlaytimeShort(g.playtimeSec) : "New"}</span>
+                              {g.lastPlayedAt ? <span className="v">Played {relativeTime(g.lastPlayedAt)}</span> : <span style={{ color: "var(--text-faint)" }}>Never played</span>}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </main>
+        </div>
+
+        {/* Dialogs */}
+        {addOpen && <AddGameDialog onClose={() => setAddOpen(false)} onAdd={handleAdd} />}
+        {scanOpen && <ScanDialog onClose={() => setScanOpen(false)} onRunScan={handleRunScan} onImport={handleImport} onDeepScan={handleDeepScan} />}
+        {settingsOpen && settings && <SettingsPage initial={settings} onClose={() => setSettingsOpen(false)} onSave={handleSaveSettings} onCheckUpdates={handleCheckUpdates} />}
+        {updateDialogOpen && updateAvailable && <UpdateDialog info={updateAvailable} onClose={() => setUpdateDialogOpen(false)} />}
+
+        {/* Context menu */}
+        {ctxMenu && (
+          <div className="ctx-menu" style={{ left: ctxMenu.x, top: ctxMenu.y }} onClick={() => setCtxMenu(null)}>
+            <button className="ctx-item" onClick={() => { handleLaunch(ctxMenu.game); setCtxMenu(null); }}><Icon.Play size={15} /> Play</button>
+            <button className="ctx-item" onClick={() => { openPage(ctxMenu.game.id); setCtxMenu(null); }}><Icon.Info size={15} /> Details</button>
+            <div className="ctx-sep" />
+            <button className="ctx-item" onClick={() => { handleToggleFav(ctxMenu.game); setCtxMenu(null); }}><Icon.Star size={15} filled={ctxMenu.game.favorite} /> {ctxMenu.game.favorite ? "Unfavorite" : "Favorite"}</button>
+            <button className="ctx-item" onClick={() => { handleOpenDir(ctxMenu.game); setCtxMenu(null); }}><Icon.Folder size={15} /> Open Directory</button>
+            <button className="ctx-item" onClick={() => { handlePatch(ctxMenu.game); setCtxMenu(null); }}><Icon.Refresh size={15} /> Patch Metadata</button>
+            <button className="ctx-item" onClick={() => { setEditorGame(ctxMenu.game); setCtxMenu(null); }}><Icon.FileCog size={15} /> Edit Game</button>
+            <div className="ctx-sep" />
+            <button className="ctx-item danger" onClick={() => { handleDelete(ctxMenu.game); setCtxMenu(null); }}><Icon.Trash size={15} /> Remove</button>
+          </div>
+        )}
+        {editorGame && <GameEditor game={editorGame} onSave={(patch) => handleEditGame(editorGame, patch)} onClose={() => setEditorGame(null)} />}
+
+        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+      </div>
+    );
+  }
+
+  // Console mode UI (PS5-style carousel)
   return (
     <div className="app">
       <DynamicBackground games={games} focusedIdx={focusedIdx} focusedGame={focusedGame} />
@@ -526,13 +765,13 @@ export function App() {
         {/* v4.0.0 — Mode toggle: Console carousel ↔ Desktop grid */}
         <div className="mode-toggle" title="Switch launcher layout">
           <button
-            className={uiMode === "console" ? "mode-toggle-btn active" : "mode-toggle-btn"}
+            className="mode-toggle-btn"
             onClick={() => setUiModeAndPersist("console")}
           >
             <Icon.Gamepad size={14} /> Console
           </button>
           <button
-            className={uiMode === "desktop" ? "mode-toggle-btn active" : "mode-toggle-btn"}
+            className="mode-toggle-btn active"
             onClick={() => setUiModeAndPersist("desktop")}
           >
             <Icon.Grid size={14} /> Desktop
