@@ -1596,33 +1596,8 @@ html:not([data-card-entrance="0"]) .gc{animation:gcIn var(--t-slow)}
 /* ===================================================================
    v4.5.0 — Downloads panel + game-card acquisition states
    =================================================================== */
-.dl-panel{background:var(--bg)}
-.dl-section{margin-bottom:var(--s-6)}
-.dl-section-title{font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-faint);margin-bottom:var(--s-3);display:flex;align-items:center;gap:var(--s-2)}
-.dl-section-title .bar{width:3px;height:13px;border-radius:2px;background:var(--accent)}
 
-.dl-overall{padding:var(--s-4);background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg)}
-.dl-overall-label{font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-faint);margin-bottom:8px}
-.dl-overall-meta{font-size:11px;color:var(--text-dim);margin-top:8px;font-variant-numeric:tabular-nums}
 
-.dl-row{display:flex;align-items:center;gap:var(--s-3);padding:14px var(--s-4);border:1px solid var(--border);border-radius:var(--r-md);background:rgba(255,255,255,0.015);margin-bottom:var(--s-2);transition:border-color var(--t-fast),background var(--t-fast)}
-.dl-row:hover{border-color:var(--border-2);background:var(--surface)}
-.dl-row.dl-downloading{border-color:rgba(var(--accent-rgb),0.3)}
-.dl-row.dl-paused{opacity:0.75}
-.dl-row.dl-failed{border-color:rgba(248,113,113,0.25)}
-.dl-row.dl-completed{opacity:0.8}
-.dl-row-main{flex:1;min-width:0}
-.dl-row-title{font-size:14px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.dl-row-meta{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim);margin-top:3px;flex-wrap:wrap}
-.dl-row-meta .dl-dot{color:var(--text-faint)}
-.dl-err{color:var(--danger)}
-.dl-bar{height:6px;background:rgba(255,255,255,0.06);border-radius:var(--r-pill);overflow:hidden;margin-top:10px}
-.dl-bar>div{height:100%;background:var(--accent);border-radius:var(--r-pill);transition:width var(--t-base)}
-.dl-bar.dl-bar-lg{height:8px;margin-top:4px}
-.dl-row-actions{display:flex;gap:6px;flex-shrink:0}
-.dl-ctrl{width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;color:var(--text-dim);border:1px solid var(--border-2);background:var(--surface);transition:background var(--t-fast),color var(--t-fast)}
-.dl-ctrl:hover{background:var(--surface-2);color:var(--text)}
-.dl-ctrl.danger:hover{color:var(--danger);border-color:rgba(248,113,113,0.4)}
 
 /* Game card: Get button + in-card download progress */
 .gc-get{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:2;opacity:0;transition:opacity var(--t-base)}
@@ -1630,7 +1605,5 @@ html:not([data-card-entrance="0"]) .gc{animation:gcIn var(--t-slow)}
 .gc-get-btn{height:36px;padding:0 18px;border-radius:var(--r-pill);background:var(--accent);color:var(--accent-fg);font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:6px;box-shadow:0 6px 18px -4px rgba(var(--accent-rgb),0.5)}
 .gc-get-btn:hover{background:var(--accent-hover)}
 /* In-card progress bar shown when a download is active for this game */
-.gc-progress{position:absolute;bottom:0;left:0;right:0;height:4px;background:rgba(255,255,255,0.08);z-index:3}
-.gc-progress>div{height:100%;background:var(--accent);transition:width var(--t-base)}
 /* The "Not installed" badge on the card footer */
 .gc-not-installed{font-size:9px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--accent);padding:2px 6px;border-radius:var(--r-sm);background:rgba(var(--accent-rgb),0.12);border:1px solid rgba(var(--accent-rgb),0.3);display:inline-block;margin-top:2px}

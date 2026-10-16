@@ -209,78 +209,18 @@ export const PLATFORMS: Record<PlatformId, PlatformInfo> = {
 
 export const PLATFORM_LIST = Object.values(PLATFORMS);
 
-// v4.5.0 — Game acquisition + download system.
-// A download job represents one transfer of game files from an authorized
-// source to the user's machine. Jobs persist across restarts (the downloads
-// table); the in-memory AbortController is reconstructed on resume.
-export type DownloadStatus =
-  | "queued"        // waiting for a download slot
-  | "downloading"   // actively transferring bytes
-  | "paused"        // user-paused; can resume from the last byte
-  | "completed"     // transfer + verification succeeded
-  | "failed"        // transfer or verification failed; can retry
-  | "cancelled";    // user cancelled; job kept for history
+// v4.5.x — Game acquisition. The launcher manages EXISTING installed games;
+// for games that aren't installed, clicking Get opens the intelligent
+// store-link picker which redirects to the official store page (Steam/GOG/
+// Epic/Xbox) where the user can buy or download the game. No download
+// engine — the launcher never transfers files itself.
 
-export interface DownloadJob {
-  id: number;
-  gameId: number;
-  gameTitle: string;
-  sourceKind: DownloadSourceKind;   // which adapter produced this job
-  sourceName: string;               // human-readable source label
-  url: string;                      // the actual download URL (http/https only)
-  destDir: string;                  // absolute destination directory
-  fileName: string;                 // sanitized filename
-  totalBytes: number | null;        // from Content-Length; null if unknown
-  downloadedBytes: number;          // bytes written so far
-  status: DownloadStatus;
-  sha256: string | null;            // expected hash, if the source provides one
-  startedAt: string | null;
-  completedAt: string | null;
-  error: string | null;
-  createdAt: string;
-}
-
-// What a download source IS. Adapters implement this; the registry exposes
-// them. Capabilities are truthfully reported — an adapter MUST NOT claim a
-// capability it doesn't implement.
-export type DownloadSourceKind =
-  | "open-source-catalog"   // built-in: curated free/open-source games
-  | "user-http"             // user-configured direct HTTP(S) download
-  | "store-link";           // official store page (View Store, no download)
-
-export interface DownloadSourceCapability {
-  search: boolean;          // can search for games by name
-  download: boolean;        // can actually transfer files (vs store-link)
-  storePage: boolean;       // can open an official store page
-  ownership: boolean;       // can verify the user owns the game
-}
-
-export interface DownloadSourceDescriptor {
-  kind: DownloadSourceKind;
-  name: string;
-  capabilities: DownloadSourceCapability;
-  configurable: boolean;    // user can add/edit entries of this kind
-}
-
-// A resolved acquisition option for a specific game — what the user can do
-// to get THIS game from THIS source.
+// A resolved acquisition option for a specific game — one way to get it.
 export interface AcquisitionOption {
-  sourceKind: DownloadSourceKind;
-  sourceName: string;
-  label: string;            // "Get" | "Download" | "View Store" | "Buy"
-  // For downloadable sources:
-  downloadUrl?: string;     // direct http(s) URL
-  totalBytes?: number | null;
-  sha256?: string | null;
-  // For store-link sources:
-  storeUrl?: string;        // opens in the default browser
-  note?: string;            // explanation (e.g. "Free, open-source")
+  sourceKind: string;         // "store-link" (the only kind now)
+  sourceName: string;         // e.g. "Steam", "GOG", "Web"
+  label: string;              // "Get on Steam" | "Search on GOG" | "Search the web"
+  storeUrl?: string;          // opens in the default browser (https only)
+  note?: string;              // explanation
 }
 
-// User-configured HTTP source entry (stored in settings.httpSources JSON).
-export interface HttpSourceEntry {
-  id: string;               // stable uuid
-  name: string;             // user label
-  url: string;              // base URL or direct file URL
-  note?: string;
-}

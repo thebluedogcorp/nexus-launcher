@@ -50,28 +50,39 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v4.5.2"
-          $title = "NEXUS v4.5.2 — Intelligent zero-config Get button: auto-resolves the official store page (Steam deep-link, GOG, Epic, Xbox) for any game"
+          $tag = "v4.5.3"
+          $title = "NEXUS v4.5.3 — Fixed install detection (manual games now show Get, not Play) + removed all download-management residue"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
-          **v4.5.2 — Intelligent Get button (zero-config store redirect).**
+          **v4.5.3 — Two fixes.**
 
-          When a game isn't installed, clicking Get no longer requires any source setup. The launcher figures out which official store carries the game and opens its buy/store page in the browser:
+          **1. Fixed the install-detection bug (the real issue).** A manually-added game with no files on disk was still showing 'Play Now'. Root cause: createGame relied on the column default (installed=1), so every freshly-added game was marked installed immediately — even with no executable. Fix:
+          - createGame now computes the REAL install state at insert time via computeInstalled(): installed = (executable exists on disk) OR (installDir exists) OR (launchCommand is a known GAME protocol — steam://, com.epicgames.launcher://, gog://, battlenet://, etc.). http(s):// store URLs do NOT count as installed (they're web links, not launchable installs).
+          - verifyInstalled/verifyAllInstalled use the same launchable-game-URI check (was too permissive — matched http://).
+          - updateGame recomputes installed when executable/installDir/launchCommand change (so editing a game flips Play<->Get immediately).
+          - verifyAllInstalled runs on startup, so any pre-v4.5.3 manual games flagged wrong get corrected on next launch.
+          Now: a game with no executable + no game-protocol launchCommand shows 'Get' (opens the official store picker). A game with a real executable or a steam:// URI shows 'Play Now'.
 
-          - **Steam** — if the game has a steamAppId (from detection), deep-links straight to store.steampowered.com/app/<id>. Otherwise, a live search of the public Steam storesearch API finds the exact app by title and deep-links to it. Verified: 'Elden Ring' -> app 1245620, 'Celeste' -> app 504230. Falls back to Steam's search-results page if no match.
-          - **GOG** — deep-links to the GOG game page when a gogId is known or the catalog search finds a match; else opens GOG's search-results page.
-          - **Epic Games** — opens the Epic Games Store search results for the title (no reliable public per-game API).
-          - **Xbox / Microsoft Store** — opens the Microsoft Store search results.
-          - **Web search** — catch-all that opens a web search for buying the game.
+          **2. Completely removed the download-management system.** The launcher now manages EXISTING installed games + redirects to official stores for acquisition — it does not handle downloads. Removed:
+          - The download engine (src/main/downloads/manager.ts — the HTTP streaming/Range-resume/sha256 engine).
+          - The source adapter registry + open-source catalog (registry.ts, catalog.ts).
+          - The downloads DB table + all download-job CRUD (listDownloads/getDownload/createDownload/updateDownload/deleteDownload/markGameInstalled).
+          - The user-HTTP source system (listHttpSources/saveHttpSources + the Settings -> Downloads tab + the SourceEditor modal + import/export).
+          - The DownloadsPanel UI + useDownloads hook + the Downloads topbar button.
+          - The download-progress events (onDownloadProgress/Added/Removed/Completed).
+          - The in-card progress bar + 'View download' hover variant on game cards.
+          - The corresponding types (DownloadJob/DownloadStatus/DownloadSourceKind/DownloadSourceDescriptor/DownloadSourceCapability/HttpSourceEntry).
+          - The download-engine smoke test.
+          Kept: the intelligent store-link resolver (stores.ts — Steam/GOG/Epic/Xbox official-page resolution), the AcquisitionPicker (now store-focused, zero-config), the install-verification system, the 'Get' button.
 
-          The Get-game picker (AcquisitionPicker) is now store-focused: it lists 'Get on Steam', 'Get on GOG', 'Search on Epic', 'Search on Xbox', 'Search the web'. Click any -> opens that official site in the default browser. No download sourcing, no user configuration, no piracy — just intelligent redirection to the legitimate store page where the user can buy or download the game.
+          The Get flow is now consistent everywhere: not installed -> 'Get' button -> opens the official store picker (Get on Steam / Get on GOG / Search on Epic / Search on Xbox / Search the web) -> opens the store page in the browser. No download sourcing, no residue, no inconsistency.
 
-          All v4.5.x functionality preserved: availability-aware actions (Get/Play), download manager (for direct HTTP sources a user is authorized to use, with Range resume + integrity verification), the open-source catalog, the Downloads panel, Theme Studio, collections.
+          All prior functionality preserved: library, collections, platform detection, launching, playtime tracking, achievements, overlay, Theme Studio, Smart Collections, collapsible sidebar, real platform logos, lucide icons.
 
           **Downloads:**
-          - NEXUS-Setup-4.5.2.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-4.5.2.exe — single-file portable build.
+          - NEXUS-Setup-4.5.3.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-4.5.3.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@

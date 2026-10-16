@@ -41,15 +41,9 @@ import { searchRawg } from "./metadata/rawg";
 import { fetchAggregated } from "./metadata/aggregator";
 import {
   getAchievements, unlockAchievement, checkAchievements,
-  // v4.5.0 — downloads + install verification
-  listDownloads, getDownload, verifyInstalled, verifyAllInstalled,
-  listHttpSources, saveHttpSources,
+  // v4.5.0 — install verification (Play/Get action logic)
+  verifyInstalled, verifyAllInstalled,
 } from "./db";
-import {
-  startDownload, pauseDownload, resumeDownload, cancelDownload, retryDownload, clearDownload,
-  setDownloadWindow, recoverDownloadsOnStartup,
-} from "./downloads/manager";
-import { resolveAcquisitionOptions, searchCatalog, SOURCE_DESCRIPTORS } from "./downloads/registry";
 import { resolveStoreLinks } from "./downloads/stores";
 import type {
   DetectedGame,
@@ -58,7 +52,6 @@ import type {
   PlatformId,
   ScanSummary,
   AcquisitionOption,
-  HttpSourceEntry,
 } from "@shared/types";
 
 export function registerIpc(): void {
@@ -368,40 +361,14 @@ export function registerIpc(): void {
   ipcMain.handle("themes:delete", (_e, id: number) => { deleteTheme(id); return true; });
   ipcMain.handle("themes:duplicate", (_e, id: number, newName: string) => duplicateTheme(id, newName));
 
-  // ===== v4.5.0 Downloads + acquisition =====
-  ipcMain.handle("downloads:list", () => listDownloads());
-  ipcMain.handle("downloads:get", (_e, id: number) => getDownload(id));
-  ipcMain.handle("downloads:resolveOptions", async (_e, gameId: number) => {
-    const game = await getGame(gameId);
-    if (!game) return [];
-    return resolveAcquisitionOptions(game);
-  });
-  ipcMain.handle("downloads:start", async (_e, gameId: number, option: AcquisitionOption) => {
-    const game = await getGame(gameId);
-    if (!game) return { error: "Game not found." };
-    const r = startDownload(gameId, game.title, option);
-    return r;
-  });
-  ipcMain.handle("downloads:pause", (_e, id: number) => { pauseDownload(id); return true; });
-  ipcMain.handle("downloads:resume", (_e, id: number) => { resumeDownload(id); return true; });
-  ipcMain.handle("downloads:cancel", (_e, id: number) => { cancelDownload(id); return true; });
-  ipcMain.handle("downloads:retry", (_e, id: number) => { retryDownload(id); return true; });
-  ipcMain.handle("downloads:clear", (_e, id: number) => { clearDownload(id); return true; });
-
-  // ===== v4.5.0 Install verification =====
+  // ===== v4.5.x — Install verification + intelligent store-link resolution =====
+  // (The download-management system was removed in v4.5.3 — the launcher now
+  //  manages EXISTING games + redirects to official stores for acquisition.)
   ipcMain.handle("games:verifyInstalled", (_e, gameId: number) => verifyInstalled(gameId));
   ipcMain.handle("games:verifyAll", () => verifyAllInstalled());
-
-  // ===== v4.5.0 Sources + catalog =====
-  ipcMain.handle("sources:descriptors", () => SOURCE_DESCRIPTORS);
-  ipcMain.handle("sources:listHttp", () => listHttpSources());
-  ipcMain.handle("sources:saveHttp", (_e, list: HttpSourceEntry[]) => { saveHttpSources(list); return listHttpSources(); });
-  ipcMain.handle("catalog:search", (_e, query: string) => searchCatalog(query ?? ""));
-
-  // v4.5.2 — Intelligent store-link resolution. Given a game, returns the
-  // official store page(s) where it can be bought/gotten — zero-config.
-  // Deep-links to the exact app page when a platform id is known or the live
-  // Steam/GOG search finds a match; else falls back to the store's search page.
+  // Intelligent zero-config Get: returns the official store page(s) for a game
+  // — exact app page when a platform id is known or live search finds a match,
+  // else the store's search-results page.
   ipcMain.handle("sources:resolveStoreLinks", async (_e, gameId: number) => {
     const game = await getGame(gameId);
     if (!game) return [];
