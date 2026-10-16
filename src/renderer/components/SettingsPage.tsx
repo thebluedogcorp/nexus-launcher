@@ -1,5 +1,5 @@
 import { useState, useEffect, type ReactNode } from "react";
-import type { LauncherSettings, SortKey, Collection } from "@shared/types";
+import type { LauncherSettings, SortKey, Collection, HttpSourceEntry } from "@shared/types";
 import { SORT_LABELS, PLATFORM_LIST } from "@shared/types";
 import { Icon } from "./Icons";
 import { applyAccent } from "../lib/accent";
@@ -14,7 +14,7 @@ interface Props {
   onCheckUpdates: () => void;
 }
 
-type TabId = "general" | "appearance" | "library" | "sidebar" | "startup" | "overlay" | "about";
+type TabId = "general" | "appearance" | "library" | "sidebar" | "downloads" | "startup" | "overlay" | "about";
 
 interface TabDef { id: TabId; label: string; icon: ReactNode }
 const TABS: TabDef[] = [
@@ -22,6 +22,7 @@ const TABS: TabDef[] = [
   { id: "appearance", label: "Appearance", icon: <Icon.Sparkles size={15} /> },
   { id: "library", label: "Library", icon: <Icon.Library size={15} /> },
   { id: "sidebar", label: "Sidebar", icon: <Icon.Folder size={15} /> },
+  { id: "downloads", label: "Downloads", icon: <Icon.Download size={15} /> },
   { id: "startup", label: "Startup & Close", icon: <Icon.Shield size={15} /> },
   { id: "overlay", label: "Overlay", icon: <Icon.Gamepad size={15} /> },
   { id: "about", label: "About", icon: <Icon.Info size={15} /> },
@@ -70,6 +71,56 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
   const [collections, setCollections] = useState<Collection[]>([]);
   // Load collections for the management section.
   useEffect(() => { (async () => { try { setCollections(await window.nexus.listCollections()); } catch { /* ignore */ } })(); }, []);
+  // v4.5.1 — user download sources (HTTP direct downloads the user is authorized to use).
+  const [httpSources, setHttpSources] = useState<HttpSourceEntry[]>([]);
+  const [draftSource, setDraftSource] = useState<HttpSourceEntry | null>(null);
+  useEffect(() => { (async () => { try { setHttpSources(await window.nexus.listHttpSources()); } catch { /* ignore */ } })(); }, []);
+  const persistSources = async (list: HttpSourceEntry[]) => {
+    setHttpSources(list);
+    try { setHttpSources(await window.nexus.saveHttpSources(list)); } catch (e) { flash("error", "Couldn't save sources: " + (e instanceof Error ? e.message : String(e))); }
+  };
+  const addOrUpdateSource = (src: HttpSourceEntry) => {
+    const exists = httpSources.some((s) => s.id === src.id);
+    const next = exists ? httpSources.map((s) => s.id === src.id ? src : s) : [...httpSources, src];
+    void persistSources(next);
+    setDraftSource(null);
+    flash("success", exists ? "Source updated" : "Source added");
+  };
+  const removeSource = (id: string) => { void persistSources(httpSources.filter((s) => s.id !== id)); flash("success", "Source removed"); };
+  const exportSources = () => {
+    const blob = new Blob([JSON.stringify({ schema: "nexus-sources/v1", sources: httpSources }, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = "nexus-sources.json"; a.click(); URL.revokeObjectURL(url);
+    flash("success", "Sources exported");
+  };
+  const importSources = () => {
+    const input = document.createElement("input"); input.type = "file"; input.accept = ".json,application/json";
+    input.onchange = () => {
+      const f = input.files?.[0]; if (!f) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const parsed = JSON.parse(String(reader.result));
+          // Accept either {sources:[...]} or a bare array. Validate each entry.
+          const arr = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.sources) ? parsed.sources : null);
+          if (!arr) throw new Error("No sources array");
+          const valid: HttpSourceEntry[] = arr
+            .filter((e: unknown) => e && typeof e === "object" && typeof (e as Record<string, unknown>).url === "string")
+            .map((e: Record<string, unknown>) => ({
+              id: typeof e.id === "string" ? e.id : crypto.randomUUID(),
+              name: typeof e.name === "string" ? e.name : "Imported source",
+              url: String(e.url),
+              note: typeof e.note === "string" ? e.note : undefined,
+            }));
+          if (valid.length === 0) throw new Error("No valid sources in file");
+          void persistSources([...httpSources.filter((s) => !valid.some((v) => v.url === s.url)), ...valid]);
+          flash("success", `Imported ${valid.length} source${valid.length === 1 ? "" : "s"}`);
+        } catch (e) { flash("error", "Invalid sources file: " + (e instanceof Error ? e.message : String(e))); }
+      };
+      reader.readAsText(f);
+    };
+    input.click();
+  };
 
   // Read the actual registry state for launch-on-startup on mount
   useEffect(() => {
@@ -451,6 +502,76 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
               </>
             )}
 
+            {/* ===== DOWNLOADS TAB (v4.5.1) ===== */}
+            {tab === "downloads" && (
+              <>
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />Direct Download Sources</div>
+                  <div className="settings-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 12 }}>
+                    <div className="label-stack">
+                      <div className="t">Your download sources</div>
+                      <div className="d">Each entry is a direct HTTP(S) URL for content you are authorized to download (free games, your own hosted files, official direct downloads). These appear as "Download" options in the Get-game picker for every game in your library.</div>
+                    </div>
+                    {httpSources.length === 0 && (
+                      <div style={{ padding: "10px 4px", fontSize: 12, color: "var(--text-faint)" }}>No sources yet. Add one below, or import a JSON source list.</div>
+                    )}
+                    {httpSources.map((s) => (
+                      <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 11px", borderRadius: "var(--r-md)", background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)" }}>
+                        <Icon.Download size={14} style={{ color: "var(--accent)", flexShrink: 0 }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, color: "var(--text)", fontWeight: 600 }}>{s.name || "Untitled source"}</div>
+                          <div style={{ fontSize: 11, color: "var(--text-faint)", fontFamily: '"Cascadia Code",Consolas,monospace', overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.url}</div>
+                          {s.note && <div style={{ fontSize: 10, color: "var(--text-faint)", marginTop: 2 }}>{s.note}</div>}
+                        </div>
+                        <button className="ctx-item" style={{ padding: "4px 8px", fontSize: 11 }} onClick={() => setDraftSource(s)} title="Edit"><Icon.FileCog size={12} /></button>
+                        <button className="ctx-item danger" style={{ padding: "4px 8px", fontSize: 11 }} onClick={() => removeSource(s.id)} title="Remove"><Icon.Trash size={12} /></button>
+                      </div>
+                    ))}
+                    <div className="settings-choice-row">
+                      <button className="settings-choice" style={{ minWidth: 0 }} onClick={() => setDraftSource({ id: crypto.randomUUID(), name: "", url: "", note: "" })}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Icon.Plus size={14} /> Add Source</span>
+                      </button>
+                      <button className="settings-choice" style={{ minWidth: 0 }} onClick={importSources} title="Import a JSON source list"><Icon.DownloadCloud size={14} /> Import JSON</button>
+                      <button className="settings-choice" style={{ minWidth: 0 }} onClick={exportSources} disabled={httpSources.length === 0} title="Export your sources as JSON"><Icon.ExternalLink size={14} /> Export JSON</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />Source JSON format</div>
+                  <div className="settings-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 8, padding: "14px 16px" }}>
+                    <div className="d" style={{ lineHeight: 1.6 }}>
+                      Import/export uses an open JSON schema. Each source is a direct-download URL you're authorized to use:
+                    </div>
+                    <pre style={{ margin: 0, padding: 14, borderRadius: "var(--r-md)", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border)", fontSize: 11, lineHeight: 1.6, color: "var(--text-dim)", fontFamily: '"Cascadia Code",Consolas,monospace', overflowX: "auto" }}>{`{
+  "schema": "nexus-sources/v1",
+  "sources": [
+    {
+      "id": "any-unique-id",
+      "name": "My Free Game Mirror",
+      "url": "https://example.com/my-game-installer.exe",
+      "note": "optional description"
+    }
+  ]
+}`}</pre>
+                    <div className="field-hint"><Icon.Info size={12} /><span>Only <code>http://</code> and <code>https://</code> URLs are accepted. Magnet links, torrent files, and any source of unauthorized commercial games are rejected. You are responsible for ensuring each source is one you're authorized to download from.</span></div>
+                  </div>
+                </div>
+
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />About Hydra compatibility</div>
+                  <div className="settings-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 8, padding: "14px 16px" }}>
+                    <div className="d" style={{ lineHeight: 1.6 }}>
+                      <strong style={{ color: "var(--text)" }}>Hydra Launcher's source files are not supported.</strong> Hydra's download sources (OnlineFix, Xatab, DODI, FitGirl, and similar) distribute commercial copyrighted games without authorization — importing those source lists would mean importing unauthorized download links, which NEXUS does not allow. This is consistent with the original design brief: "Support only authorized distribution and downloading. Do not bypass DRM, authentication, access controls, or ownership requirements."
+                    </div>
+                    <div className="d" style={{ lineHeight: 1.6 }}>
+                      The NEXUS source format above is the legitimate equivalent: an open JSON schema for any <strong>authorized</strong> direct-download URL. It works for free/open-source games, your own hosted files, and official direct downloads from publishers who permit it. To turn a Hydra-style source list into a NEXUS-compatible one, replace each unauthorized commercial-game link with an authorized direct-download URL (or remove the entry).
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
             {/* ===== STARTUP & CLOSE TAB ===== */}
             {tab === "startup" && (
               <>
@@ -560,7 +681,7 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
                     <div className="logo"><NexusMark size={28} /></div>
                     <div>
                       <div className="name">NEXUS Launcher</div>
-                      <div className="ver">Version 4.5.0 — Universal Game Launcher for Windows</div>
+                      <div className="ver">Version 4.5.1 — Universal Game Launcher for Windows</div>
                       <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 6 }}>
                         Auto-detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox. Patches rich metadata via RAWG + Steam APIs. Launches natively.
                       </div>
@@ -591,6 +712,56 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
               <button className="btn btn-ghost" onClick={onClose}>Close</button>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* v4.5.1 — Add/Edit download source modal */}
+      {draftSource && (
+        <SourceEditor
+          initial={draftSource}
+          onClose={() => setDraftSource(null)}
+          onSave={(src) => addOrUpdateSource(src)}
+        />
+      )}
+    </div>
+  );
+}
+
+// Inline Add/Edit download-source modal.
+function SourceEditor({ initial, onClose, onSave }: { initial: HttpSourceEntry; onClose: () => void; onSave: (s: HttpSourceEntry) => void; }) {
+  const [name, setName] = useState(initial.name);
+  const [url, setUrl] = useState(initial.url);
+  const [note, setNote] = useState(initial.note ?? "");
+  const isHttp = /^https?:\/\//i.test(url.trim());
+  const valid = isHttp && url.trim().length > 10;
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Download source">
+        <div className="modal-header">
+          <div className="modal-title"><Icon.Download size={16} /> Download Source</div>
+          <button className="modal-close" onClick={onClose} aria-label="Close"><Icon.Close size={16} /></button>
+        </div>
+        <div className="modal-body">
+          <div className="field">
+            <label className="field-label" htmlFor="src-name">Name</label>
+            <input id="src-name" className="field-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. My Free Game Mirror" maxLength={48} autoFocus />
+          </div>
+          <div className="field">
+            <label className="field-label" htmlFor="src-url">Direct download URL</label>
+            <input id="src-url" className="field-input" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com/game-installer.exe" style={{ fontFamily: '"Cascadia Code",Consolas,monospace', fontSize: 12 }} />
+            {url && !isHttp && <div className="field-hint" style={{ color: "var(--danger)" }}><Icon.Info size={12} /><span>Only http:// and https:// URLs are accepted.</span></div>}
+          </div>
+          <div className="field">
+            <label className="field-label" htmlFor="src-note">Note <span style={{ fontWeight: 400, opacity: 0.6 }}>(optional)</span></label>
+            <input id="src-note" className="field-input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Official mirror, public domain" maxLength={100} />
+          </div>
+          <div className="field-hint"><Icon.Info size={12} /><span>Only add sources you are authorized to download from — free/open-source games, your own files, or official direct downloads. Unauthorized commercial-game repacks/torrents are not permitted.</span></div>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary btn-sm" onClick={() => valid && onSave({ id: initial.id, name: name.trim() || "Source", url: url.trim(), note: note.trim() || undefined })} disabled={!valid}>
+            <Icon.Check size={14} /> Save Source
+          </button>
         </div>
       </div>
     </div>

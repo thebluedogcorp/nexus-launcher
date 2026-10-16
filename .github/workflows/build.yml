@@ -50,47 +50,31 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v4.5.0"
-          $title = "NEXUS v4.5.0 — Smart game acquisition: availability-aware actions (Get/Download/Play), pluggable source adapters, download manager with resume"
+          $tag = "v4.5.1"
+          $title = "NEXUS v4.5.1 — Download-source management UI: add/edit/remove/import/export direct HTTP(S) sources"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
-          **v4.5.0 — Smart Game Acquisition + Download Sources.**
+          **v4.5.1 — Download-source management UI (the missing piece from v4.5.0).**
 
-          **1. Fixed the availability bug (the core ask).** A game in the library that isn't installed no longer shows 'Play Now'. Each game now carries a verified 'installed' flag; the card + detail page show the right action:
-          - Installed + launchable -> **Play Now**.
-          - In library but not installed, with an acquisition path -> **Get** (opens the acquisition picker).
-          - Active download -> in-card progress bar + a **View download** button.
-          - Download completed + verified -> **Play Now**.
-          - Missing source -> a clear explanation + alternatives.
-          The flag is verified against the real install state on startup (verifyAllInstalled) and after every download completes — never assumed from library presence alone.
+          v4.5.0 shipped the download engine + adapter backend but no UI to actually add sources. This release adds a full Settings -> Downloads tab:
 
-          **2. Pluggable source-adapter system.** A consistent DownloadSource interface + a registry that resolves acquisition options per game. Three real adapters:
-          - **open-source-catalog** — 10 real free/open-source games (SuperTuxKart, 0 A.D., Mindustry, OpenTTD, Shattered Pixel Dungeon, Battle for Wesnoth, Veloren, Endless Sky, Freeciv, Cataclysm: DDA) each linked to its OFFICIAL download page. Fuzzy title matching.
-          - **store-link** — official store pages (Steam store by app id; others fall back to their storefront). 'View Store' opens the real store page in the browser.
-          - **user-http** — user-configured direct HTTP(S) downloads for content the user is authorized to download. Managed in Settings.
-          Adapters truthfully report capabilities (search/download/storePage/ownership). Adding a new authorized source = adding a branch in registry.ts.
+          **1. Direct Download Sources** — add, edit, and remove user HTTP(S) sources. Each entry is a direct-download URL you are authorized to use (free games, your own hosted files, official direct downloads). These appear as "Download" options in the Get-game picker for every game in your library. An Add/Edit modal validates the URL (http/https only) and captures a name + optional note.
 
-          **3. Download manager.** A native download engine (global fetch + ReadableStream reader) that streams to disk with:
-          - **Range resume** — pause keeps the partial file + bytes; resume re-issues GET with 'Range: bytes=<n>-' (append mode).
-          - **Pause / Cancel / Retry** — AbortController aborts the in-flight fetch; cancel deletes the partial file; retry restarts from 0.
-          - **Integrity verification** — on completion, verifies the written file size matches Content-Length; if the source provided a sha256, verifies the hash. Only on success does it call markGameInstalled + transition the job to 'completed'.
-          - **Concurrency limit** — max 2 concurrent transfers; the rest stay queued.
-          - **Persistent jobs** — the downloads DB table survives restarts; jobs left mid-transfer are flipped to 'paused' (the in-memory controller was lost) so the user can resume.
-          - **Progress events** — throttled to 4/sec, sent to the renderer + persisted.
-          - **Full UI** — a Downloads panel (topbar button) with active/queued/completed/failed sections, per-job progress bars, overall progress, + pause/resume/cancel/retry/clear controls.
+          **2. Import / Export JSON** — export your source list to an open-schema JSON file, or import one. The schema is documented inline:
+          {
+            "schema": "nexus-sources/v1",
+            "sources": [ { "id": "...", "name": "...", "url": "https://...", "note": "..." } ]
+          }
+          Import accepts either {sources:[...]} or a bare array, validates each entry, and dedupes by URL.
 
-          **4. Security.** Only http(s) URLs are accepted (no file://, no local-network bypass). Filenames are sanitized (no path traversal). Downloaded files are NEVER auto-executed — the user must explicitly launch. No DRM bypass, no unauthorized sources, no piracy integration (Hydra's torrent/repack sources were explicitly NOT implemented; only authorized distribution).
+          **3. Source JSON format + Hydra compatibility note** — a clear in-app explanation that only http(s) direct-download URLs are accepted (no magnets/torrents), and that Hydra Launcher's source files (which contain unauthorized commercial-game repack/torrent links) are not supported. The NEXUS format is the legitimate equivalent — an open schema for any authorized direct-download URL.
 
-          **5. Verified.** The download engine was smoke-tested end-to-end against a real public-domain file (Project Gutenberg, 772KB): full transfer + sha256 + size verification passed; Range-resume (206 + append) reconstructed the file correctly.
-
-          All existing functionality preserved: library, collections, platform detection, launching, playtime tracking, achievements, overlay, Theme Studio.
-
-          **Roadmap (documented, not in this release):** ownership/entitlement verification (needs platform OAuth), update detection, torrent adapter for legally-distributable P2P content, dashboard widget for downloads.
+          All v4.5.0 functionality preserved: availability-aware actions (Get/Play), the open-source catalog (10 real free games), official store links, the download manager (Range resume, pause/cancel/retry, sha256 verification, persistent jobs), the Downloads panel, and the security model (http(s)-only, path-traversal-safe, never auto-execute).
 
           **Downloads:**
-          - NEXUS-Setup-4.5.0.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-4.5.0.exe — single-file portable build.
+          - NEXUS-Setup-4.5.1.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-4.5.1.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@
