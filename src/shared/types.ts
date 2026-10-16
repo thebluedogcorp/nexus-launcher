@@ -54,6 +54,10 @@ export interface Game {
   favorite: boolean;
   hidden: boolean;
   installedAt: string | null;
+  // v4.5.0 — install state. False when a game is in the library but not
+  // installed (e.g. added from a store catalog or queued for download).
+  // verifyInstalled() updates this; the renderer uses it to show Get vs Play.
+  installed: boolean;
   createdAt: string;
   updatedAt: string;
   // v2.0 — 50 features
@@ -204,3 +208,79 @@ export const PLATFORMS: Record<PlatformId, PlatformInfo> = {
 };
 
 export const PLATFORM_LIST = Object.values(PLATFORMS);
+
+// v4.5.0 — Game acquisition + download system.
+// A download job represents one transfer of game files from an authorized
+// source to the user's machine. Jobs persist across restarts (the downloads
+// table); the in-memory AbortController is reconstructed on resume.
+export type DownloadStatus =
+  | "queued"        // waiting for a download slot
+  | "downloading"   // actively transferring bytes
+  | "paused"        // user-paused; can resume from the last byte
+  | "completed"     // transfer + verification succeeded
+  | "failed"        // transfer or verification failed; can retry
+  | "cancelled";    // user cancelled; job kept for history
+
+export interface DownloadJob {
+  id: number;
+  gameId: number;
+  gameTitle: string;
+  sourceKind: DownloadSourceKind;   // which adapter produced this job
+  sourceName: string;               // human-readable source label
+  url: string;                      // the actual download URL (http/https only)
+  destDir: string;                  // absolute destination directory
+  fileName: string;                 // sanitized filename
+  totalBytes: number | null;        // from Content-Length; null if unknown
+  downloadedBytes: number;          // bytes written so far
+  status: DownloadStatus;
+  sha256: string | null;            // expected hash, if the source provides one
+  startedAt: string | null;
+  completedAt: string | null;
+  error: string | null;
+  createdAt: string;
+}
+
+// What a download source IS. Adapters implement this; the registry exposes
+// them. Capabilities are truthfully reported — an adapter MUST NOT claim a
+// capability it doesn't implement.
+export type DownloadSourceKind =
+  | "open-source-catalog"   // built-in: curated free/open-source games
+  | "user-http"             // user-configured direct HTTP(S) download
+  | "store-link";           // official store page (View Store, no download)
+
+export interface DownloadSourceCapability {
+  search: boolean;          // can search for games by name
+  download: boolean;        // can actually transfer files (vs store-link)
+  storePage: boolean;       // can open an official store page
+  ownership: boolean;       // can verify the user owns the game
+}
+
+export interface DownloadSourceDescriptor {
+  kind: DownloadSourceKind;
+  name: string;
+  capabilities: DownloadSourceCapability;
+  configurable: boolean;    // user can add/edit entries of this kind
+}
+
+// A resolved acquisition option for a specific game — what the user can do
+// to get THIS game from THIS source.
+export interface AcquisitionOption {
+  sourceKind: DownloadSourceKind;
+  sourceName: string;
+  label: string;            // "Get" | "Download" | "View Store" | "Buy"
+  // For downloadable sources:
+  downloadUrl?: string;     // direct http(s) URL
+  totalBytes?: number | null;
+  sha256?: string | null;
+  // For store-link sources:
+  storeUrl?: string;        // opens in the default browser
+  note?: string;            // explanation (e.g. "Free, open-source")
+}
+
+// User-configured HTTP source entry (stored in settings.httpSources JSON).
+export interface HttpSourceEntry {
+  id: string;               // stable uuid
+  name: string;             // user label
+  url: string;              // base URL or direct file URL
+  note?: string;
+}

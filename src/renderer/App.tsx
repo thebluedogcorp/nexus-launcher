@@ -7,6 +7,9 @@ import { ModeToggle } from "./components/ModeToggle";
 import { PlatformMark } from "./components/PlatformMark";
 import { IconGlyph } from "./components/IconGlyph";
 import { ThemeStudio } from "./components/theme/ThemeStudio";
+import { AcquisitionPicker } from "./components/AcquisitionPicker";
+import { DownloadsPanel } from "./components/DownloadsPanel";
+import { useDownloads } from "./lib/useDownloads";
 import { CreateCollectionDialog } from "./components/CreateCollectionDialog";
 import { CollectionPicker } from "./components/CollectionPicker";
 import { GamePage } from "./components/GamePage";
@@ -66,6 +69,10 @@ export function App() {
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
   // v4.4.0 — Theme Studio (full-screen visual theme editor).
   const [studioOpen, setStudioOpen] = useState(false);
+  // v4.5.0 — Acquisition + downloads.
+  const [downloadsOpen, setDownloadsOpen] = useState(false);
+  const [acquireGame, setAcquireGame] = useState<{ id: number; title: string; installed: boolean } | null>(null);
+  const { progressForGame } = useDownloads();
   // Playtime tracking state — shows live playtime when a game is running.
   const [activePlaytime, setActivePlaytime] = useState<{ gameId: number; gameTitle: string; elapsedSec: number; startedAt: number } | null>(null);
   // v4.3.0 — Collections + collapsible sidebar + platform visibility.
@@ -137,6 +144,8 @@ export function App() {
           localStorage.setItem("nx-uimode", s.uiMode);
           setUiMode(s.uiMode);
         }
+        // v4.5.0 — verify install state for every game (fix Play/Get actions).
+        try { const changed = await window.nexus.verifyAllInstalled(); if (changed.length > 0) await refreshGames(); } catch {}
         await refreshAll();
         if (s.autoScanOnStart) {
           try {
@@ -191,6 +200,14 @@ export function App() {
   }, []);
 
   useEffect(() => { if (!loading) refreshGames(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters, activeCollection]);
+
+  // v4.5.0 — when a download completes (files verified + game marked installed),
+  // refresh the games list so the card/detail action flips from Get → Play Now.
+  useEffect(() => {
+    const off = window.nexus.onDownloadCompleted(() => { void refreshGames(); void refreshStats(); });
+    return () => { off?.(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const openPage = useCallback(async (id: number) => setPageGame(await window.nexus.getGame(id)), []);
   const handleLaunch = useCallback(async (g: Game) => {
@@ -581,7 +598,7 @@ export function App() {
   if (pageGame) {
     return (
       <>
-        <GamePage game={pageGame} onClose={() => setPageGame(null)} onLaunch={handleLaunch} onPatch={handlePatch} onDelete={handleDelete} onToggleFav={handleToggleFav} onUpdate={handleUpdateFromPage} onOpenDir={handleOpenDir} onAddToCollection={(g) => setCollPickerGame({ id: g.id, title: g.title })} />
+        <GamePage game={pageGame} onClose={() => setPageGame(null)} onLaunch={handleLaunch} onPatch={handlePatch} onDelete={handleDelete} onToggleFav={handleToggleFav} onUpdate={handleUpdateFromPage} onOpenDir={handleOpenDir} onAddToCollection={(g) => setCollPickerGame({ id: g.id, title: g.title })} onGet={(g) => setAcquireGame({ id: g.id, title: g.title, installed: g.installed })} />
         {controllerConnected && <div className="hints-bar"><span className="hint"><span className="k r">B</span> Back</span><span className="hint"><span className="k r">A</span>/<span className="k r">X</span> Play</span></div>}
         {/* v4.3.0 — Collection dialogs accessible from the game page too */}
         {createCollOpen && <CreateCollectionDialog onClose={() => setCreateCollOpen(false)} onSave={handleCreateCollection} />}
@@ -598,6 +615,8 @@ export function App() {
         )}
         <ToastContainer toasts={toasts} onDismiss={dismissToast} />
         {studioOpen && <ThemeStudio onClose={() => setStudioOpen(false)} />}
+        {acquireGame && <AcquisitionPicker gameId={acquireGame.id} gameTitle={acquireGame.title} installed={acquireGame.installed} onClose={() => setAcquireGame(null)} onStarted={() => { setAcquireGame(null); setDownloadsOpen(true); }} />}
+        {downloadsOpen && <DownloadsPanel onClose={() => setDownloadsOpen(false)} />}
       </>
     );
   }
@@ -865,16 +884,31 @@ export function App() {
                               </button>
                             </div>
                             <div className="gc-hover-play">
-                              <button className="gc-play-btn" onClick={(e) => { e.stopPropagation(); handleLaunch(g); }} title={`Play ${g.title}`}>
-                                <Icon.Play size={20} />
-                              </button>
+                              {g.installed ? (
+                                <button className="gc-play-btn" onClick={(e) => { e.stopPropagation(); handleLaunch(g); }} title={`Play ${g.title}`}>
+                                  <Icon.Play size={20} />
+                                </button>
+                              ) : (progressForGame(g.id) ? (
+                                <button className="gc-play-btn" onClick={(e) => { e.stopPropagation(); setDownloadsOpen(true); }} title="View download">
+                                  <Icon.Download size={18} />
+                                </button>
+                              ) : (
+                                <button className="gc-get-btn" onClick={(e) => { e.stopPropagation(); setAcquireGame({ id: g.id, title: g.title, installed: g.installed }); }} title={`Get ${g.title}`}>
+                                  <Icon.Download size={14} /> Get
+                                </button>
+                              ))}
                             </div>
                           </div>
+                          {(() => { const pg = progressForGame(g.id); const pct = pg && pg.totalBytes ? Math.min(100, Math.round((pg.downloadedBytes / pg.totalBytes) * 100)) : 0; return pg ? <div className="gc-progress"><div style={{ width: `${pct}%` }} /></div> : null; })()}
                           <div className="gc-footer">
                             <div className="gc-title" title={g.title}>{g.title}</div>
                             <div className="gc-meta">
-                              <span>{g.playtimeSec > 0 ? formatPlaytimeShort(g.playtimeSec) : "New"}</span>
-                              {g.lastPlayedAt ? <span className="v">Played {relativeTime(g.lastPlayedAt)}</span> : <span style={{ color: "var(--text-faint)" }}>Never played</span>}
+                              {g.installed ? (
+                                <span>{g.playtimeSec > 0 ? formatPlaytimeShort(g.playtimeSec) : "New"}</span>
+                              ) : (
+                                <span className="gc-not-installed">Not installed</span>
+                              )}
+                              {g.installed && (g.lastPlayedAt ? <span className="v">Played {relativeTime(g.lastPlayedAt)}</span> : <span style={{ color: "var(--text-faint)" }}>Never played</span>)}
                             </div>
                           </div>
                         </div>
@@ -925,6 +959,8 @@ export function App() {
 
         <ToastContainer toasts={toasts} onDismiss={dismissToast} />
         {studioOpen && <ThemeStudio onClose={() => setStudioOpen(false)} />}
+        {acquireGame && <AcquisitionPicker gameId={acquireGame.id} gameTitle={acquireGame.title} installed={acquireGame.installed} onClose={() => setAcquireGame(null)} onStarted={() => { setAcquireGame(null); setDownloadsOpen(true); }} />}
+        {downloadsOpen && <DownloadsPanel onClose={() => setDownloadsOpen(false)} />}
       </div>
     );
   }
@@ -973,6 +1009,7 @@ export function App() {
         <button className="tb-icon primary" onClick={() => setAddOpen(true)} title="Add (A)"><Icon.Plus size={15} /> Add</button>
         <button className="tb-icon" onClick={() => setStatsOpen(true)} title="Stats dashboard"><Icon.TrendingUp size={16} /></button>
         <button className="tb-icon" onClick={() => setStudioOpen(true)} title="Theme Studio"><IconGlyph k="palette" size={16} /></button>
+        <button className="tb-icon" onClick={() => setDownloadsOpen(true)} title="Downloads"><Icon.Download size={16} /></button>
         <button className="tb-icon" onClick={() => setSettingsOpen(true)} title="Settings"><Icon.Settings size={16} /></button>
       </header>
 
@@ -1332,6 +1369,8 @@ export function App() {
 
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
         {studioOpen && <ThemeStudio onClose={() => setStudioOpen(false)} />}
+        {acquireGame && <AcquisitionPicker gameId={acquireGame.id} gameTitle={acquireGame.title} installed={acquireGame.installed} onClose={() => setAcquireGame(null)} onStarted={() => { setAcquireGame(null); setDownloadsOpen(true); }} />}
+        {downloadsOpen && <DownloadsPanel onClose={() => setDownloadsOpen(false)} />}
     </div>
   );
 }

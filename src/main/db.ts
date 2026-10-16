@@ -13,7 +13,7 @@
 import { app } from "electron";
 import { join, dirname } from "path";
 import { mkdirSync, existsSync } from "fs";
-import type { Game, DetectedGame, LauncherSettings, Collection, CollectionKind } from "@shared/types";
+import type { Game, DetectedGame, LauncherSettings, Collection, CollectionKind, DownloadJob, DownloadStatus, HttpSourceEntry } from "@shared/types";
 // v4.4.1 — CRITICAL: the main process is compiled to CommonJS, and Node's
 // runtime resolver does NOT understand the @shared/* path alias (only tsc
 // type-checking + the Vite-bundled renderer do). These are VALUE imports
@@ -199,6 +199,31 @@ function migrate(conn: import("better-sqlite3").Database) {
       builtin INTEGER NOT NULL DEFAULT 0,
       createdAt TEXT NOT NULL DEFAULT (datetime('now'))
     );
+    -- v4.5.0 — Download jobs. Persist across restarts so paused/failed jobs
+    -- can be resumed. The in-memory AbortController is NOT persisted — the
+    -- manager reconstructs it by re-issuing the HTTP request from the last
+    -- downloaded byte (Range resume).
+    CREATE TABLE IF NOT EXISTS downloads (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      gameId INTEGER NOT NULL,
+      gameTitle TEXT NOT NULL,
+      sourceKind TEXT NOT NULL,
+      sourceName TEXT NOT NULL,
+      url TEXT NOT NULL,
+      destDir TEXT NOT NULL,
+      fileName TEXT NOT NULL,
+      totalBytes INTEGER,
+      downloadedBytes INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'queued',
+      sha256 TEXT,
+      startedAt TEXT,
+      completedAt TEXT,
+      error TEXT,
+      createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (gameId) REFERENCES games(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_downloads_gameId ON downloads(gameId);
+    CREATE INDEX IF NOT EXISTS idx_downloads_status ON downloads(status);
   `);
   addColumnIfMissing(conn, "games", "completionStatus", "TEXT");
   addColumnIfMissing(conn, "games", "userRating", "INTEGER");
@@ -207,6 +232,8 @@ function migrate(conn: import("better-sqlite3").Database) {
   addColumnIfMissing(conn, "games", "lastSessionAt", "TEXT");
   addColumnIfMissing(conn, "games", "sessionMinutes", "INTEGER DEFAULT 0");
   addColumnIfMissing(conn, "games", "sortOrder", "INTEGER DEFAULT 0");
+  // v4.5.0 — install state. Default 1 (existing detected games are installed).
+  addColumnIfMissing(conn, "games", "installed", "INTEGER NOT NULL DEFAULT 1");
 
   // v4.3.0 — Collections: icon, kind, description, pinned, sortOrder.
   // The collections table existed since v2.0 with just (id, name, color, createdAt).
@@ -314,6 +341,7 @@ interface GameRow {
   favorite: number;
   hidden: number;
   installedAt: string | null;
+  installed: number;            // v4.5.0 — 0 = not installed, 1 = installed
   createdAt: string;
   updatedAt: string;
   completionStatus: string | null;
@@ -361,6 +389,7 @@ function rowToGame(r: GameRow): Game {
     favorite: !!r.favorite,
     hidden: !!r.hidden,
     installedAt: r.installedAt,
+    installed: r.installed === 1,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
     completionStatus: (r.completionStatus || "") as Game["completionStatus"],
@@ -856,6 +885,129 @@ export function duplicateTheme(id: number, newName: string): SavedTheme | null {
   return createTheme(newName, { ...cur.config, name: newName });
 }
 
+// ===== v4.5.0 Downloads + install verification =====
+
+interface DownloadRow {
+  id: number; gameId: number; gameTitle: string; sourceKind: string; sourceName: string;
+  url: string; destDir: string; fileName: string; totalBytes: number | null;
+  downloadedBytes: number; status: string; sha256: string | null; startedAt: string | null;
+  completedAt: string | null; error: string | null; createdAt: string;
+}
+
+function rowToDownload(r: DownloadRow): DownloadJob {
+  return {
+    id: r.id, gameId: r.gameId, gameTitle: r.gameTitle, sourceKind: r.sourceKind as DownloadJob["sourceKind"],
+    sourceName: r.sourceName, url: r.url, destDir: r.destDir, fileName: r.fileName,
+    totalBytes: r.totalBytes, downloadedBytes: r.downloadedBytes, status: r.status as DownloadStatus,
+    sha256: r.sha256, startedAt: r.startedAt, completedAt: r.completedAt, error: r.error, createdAt: r.createdAt,
+  };
+}
+
+export function listDownloads(): DownloadJob[] {
+  const rows = db().prepare("SELECT * FROM downloads ORDER BY id DESC").all() as DownloadRow[];
+  return rows.map(rowToDownload);
+}
+
+export function getDownload(id: number): DownloadJob | null {
+  const row = db().prepare("SELECT * FROM downloads WHERE id = ?").get(id) as DownloadRow | undefined;
+  return row ? rowToDownload(row) : null;
+}
+
+export function getActiveDownloadForGame(gameId: number): DownloadJob | null {
+  // The most recent non-terminal job for this game (queued/downloading/paused).
+  const row = db().prepare(
+    "SELECT * FROM downloads WHERE gameId = ? AND status IN ('queued','downloading','paused') ORDER BY id DESC LIMIT 1"
+  ).get(gameId) as DownloadRow | undefined;
+  return row ? rowToDownload(row) : null;
+}
+
+export function createDownload(input: {
+  gameId: number; gameTitle: string; sourceKind: string; sourceName: string;
+  url: string; destDir: string; fileName: string; totalBytes: number | null; sha256: string | null;
+}): DownloadJob {
+  const info = db().prepare(
+    "INSERT INTO downloads (gameId, gameTitle, sourceKind, sourceName, url, destDir, fileName, totalBytes, downloadedBytes, status, sha256) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'queued', ?)"
+  ).run(input.gameId, input.gameTitle, input.sourceKind, input.sourceName, input.url, input.destDir, input.fileName, input.totalBytes, input.sha256 ?? null);
+  return getDownload(Number(info.lastInsertRowid))!;
+}
+
+export function updateDownload(id: number, patch: Partial<DownloadRow>): void {
+  const cur = getDownload(id);
+  if (!cur) return;
+  const sets: string[] = [];
+  const vals: (string | number | null)[] = [];
+  for (const k of ["downloadedBytes", "totalBytes", "status", "startedAt", "completedAt", "error"] as const) {
+    if (patch[k] !== undefined) { sets.push(`${k} = ?`); vals.push(patch[k] as string | number | null); }
+  }
+  if (sets.length > 0) { vals.push(id); db().prepare(`UPDATE downloads SET ${sets.join(", ")} WHERE id = ?`).run(...vals); }
+}
+
+export function deleteDownload(id: number): void {
+  db().prepare("DELETE FROM downloads WHERE id = ?").run(id);
+}
+
+/** Mark a game as installed + set its executable/installDir (called after a download verifies). */
+export function markGameInstalled(gameId: number, executable: string, installDir: string, sizeBytes: number | null): void {
+  const now = new Date().toISOString();
+  db().prepare(
+    "UPDATE games SET installed = 1, executable = ?, installDir = ?, sizeBytes = COALESCE(?, sizeBytes), installedAt = COALESCE(installedAt, ?), updatedAt = ? WHERE id = ?"
+  ).run(executable, installDir, sizeBytes, now, now, gameId);
+}
+
+/** Verify whether a game is actually installed on disk + update the flag. */
+export function verifyInstalled(gameId: number): boolean {
+  const g = db().prepare("SELECT platform, executable, installDir, launchCommand FROM games WHERE id = ?").get(gameId) as
+    { platform: string; executable: string | null; installDir: string | null; launchCommand: string | null } | undefined;
+  if (!g) return false;
+  // A game is "installed" if:
+  //  - it has a launchCommand URI (steam://, epic://, …) — the protocol handler
+  //    owns the launch; we trust the library entry came from a real detection.
+  //  - OR its executable exists on disk (manual/custom games).
+  //  - OR its installDir exists (some platform games with no exe recorded).
+  let installed = false;
+  if (g.launchCommand && /^[a-z][a-z0-9+.-]*:\/\//i.test(g.launchCommand)) installed = true;
+  if (!installed && g.executable && existsSync(g.executable)) installed = true;
+  if (!installed && g.installDir && existsSync(g.installDir)) installed = true;
+  db().prepare("UPDATE games SET installed = ?, updatedAt = ? WHERE id = ?").run(installed ? 1 : 0, new Date().toISOString(), gameId);
+  return installed;
+}
+
+/** Batch-verify all games; returns the list whose installed flag changed. */
+export function verifyAllInstalled(): Array<{ id: number; title: string; installed: boolean }> {
+  const conn = db();
+  const games = conn.prepare("SELECT id, title, platform, executable, installDir, launchCommand FROM games").all() as
+    Array<{ id: number; title: string; platform: string; executable: string | null; installDir: string | null; launchCommand: string | null }>;
+  const changed: Array<{ id: number; title: string; installed: boolean }> = [];
+  const now = new Date().toISOString();
+  for (const g of games) {
+    let installed = false;
+    if (g.launchCommand && /^[a-z][a-z0-9+.-]*:\/\//i.test(g.launchCommand)) installed = true;
+    if (!installed && g.executable && existsSync(g.executable)) installed = true;
+    if (!installed && g.installDir && existsSync(g.installDir)) installed = true;
+    const cur = conn.prepare("SELECT installed FROM games WHERE id = ?").get(g.id) as { installed: number } | undefined;
+    if (cur && (cur.installed === 1) !== installed) {
+      conn.prepare("UPDATE games SET installed = ?, updatedAt = ? WHERE id = ?").run(installed ? 1 : 0, now, g.id);
+      changed.push({ id: g.id, title: g.title, installed });
+    }
+  }
+  return changed;
+}
+
+// ===== User-configured HTTP sources (stored in settings) =====
+
+export function listHttpSources(): HttpSourceEntry[] {
+  const raw = getSetting("httpSources");
+  if (!raw) return [];
+  try {
+    const arr = JSON.parse(raw);
+    if (Array.isArray(arr)) return arr.filter((e) => e && typeof e.id === "string" && typeof e.url === "string");
+  } catch { /* ignore */ }
+  return [];
+}
+
+export function saveHttpSources(list: HttpSourceEntry[]): void {
+  setSetting("httpSources", JSON.stringify(list));
+}
 // ===== v2.0 Features =====
 
 /** Export the entire library as JSON (backup). */

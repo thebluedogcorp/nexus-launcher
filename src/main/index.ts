@@ -7,6 +7,7 @@ import { app, BrowserWindow, shell, dialog } from "electron";
 import { join } from "path";
 import { existsSync } from "fs";
 import { registerIpc } from "./ipc";
+import { setDownloadWindow, recoverDownloadsOnStartup } from "./downloads/manager";
 import { createTray, registerStartupCloseIpc, handleCloseRequest, getIsQuitting, destroyTray } from "./startup-close";
 import { getAllSettings } from "./db";
 import { initOverlay, cleanupOverlay, setActiveGame } from "./overlay";
@@ -72,6 +73,12 @@ function createWindow() {
   mainWindow.once("ready-to-show", () => {
     mainWindow?.show();
   });
+
+  // v4.5.0 — wire the download manager to this window so it can emit progress
+  // events to the renderer, and recover any jobs left mid-transfer on the last
+  // run (they're flipped to "paused" since the in-memory controller was lost).
+  setDownloadWindow(mainWindow);
+  try { recoverDownloadsOnStartup(); } catch { /* never let downloads break startup */ }
 
   // Open external links (RAWG links, etc.) in the user's default browser.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {

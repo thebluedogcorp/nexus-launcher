@@ -6,9 +6,13 @@
 
 import { contextBridge, ipcRenderer } from "electron";
 import type {
+  AcquisitionOption,
   Collection,
   DetectedGame,
+  DownloadJob,
+  DownloadSourceDescriptor,
   Game,
+  HttpSourceEntry,
   LauncherSettings,
   MetadataResult,
   ScanSummary,
@@ -130,6 +134,45 @@ const api = {
     ipcRenderer.invoke("themes:update", id, patch) as Promise<SavedTheme | null>,
   deleteTheme: (id: number) => ipcRenderer.invoke("themes:delete", id) as Promise<boolean>,
   duplicateTheme: (id: number, newName: string) => ipcRenderer.invoke("themes:duplicate", id, newName) as Promise<SavedTheme | null>,
+
+  // v4.5.0 — Downloads + acquisition
+  listDownloads: () => ipcRenderer.invoke("downloads:list") as Promise<DownloadJob[]>,
+  resolveAcquisitionOptions: (gameId: number) => ipcRenderer.invoke("downloads:resolveOptions", gameId) as Promise<AcquisitionOption[]>,
+  startDownload: (gameId: number, option: AcquisitionOption) => ipcRenderer.invoke("downloads:start", gameId, option) as Promise<DownloadJob | { error: string }>,
+  pauseDownload: (id: number) => ipcRenderer.invoke("downloads:pause", id) as Promise<boolean>,
+  resumeDownload: (id: number) => ipcRenderer.invoke("downloads:resume", id) as Promise<boolean>,
+  cancelDownload: (id: number) => ipcRenderer.invoke("downloads:cancel", id) as Promise<boolean>,
+  retryDownload: (id: number) => ipcRenderer.invoke("downloads:retry", id) as Promise<boolean>,
+  clearDownload: (id: number) => ipcRenderer.invoke("downloads:clear", id) as Promise<boolean>,
+  // Install verification
+  verifyInstalled: (gameId: number) => ipcRenderer.invoke("games:verifyInstalled", gameId) as Promise<boolean>,
+  verifyAllInstalled: () => ipcRenderer.invoke("games:verifyAll") as Promise<Array<{ id: number; title: string; installed: boolean }>>,
+  // Sources + catalog
+  listSourceDescriptors: () => ipcRenderer.invoke("sources:descriptors") as Promise<DownloadSourceDescriptor[]>,
+  listHttpSources: () => ipcRenderer.invoke("sources:listHttp") as Promise<HttpSourceEntry[]>,
+  saveHttpSources: (list: HttpSourceEntry[]) => ipcRenderer.invoke("sources:saveHttp", list) as Promise<HttpSourceEntry[]>,
+  searchCatalog: (query: string) => ipcRenderer.invoke("catalog:search", query) as Promise<Array<{ title: string; developer: string; description: string; downloadPageUrl: string; homepage: string; genres: string[] }>>,
+  // Download progress events
+  onDownloadProgress: (cb: (p: { id: number; status: string; downloadedBytes: number; totalBytes?: number | null; error?: string | null }) => void) => {
+    const l = (_e: unknown, p: { id: number; status: string; downloadedBytes: number; totalBytes?: number | null; error?: string | null }) => cb(p);
+    ipcRenderer.on("download:progress", l);
+    return () => ipcRenderer.removeListener("download:progress", l);
+  },
+  onDownloadCompleted: (cb: (p: { id: number; gameId: number }) => void) => {
+    const l = (_e: unknown, p: { id: number; gameId: number }) => cb(p);
+    ipcRenderer.on("download:completed", l);
+    return () => ipcRenderer.removeListener("download:completed", l);
+  },
+  onDownloadAdded: (cb: (job: DownloadJob) => void) => {
+    const l = (_e: unknown, job: DownloadJob) => cb(job);
+    ipcRenderer.on("download:added", l);
+    return () => ipcRenderer.removeListener("download:added", l);
+  },
+  onDownloadRemoved: (cb: (p: { id: number }) => void) => {
+    const l = (_e: unknown, p: { id: number }) => cb(p);
+    ipcRenderer.on("download:removed", l);
+    return () => ipcRenderer.removeListener("download:removed", l);
+  },
   // Achievements
   getAchievements: () => ipcRenderer.invoke("achievements:list") as Promise<Array<{ id: string; name: string; description: string; icon: string; unlockedAt: string | null; progress: number; maxProgress: number }>>,
   checkAchievements: () => ipcRenderer.invoke("achievements:check") as Promise<{ newlyUnlocked: string[] }>,

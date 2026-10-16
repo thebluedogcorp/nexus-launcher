@@ -17,6 +17,7 @@ interface Props {
   onUpdate: (g: Game, patch: Record<string, unknown>) => Promise<void>;
   onOpenDir: (g: Game) => void;
   onAddToCollection: (g: Game) => void;   // v4.3.0
+  onGet: (g: Game) => void;             // v4.5.0 — acquire/download
 }
 
 const COMPLETION_STATUSES = [
@@ -29,7 +30,7 @@ const COMPLETION_STATUSES = [
 ] as const;
 
 /** Full-screen dedicated game page with immersive customization/edit mode. */
-export function GamePage({ game, onClose, onLaunch, onPatch, onDelete, onToggleFav, onUpdate, onOpenDir, onAddToCollection }: Props) {
+export function GamePage({ game, onClose, onLaunch, onPatch, onDelete, onToggleFav, onUpdate, onOpenDir, onAddToCollection, onGet }: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [scrollY, setScrollY] = useState(0);
@@ -164,7 +165,11 @@ export function GamePage({ game, onClose, onLaunch, onPatch, onDelete, onToggleF
                 {game.lastPlayedAt && <><span className="dot" /><span>Last: {relativeTime(game.lastPlayedAt)}</span></>}
               </div>
               <div className="gp-actions">
-                <button className="gp-play" onClick={() => onLaunch(game)}><Icon.Play size={18} /> Play Now</button>
+                {game.installed ? (
+                  <button className="gp-play" onClick={() => onLaunch(game)}><Icon.Play size={18} /> Play Now</button>
+                ) : (
+                  <button className="gp-play" onClick={() => onGet(game)}><Icon.Download size={18} /> Get</button>
+                )}
                 <button className="btn btn-ghost" style={{ height: 52, padding: "0 22px", fontSize: 15 }} onClick={() => onPatch(game)}>
                   <Icon.Refresh size={17} /> Patch
                 </button>

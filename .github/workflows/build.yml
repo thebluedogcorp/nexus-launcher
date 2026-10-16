@@ -50,22 +50,47 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v4.4.1"
-          $title = "NEXUS v4.4.1 — Critical fix: 'Cannot find module @shared/theme-types' crash on startup (v4.4.0 hotfix)"
+          $tag = "v4.5.0"
+          $title = "NEXUS v4.5.0 — Smart game acquisition: availability-aware actions (Get/Download/Play), pluggable source adapters, download manager with resume"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
-          **v4.4.1 — Critical hotfix for v4.4.0.**
+          **v4.5.0 — Smart Game Acquisition + Download Sources.**
 
-          **The bug:** v4.4.0 introduced the Theme Studio, whose main-process DB layer imported DEFAULT_THEME and PRESET_THEMES from '@shared/theme-types' / '@shared/theme-presets' using the TypeScript path alias. The main process is compiled to CommonJS, and while tsc resolves the alias at TYPE-CHECK time, it does NOT rewrite it in the emitted JavaScript — so the packaged db.js contained 'require("@shared/theme-types")' verbatim. Node's CommonJS runtime resolver does not understand the @shared/* alias, so on startup the main process threw 'Error: Cannot find module @shared/theme-types' and the app never opened. (The existing '@shared/types' imports were 'import type' — erased at emit — so they never tripped this; only the new VALUE imports did.)
+          **1. Fixed the availability bug (the core ask).** A game in the library that isn't installed no longer shows 'Play Now'. Each game now carries a verified 'installed' flag; the card + detail page show the right action:
+          - Installed + launchable -> **Play Now**.
+          - In library but not installed, with an acquisition path -> **Get** (opens the acquisition picker).
+          - Active download -> in-card progress bar + a **View download** button.
+          - Download completed + verified -> **Play Now**.
+          - Missing source -> a clear explanation + alternatives.
+          The flag is verified against the real install state on startup (verifyAllInstalled) and after every download completes — never assumed from library presence alone.
 
-          **The fix:** changed the two value imports in src/main/db.ts to relative paths ('../shared/theme-types' and '../shared/theme-presets') so Node resolves them at runtime. Verified: the emitted dist-electron/main/db.js now contains 'require("../shared/theme-types")' and zero 'require("@shared/...') calls remain anywhere in the main process. The renderer (bundled by Vite, which resolves the alias at build time) was always fine.
+          **2. Pluggable source-adapter system.** A consistent DownloadSource interface + a registry that resolves acquisition options per game. Three real adapters:
+          - **open-source-catalog** — 10 real free/open-source games (SuperTuxKart, 0 A.D., Mindustry, OpenTTD, Shattered Pixel Dungeon, Battle for Wesnoth, Veloren, Endless Sky, Freeciv, Cataclysm: DDA) each linked to its OFFICIAL download page. Fuzzy title matching.
+          - **store-link** — official store pages (Steam store by app id; others fall back to their storefront). 'View Store' opens the real store page in the browser.
+          - **user-http** — user-configured direct HTTP(S) downloads for content the user is authorized to download. Managed in Settings.
+          Adapters truthfully report capabilities (search/download/storePage/ownership). Adding a new authorized source = adding a branch in registry.ts.
 
-          All v4.4.0 Theme Studio functionality is preserved — this is purely the startup-crash fix. If you installed v4.4.0 and it would not open, install v4.4.1 over it; your library, collections, and any saved themes are unaffected.
+          **3. Download manager.** A native download engine (global fetch + ReadableStream reader) that streams to disk with:
+          - **Range resume** — pause keeps the partial file + bytes; resume re-issues GET with 'Range: bytes=<n>-' (append mode).
+          - **Pause / Cancel / Retry** — AbortController aborts the in-flight fetch; cancel deletes the partial file; retry restarts from 0.
+          - **Integrity verification** — on completion, verifies the written file size matches Content-Length; if the source provided a sha256, verifies the hash. Only on success does it call markGameInstalled + transition the job to 'completed'.
+          - **Concurrency limit** — max 2 concurrent transfers; the rest stay queued.
+          - **Persistent jobs** — the downloads DB table survives restarts; jobs left mid-transfer are flipped to 'paused' (the in-memory controller was lost) so the user can resume.
+          - **Progress events** — throttled to 4/sec, sent to the renderer + persisted.
+          - **Full UI** — a Downloads panel (topbar button) with active/queued/completed/failed sections, per-job progress bars, overall progress, + pause/resume/cancel/retry/clear controls.
+
+          **4. Security.** Only http(s) URLs are accepted (no file://, no local-network bypass). Filenames are sanitized (no path traversal). Downloaded files are NEVER auto-executed — the user must explicitly launch. No DRM bypass, no unauthorized sources, no piracy integration (Hydra's torrent/repack sources were explicitly NOT implemented; only authorized distribution).
+
+          **5. Verified.** The download engine was smoke-tested end-to-end against a real public-domain file (Project Gutenberg, 772KB): full transfer + sha256 + size verification passed; Range-resume (206 + append) reconstructed the file correctly.
+
+          All existing functionality preserved: library, collections, platform detection, launching, playtime tracking, achievements, overlay, Theme Studio.
+
+          **Roadmap (documented, not in this release):** ownership/entitlement verification (needs platform OAuth), update detection, torrent adapter for legally-distributable P2P content, dashboard widget for downloads.
 
           **Downloads:**
-          - NEXUS-Setup-4.4.1.exe — NSIS installer (recommended, supports auto-update; if you had v4.4.0 installed, this updater will also fix the crash).
-          - NEXUS-Portable-4.4.1.exe — single-file portable build.
+          - NEXUS-Setup-4.5.0.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-4.5.0.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@

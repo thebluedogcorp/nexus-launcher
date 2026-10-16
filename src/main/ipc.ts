@@ -39,13 +39,25 @@ import { runScan } from "./detectors";
 import { launchGame } from "./launchers";
 import { searchRawg } from "./metadata/rawg";
 import { fetchAggregated } from "./metadata/aggregator";
-import { getAchievements, unlockAchievement, checkAchievements } from "./db";
+import {
+  getAchievements, unlockAchievement, checkAchievements,
+  // v4.5.0 — downloads + install verification
+  listDownloads, getDownload, verifyInstalled, verifyAllInstalled,
+  listHttpSources, saveHttpSources,
+} from "./db";
+import {
+  startDownload, pauseDownload, resumeDownload, cancelDownload, retryDownload, clearDownload,
+  setDownloadWindow, recoverDownloadsOnStartup,
+} from "./downloads/manager";
+import { resolveAcquisitionOptions, searchCatalog, SOURCE_DESCRIPTORS } from "./downloads/registry";
 import type {
   DetectedGame,
   Game,
   MetadataResult,
   PlatformId,
   ScanSummary,
+  AcquisitionOption,
+  HttpSourceEntry,
 } from "@shared/types";
 
 export function registerIpc(): void {
@@ -354,6 +366,36 @@ export function registerIpc(): void {
   ipcMain.handle("themes:update", (_e, id: number, patch: { name?: string; config?: import("../shared/theme-types").ThemeConfig }) => updateTheme(id, patch));
   ipcMain.handle("themes:delete", (_e, id: number) => { deleteTheme(id); return true; });
   ipcMain.handle("themes:duplicate", (_e, id: number, newName: string) => duplicateTheme(id, newName));
+
+  // ===== v4.5.0 Downloads + acquisition =====
+  ipcMain.handle("downloads:list", () => listDownloads());
+  ipcMain.handle("downloads:get", (_e, id: number) => getDownload(id));
+  ipcMain.handle("downloads:resolveOptions", async (_e, gameId: number) => {
+    const game = await getGame(gameId);
+    if (!game) return [];
+    return resolveAcquisitionOptions(game);
+  });
+  ipcMain.handle("downloads:start", async (_e, gameId: number, option: AcquisitionOption) => {
+    const game = await getGame(gameId);
+    if (!game) return { error: "Game not found." };
+    const r = startDownload(gameId, game.title, option);
+    return r;
+  });
+  ipcMain.handle("downloads:pause", (_e, id: number) => { pauseDownload(id); return true; });
+  ipcMain.handle("downloads:resume", (_e, id: number) => { resumeDownload(id); return true; });
+  ipcMain.handle("downloads:cancel", (_e, id: number) => { cancelDownload(id); return true; });
+  ipcMain.handle("downloads:retry", (_e, id: number) => { retryDownload(id); return true; });
+  ipcMain.handle("downloads:clear", (_e, id: number) => { clearDownload(id); return true; });
+
+  // ===== v4.5.0 Install verification =====
+  ipcMain.handle("games:verifyInstalled", (_e, gameId: number) => verifyInstalled(gameId));
+  ipcMain.handle("games:verifyAll", () => verifyAllInstalled());
+
+  // ===== v4.5.0 Sources + catalog =====
+  ipcMain.handle("sources:descriptors", () => SOURCE_DESCRIPTORS);
+  ipcMain.handle("sources:listHttp", () => listHttpSources());
+  ipcMain.handle("sources:saveHttp", (_e, list: HttpSourceEntry[]) => { saveHttpSources(list); return listHttpSources(); });
+  ipcMain.handle("catalog:search", (_e, query: string) => searchCatalog(query ?? ""));
 
   // ===== Achievements =====
   ipcMain.handle("achievements:list", () => getAchievements());
