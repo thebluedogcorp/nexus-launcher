@@ -6,6 +6,7 @@ import { NexusMark } from "./components/Logo";
 import { ModeToggle } from "./components/ModeToggle";
 import { PlatformMark } from "./components/PlatformMark";
 import { IconGlyph } from "./components/IconGlyph";
+import { ThemeStudio } from "./components/theme/ThemeStudio";
 import { CreateCollectionDialog } from "./components/CreateCollectionDialog";
 import { CollectionPicker } from "./components/CollectionPicker";
 import { GamePage } from "./components/GamePage";
@@ -17,6 +18,7 @@ import { ToastContainer, type Toast } from "./components/Toast";
 import { useGamepadController } from "./lib/useGamepad";
 import { formatPlaytime, formatPlaytimeShort, formatSize, platformColor, platformLabel, gradientFor, initials, relativeTime } from "./lib/helpers";
 import { applyAccent } from "./lib/accent";
+import { applyActiveThemeOnStartup } from "./lib/applyTheme";
 
 interface Filters { platform: string; favOnly: boolean; query: string; sort: SortKey }
 const DEFAULT_FILTERS: Filters = { platform: "all", favOnly: false, query: "", sort: "recent" };
@@ -62,6 +64,8 @@ export function App() {
   const [editorGame, setEditorGame] = useState<Game | null>(null);
   const [updateAvailable, setUpdateAvailable] = useState<{ version?: string; releaseUrl?: string; downloadUrl?: string; downloadSize?: number } | null>(null);
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
+  // v4.4.0 — Theme Studio (full-screen visual theme editor).
+  const [studioOpen, setStudioOpen] = useState(false);
   // Playtime tracking state — shows live playtime when a game is running.
   const [activePlaytime, setActivePlaytime] = useState<{ gameId: number; gameTitle: string; elapsedSec: number; startedAt: number } | null>(null);
   // v4.3.0 — Collections + collapsible sidebar + platform visibility.
@@ -119,6 +123,10 @@ export function App() {
     // library so the very first frame uses the user's chosen accent (not the
     // default teal). localStorage is the source of truth for appearance.
     applyAccent(localStorage.getItem("nx-accent") || "#2dd4bf");
+    // v4.4.0 — Apply the active Theme Studio theme (supersedes the accent
+    // above; the theme sets --accent + ~60 other tokens). Falls back to the
+    // default theme if none saved. Never throws.
+    void applyActiveThemeOnStartup();
     (async () => {
       try {
         const s = await window.nexus.getSettings();
@@ -589,6 +597,7 @@ export function App() {
           />
         )}
         <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+        {studioOpen && <ThemeStudio onClose={() => setStudioOpen(false)} />}
       </>
     );
   }
@@ -630,6 +639,7 @@ export function App() {
           <ModeToggle current={uiMode} onSwitch={setUiModeAndPersist} />
           <button className="tb-icon" onClick={() => setScanOpen(true)} title="Scan"><Icon.Scan size={16} /></button>
           <button className="tb-icon primary" onClick={() => setAddOpen(true)} title="Add"><Icon.Plus size={15} /> Add</button>
+          <button className="tb-icon" onClick={() => setStudioOpen(true)} title="Theme Studio"><IconGlyph k="palette" size={16} /></button>
           <button className="tb-icon" onClick={() => setSettingsOpen(true)} title="Settings"><Icon.Settings size={16} /></button>
         </header>
 
@@ -914,6 +924,7 @@ export function App() {
         {editorGame && <GameEditor game={editorGame} onSave={(patch) => handleEditGame(editorGame, patch)} onClose={() => setEditorGame(null)} />}
 
         <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+        {studioOpen && <ThemeStudio onClose={() => setStudioOpen(false)} />}
       </div>
     );
   }
@@ -961,6 +972,7 @@ export function App() {
         <button className="tb-icon" onClick={() => setScanOpen(true)} title="Scan (S)"><Icon.Scan size={16} /></button>
         <button className="tb-icon primary" onClick={() => setAddOpen(true)} title="Add (A)"><Icon.Plus size={15} /> Add</button>
         <button className="tb-icon" onClick={() => setStatsOpen(true)} title="Stats dashboard"><Icon.TrendingUp size={16} /></button>
+        <button className="tb-icon" onClick={() => setStudioOpen(true)} title="Theme Studio"><IconGlyph k="palette" size={16} /></button>
         <button className="tb-icon" onClick={() => setSettingsOpen(true)} title="Settings"><Icon.Settings size={16} /></button>
       </header>
 
@@ -1319,6 +1331,7 @@ export function App() {
       {controllerConnected && !pageGame && <div className="hints-bar"><span className="hint"><span className="k">↑↓</span> {gpZone === "topbar" ? "Top Bar" : gpZone === "filters" ? "Filters" : gpZone === "carousel" ? "Games" : "Actions"}</span><span className="hint"><span className="k">←→</span> Navigate</span><span className="hint"><span className="k r">A</span> Select</span><span className="hint"><span className="k r">X</span> Play</span><span className="hint"><span className="k r">Y</span> Details</span><span className="hint"><span className="k r">B</span> Back</span><span className="hint"><span className="k"><Icon.Settings size={10} /></span> Settings</span></div>}
 
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+        {studioOpen && <ThemeStudio onClose={() => setStudioOpen(false)} />}
     </div>
   );
 }

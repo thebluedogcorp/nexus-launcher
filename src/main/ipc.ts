@@ -27,6 +27,13 @@ import {
   reorderCollections,
   getGamesInCollection,
   getCollectionsForGame,
+  // v4.4.0 — themes
+  listThemes,
+  getTheme,
+  createTheme,
+  updateTheme,
+  deleteTheme,
+  duplicateTheme,
 } from "./db";
 import { runScan } from "./detectors";
 import { launchGame } from "./launchers";
@@ -339,6 +346,14 @@ export function registerIpc(): void {
   ipcMain.handle("collections:reorder", (_e, ids: number[]) => { reorderCollections(ids); return true; });
   ipcMain.handle("collections:getGames", (_e, collectionId: number) => getGamesInCollection(collectionId));
   ipcMain.handle("collections:forGame", (_e, gameId: number) => getCollectionsForGame(gameId));
+
+  // v4.4.0 — Themes (Theme Studio)
+  ipcMain.handle("themes:list", () => listThemes());
+  ipcMain.handle("themes:get", (_e, id: number) => getTheme(id));
+  ipcMain.handle("themes:create", (_e, name: string, config: import("@shared/theme-types").ThemeConfig) => createTheme(name, config));
+  ipcMain.handle("themes:update", (_e, id: number, patch: { name?: string; config?: import("@shared/theme-types").ThemeConfig }) => updateTheme(id, patch));
+  ipcMain.handle("themes:delete", (_e, id: number) => { deleteTheme(id); return true; });
+  ipcMain.handle("themes:duplicate", (_e, id: number, newName: string) => duplicateTheme(id, newName));
 
   // ===== Achievements =====
   ipcMain.handle("achievements:list", () => getAchievements());

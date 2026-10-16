@@ -1,6 +1,6 @@
 {
   "name": "nexus-launcher",
-  "version": "4.3.1",
+  "version": "4.4.0",
   "description": "NEXUS — Universal Game Launcher for Windows. Detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox, patches rich metadata via RAWG, and launches games natively.",
   "author": "NEXUS",
   "license": "MIT",
@@ -17,9 +17,13 @@
     "rebuild": "electron-rebuild -f -w better-sqlite3"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "better-sqlite3": "^11.3.0",
     "electron-updater": "^6.3.9",
-    "lucide-react": "^1.58.0"
+    "lucide-react": "^1.58.0",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",

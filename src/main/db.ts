@@ -14,6 +14,9 @@ import { app } from "electron";
 import { join, dirname } from "path";
 import { mkdirSync, existsSync } from "fs";
 import type { Game, DetectedGame, LauncherSettings, Collection, CollectionKind } from "@shared/types";
+import type { ThemeConfig, SavedTheme } from "@shared/theme-types";
+import { DEFAULT_THEME } from "@shared/theme-types";
+import { PRESET_THEMES } from "@shared/theme-presets";
 
 type BetterSqlite3Module = typeof import("better-sqlite3");
 type SqliteDatabase = import("better-sqlite3").Database;
@@ -181,6 +184,13 @@ function migrate(conn: import("better-sqlite3").Database) {
       updatedAt TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (gameId) REFERENCES games(id) ON DELETE CASCADE
     );
+    CREATE TABLE IF NOT EXISTS themes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      config TEXT NOT NULL,
+      builtin INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
   addColumnIfMissing(conn, "games", "completionStatus", "TEXT");
   addColumnIfMissing(conn, "games", "userRating", "INTEGER");
@@ -227,10 +237,25 @@ function migrate(conn: import("better-sqlite3").Database) {
     upsertSmart.run(sc.id, sc.name, sc.icon, sc.kind, sc.description, sc.sortOrder);
   }
 
+  // v4.4.0 — Seed the built-in theme presets on first run. Each preset has a
+  // stable preset id; we store the preset id in the `name` column of a
+  // dedicated builtin row keyed by a sentinel so the seeder is idempotent.
+  // We use a meta key 'presetsSeeded' to avoid re-seeding (presets are
+  // immutable; re-seeding would clobber any user edits to builtin rows, but
+  // builtin rows are read-only by convention so this is just a guard).
+  const presetsSeeded = conn.prepare("SELECT value FROM meta WHERE key = 'presetsSeeded'").get() as { value?: string } | undefined;
+  if (!presetsSeeded) {
+    const seedStmt = conn.prepare("INSERT INTO themes (name, config, builtin) VALUES (?, ?, 1)");
+    for (const p of PRESET_THEMES) {
+      seedStmt.run(p.id, JSON.stringify(p.theme));
+    }
+    conn.prepare("INSERT OR REPLACE INTO meta(key, value) VALUES('presetsSeeded', '1')").run();
+  }
+
   const row = conn.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as
     | { value?: string }
     | undefined;
-  conn.prepare("INSERT OR REPLACE INTO meta(key, value) VALUES('schemaVersion', '3')").run();
+  conn.prepare("INSERT OR REPLACE INTO meta(key, value) VALUES('schemaVersion', '4')").run();
 }
 
 function addColumnIfMissing(
@@ -734,6 +759,8 @@ export function getAllSettings(): LauncherSettings {
     // v4.3.0 — platform visibility + sidebar collapse
     hiddenPlatforms: getSetting("hiddenPlatforms") ?? "",
     sidebarCollapsed: getSetting("sidebarCollapsed") === "true",
+    // v4.4.0 — active theme id (0 = default, not yet saved)
+    activeThemeId: Number(getSetting("activeThemeId") ?? "0") || 0,
   };
 }
 
@@ -748,7 +775,77 @@ export function setAllSettings(s: Partial<LauncherSettings>): LauncherSettings {
   if (s.uiMode !== undefined) setSetting("uiMode", s.uiMode);
   if (s.hiddenPlatforms !== undefined) setSetting("hiddenPlatforms", s.hiddenPlatforms);
   if (s.sidebarCollapsed !== undefined) setSetting("sidebarCollapsed", String(s.sidebarCollapsed));
+  if (s.activeThemeId !== undefined) setSetting("activeThemeId", String(s.activeThemeId));
   return getAllSettings();
+}
+
+// ===== v4.4.0 Themes =====
+
+interface ThemeRow {
+  id: number;
+  name: string;
+  config: string;
+  builtin: number;
+  createdAt: string;
+}
+
+function rowToTheme(r: ThemeRow): SavedTheme {
+  let config: ThemeConfig;
+  try {
+    config = JSON.parse(r.config);
+  } catch {
+    config = JSON.parse(JSON.stringify(DEFAULT_THEME));
+  }
+  // For builtin themes the `name` column holds the preset id ("preset-…");
+  // the display name lives in config.name. For user themes both agree.
+  return {
+    id: r.id,
+    name: r.builtin === 1 ? (config.name ?? r.name) : r.name,
+    config,
+    builtin: r.builtin === 1,
+    createdAt: r.createdAt,
+  };
+}
+
+export function listThemes(): SavedTheme[] {
+  const conn = db();
+  const rows = conn.prepare("SELECT id, name, config, builtin, createdAt FROM themes ORDER BY builtin DESC, name ASC").all() as ThemeRow[];
+  return rows.map(rowToTheme);
+}
+
+export function getTheme(id: number): SavedTheme | null {
+  const conn = db();
+  const row = conn.prepare("SELECT id, name, config, builtin, createdAt FROM themes WHERE id = ?").get(id) as ThemeRow | undefined;
+  return row ? rowToTheme(row) : null;
+}
+
+export function createTheme(name: string, config: ThemeConfig): SavedTheme {
+  const conn = db();
+  const info = conn.prepare("INSERT INTO themes (name, config, builtin) VALUES (?, ?, 0)").run(name, JSON.stringify(config));
+  return getTheme(Number(info.lastInsertRowid))!;
+}
+
+export function updateTheme(id: number, patch: { name?: string; config?: ThemeConfig }): SavedTheme | null {
+  const conn = db();
+  const cur = getTheme(id);
+  if (!cur) return null;
+  if (cur.builtin) return cur; // builtins are read-only
+  if (patch.name !== undefined) conn.prepare("UPDATE themes SET name = ? WHERE id = ?").run(patch.name, id);
+  if (patch.config !== undefined) conn.prepare("UPDATE themes SET config = ? WHERE id = ?").run(JSON.stringify(patch.config), id);
+  return getTheme(id);
+}
+
+export function deleteTheme(id: number): void {
+  const cur = getTheme(id);
+  if (!cur || cur.builtin) return; // never delete builtins
+  db().prepare("DELETE FROM themes WHERE id = ?").run(id);
+}
+
+/** Duplicate a theme (builtin or user) into a new editable personal copy. */
+export function duplicateTheme(id: number, newName: string): SavedTheme | null {
+  const cur = getTheme(id);
+  if (!cur) return null;
+  return createTheme(newName, { ...cur.config, name: newName });
 }
 
 // ===== v2.0 Features =====

@@ -131,6 +131,8 @@ export interface LauncherSettings {
   hiddenPlatforms: string;
   // v4.3.0 — whether the platform section in the sidebar starts collapsed.
   sidebarCollapsed: boolean;
+  // v4.4.0 — the active theme id (which saved theme is applied). 0 = default.
+  activeThemeId: number;
 }
 
 export type SortKey = "recent" | "name" | "playtime" | "rating";

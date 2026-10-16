@@ -14,6 +14,7 @@ import type {
   ScanSummary,
   Stats,
 } from "@shared/types";
+import type { ThemeConfig, SavedTheme } from "@shared/theme-types";
 
 const api = {
   // Games
@@ -121,6 +122,14 @@ const api = {
   reorderCollections: (ids: number[]) => ipcRenderer.invoke("collections:reorder", ids) as Promise<boolean>,
   getGamesInCollection: (collectionId: number) => ipcRenderer.invoke("collections:getGames", collectionId) as Promise<Game[]>,
   getCollectionsForGame: (gameId: number) => ipcRenderer.invoke("collections:forGame", gameId) as Promise<number[]>,
+  // v4.4.0 — Themes (Theme Studio)
+  listThemes: () => ipcRenderer.invoke("themes:list") as Promise<SavedTheme[]>,
+  getTheme: (id: number) => ipcRenderer.invoke("themes:get", id) as Promise<SavedTheme | null>,
+  createTheme: (name: string, config: ThemeConfig) => ipcRenderer.invoke("themes:create", name, config) as Promise<SavedTheme>,
+  updateTheme: (id: number, patch: { name?: string; config?: ThemeConfig }) =>
+    ipcRenderer.invoke("themes:update", id, patch) as Promise<SavedTheme | null>,
+  deleteTheme: (id: number) => ipcRenderer.invoke("themes:delete", id) as Promise<boolean>,
+  duplicateTheme: (id: number, newName: string) => ipcRenderer.invoke("themes:duplicate", id, newName) as Promise<SavedTheme | null>,
   // Achievements
   getAchievements: () => ipcRenderer.invoke("achievements:list") as Promise<Array<{ id: string; name: string; description: string; icon: string; unlockedAt: string | null; progress: number; maxProgress: number }>>,
   checkAchievements: () => ipcRenderer.invoke("achievements:check") as Promise<{ newlyUnlocked: string[] }>,
