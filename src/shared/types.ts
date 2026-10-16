@@ -159,7 +159,8 @@ export type CollectionKind =
 export interface Collection {
   id: number;
   name: string;
-  icon: string;          // emoji or icon key, e.g. "📁", "🎮", "🏆"
+  icon: string;          // icon KEY (e.g. "folder", "gamepad", "trophy") resolved
+                        // to a lucide SVG via IconGlyph. Never an emoji.
   color: string;         // hex accent override (or "" for "use global accent")
   kind: CollectionKind;
   description: string | null;
@@ -169,10 +170,13 @@ export interface Collection {
   createdAt: string;
 }
 
+// v4.3.1 — icon KEYS (not emojis). Resolved to lucide-react SVGs in the
+// renderer via IconGlyph. Add a key here AND to IconGlyph.GLYPHS to make a
+// new icon available in the collection picker.
 export const COLLECTION_ICONS = [
-  "📁", "🎮", "🏆", "⭐", "❤️", "🔥", "🎯", "🎲",
-  "🎨", "🚀", "⚔️", "🛡️", "🌌", "🧟", "🏰", "💎",
-  "🕹️", "🧩", "👾", "🎬", "📚", "💀", "🌟", "⚡",
+  "folder", "gamepad", "trophy", "star", "heart", "flame", "target", "dice",
+  "palette", "rocket", "swords", "shield", "globe", "skull", "gem", "joystick",
+  "puzzle", "film", "book", "zap", "bookmark", "clock", "sparkles", "crown",
 ] as const;
 
 export interface PlatformInfo {

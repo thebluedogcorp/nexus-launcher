@@ -5,6 +5,7 @@ import { Icon } from "./Icons";
 import { applyAccent } from "../lib/accent";
 import { NexusMark } from "./Logo";
 import { PlatformMark } from "./PlatformMark";
+import { IconGlyph } from "./IconGlyph";
 
 interface Props {
   initial: LauncherSettings;
@@ -428,7 +429,7 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
                     )}
                     {collections.map((c) => (
                       <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 8px", borderRadius: "var(--r-sm)", background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)" }}>
-                        <span style={{ fontSize: 15 }}>{c.icon}</span>
+                        <span style={{ fontSize: 15, display: "inline-flex", alignItems: "center", color: "var(--text)" }}><IconGlyph k={c.icon} size={16} /></span>
                         <span style={{ flex: 1, fontSize: 13, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
                         <span style={{ fontSize: 10, color: "var(--text-faint)" }}>{c.gameCount} games</span>
                         {c.pinned && <span style={{ color: "var(--accent)" }} title="Pinned"><Icon.Star size={12} filled /></span>}
@@ -559,7 +560,7 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
                     <div className="logo"><NexusMark size={28} /></div>
                     <div>
                       <div className="name">NEXUS Launcher</div>
-                      <div className="ver">Version 4.3.0 — Universal Game Launcher for Windows</div>
+                      <div className="ver">Version 4.3.1 — Universal Game Launcher for Windows</div>
                       <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 6 }}>
                         Auto-detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox. Patches rich metadata via RAWG + Steam APIs. Launches natively.
                       </div>

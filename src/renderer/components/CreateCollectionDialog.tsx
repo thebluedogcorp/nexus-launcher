@@ -1,12 +1,13 @@
 // v4.3.0 — Create / Edit Collection dialog.
-// Lets the user name a collection, pick a folder emoji, optionally set a
-// per-collection accent color (or inherit the global accent), and add a
-// description. Used both for creating new manual collections and editing
-// existing ones.
+// Lets the user name a collection, pick a folder icon (from the lucide icon
+// library — never an emoji), optionally set a per-collection accent color (or
+// inherit the global accent), and add a description. Used both for creating new
+// manual collections and editing existing ones.
 import { useState, useEffect } from "react";
 import type { Collection } from "@shared/types";
 import { COLLECTION_ICONS } from "@shared/types";
 import { Icon } from "./Icons";
+import { IconGlyph } from "./IconGlyph";
 
 interface Props {
   initial?: Collection | null;     // null = create mode; object = edit mode
@@ -22,7 +23,7 @@ const COLOR_SWATCHES = [
 
 export function CreateCollectionDialog({ initial, onClose, onSave }: Props) {
   const [name, setName] = useState(initial?.name ?? "");
-  const [icon, setIcon] = useState(initial?.icon ?? "📁");
+  const [icon, setIcon] = useState(initial?.icon ?? "folder");
   const [color, setColor] = useState(initial?.color ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [saving, setSaving] = useState(false);
@@ -62,14 +63,14 @@ export function CreateCollectionDialog({ initial, onClose, onSave }: Props) {
           <div className="field">
             <label className="field-label">Icon</label>
             <div className="coll-icon-grid">
-              {COLLECTION_ICONS.map((emoji) => (
+              {COLLECTION_ICONS.map((k) => (
                 <button
-                  key={emoji}
-                  className={icon === emoji ? "coll-icon-swatch active" : "coll-icon-swatch"}
-                  onClick={() => setIcon(emoji)}
-                  title={emoji}
-                  aria-label={`Icon ${emoji}`}
-                >{emoji}</button>
+                  key={k}
+                  className={icon === k ? "coll-icon-swatch active" : "coll-icon-swatch"}
+                  onClick={() => setIcon(k)}
+                  title={k}
+                  aria-label={`Icon ${k}`}
+                ><IconGlyph k={k} size={18} /></button>
               ))}
             </div>
           </div>

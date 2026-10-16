@@ -280,8 +280,8 @@ export function GamePage({ game, onClose, onLaunch, onPatch, onDelete, onToggleF
 
             {/* JSON format reference (collapsible) */}
             <details style={{ marginBottom: 20 }}>
-              <summary style={{ cursor: "pointer", fontSize: 12, color: "var(--nx-text-dim)", fontWeight: 600, padding: "8px 0" }}>
-                📋 JSON Format Reference (click to expand)
+              <summary style={{ cursor: "pointer", fontSize: 12, color: "var(--nx-text-dim)", fontWeight: 600, padding: "8px 0", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <Icon.FileCog size={13} /> JSON Format Reference (click to expand)
               </summary>
               <pre style={{
                 marginTop: 8, padding: 14, borderRadius: 10,

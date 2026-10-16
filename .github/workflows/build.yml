@@ -50,41 +50,35 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v4.3.0"
-          $title = "NEXUS v4.3.0 — Collections system, platform logos, collapsible sidebar, Smart Collections"
+          $tag = "v4.3.1"
+          $title = "NEXUS v4.3.1 — No emojis as icons: real platform logos + lucide icon library everywhere"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
-          **v4.3.0 — Library organization & personalization pass.** A full collections system (user-curated groups + auto-generated Smart Collections), real platform logos instead of colored dots, and a collapsible, customizable sidebar.
+          **v4.3.1 — Icon cleanup pass.** The app no longer uses emojis as icons anywhere. Every icon now comes from a recognized icon library (lucide-react) or the official brand logo SVG.
 
-          **What's new:**
+          **What changed:**
 
-          1. **Collections system** — create your own groups to organize your library however you like. Build a 'GTA' collection, a 'Currently Playing' shelf, a 'Backlog', anything. Each collection is fully customizable:
-             * **Folder emoji** picker (24 marks) when creating.
-             * **Per-collection accent color** — give the collection its own accent (or inherit the global accent). The active collection's color shows on the sidebar item + view header.
-             * **Optional description** + **pinning** (pinned collections float to the top).
-             * **Add games** from the right-click context menu, the game detail page, or a dedicated picker dialog that lists every collection with live checkmarks.
-             * **Edit / delete** from the collection view header or Settings -> Sidebar.
-             * Collections export/import with the library backup.
+          1. **Real platform logos** — the 8 store brands (Steam, Epic, GOG, Xbox, Ubisoft, Battle.net, EA, Riot) now use their OFFICIAL single-color SVG path data sourced from simple-icons (the open brand-logo collection traced from each brand's own assets). These are the real logos, not stylized interpretations. Manual/Custom use clean geometric SVG glyphs.
 
-          2. **Smart Collections (auto-generated)** — 7 built-in, read-only collections seeded on first run whose membership is computed live from your activity:
-             * **All Games**, **Favorites**, **Recently Played** (last 30 days), **Currently Playing** (status=playing), **Backlog** (status=backlog), **Never Played**, **Top 10 Played**.
-             * They update automatically as you play, favorite, and change statuses — no manual curation needed.
-             * Can't be deleted (they're virtual), but can be hidden via the collapse chevron.
+          2. **No emojis as icons** — installed the lucide-react icon library and replaced every emoji used as an icon:
+             * **Achievements** — the 20 achievement icons (was 🎮📚🏆▶️🎯🔥⭐💖✅🎖️📝🔍✨⏰⌛🌐⚙️📁💾🤿) are now lucide SVG keys (gamepad, library, trophy, play, target, flame, star, heart, check, award, pencil, search, sparkles, clock, hourglass, globe, settings, folder, save, waves).
+             * **Collections** — the 24-icon picker (was 📁🎮🏆⭐❤️🔥🎯🎲🎨🚀⚔️🛡️🌌🧟🏰💎🕹️🧩👾🎬📚💀🌟⚡) is now 24 lucide SVG keys (folder, gamepad, trophy, star, heart, flame, target, dice, palette, rocket, swords, shield, globe, skull, gem, joystick, puzzle, film, book, zap, bookmark, clock, sparkles, crown).
+             * **Smart Collections** — the 7 built-in collections (All Games, Favorites, Recently Played, Currently Playing, Backlog, Never Played, Top 10 Played) now use lucide icons (library, star, clock, gamepad, clipboard, sparkles, trophy).
+             * The **achievement toast** no longer prefixes with a 🏆 emoji.
+             * The **'Unlocked' label** uses a real check icon instead of a ✓ glyph.
+             * The **'Avg rating' stat** uses a real star icon instead of a ★ glyph.
+             * The **game-page JSON reference** heading uses a FileCog icon instead of a 📋 emoji.
+             * The **search-suggestion rating** uses a real star instead of a ★ glyph.
+             * The **controller-hints menu key** uses a Settings gear instead of a ☰ glyph.
 
-          3. **Real platform logos** — replaced the generic colored dots beside platform names with crisp, original SVG logo marks for Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot, Xbox, Manual, and Custom. Shown in the sidebar, on game cards, in the console filter pills, and on the game detail page. Monochrome (inherit the accent in active states).
+          3. **Icon-key system** — new IconGlyph component + resolveIconGlyph() map a string KEY (e.g. 'trophy') to a lucide component. Collections and achievements store icon KEYS in the database (never emojis). The DB migration UPSERTs every existing achievement + Smart Collection row so v4.3.0 emoji icons get refreshed to the new keys on upgrade. Old user-created collections with emoji icons fall back to a Folder icon (re-pickable via the edit dialog).
 
-          4. **Collapsible sidebar (both modes)** — the Collections and Platforms sections each have a chevron that collapses them; your choice persists across restarts. The console-mode filter row respects the same visibility settings.
-
-          5. **Customizable platform list (Settings -> Sidebar)** — toggle which platforms appear in the sidebar list. Hidden platforms still show on game cards, they just don't clutter your nav. A 'Manage Collections' panel lets you pin/unpin/delete from one place. A 'Collapse Behavior' section sets the default expanded/collapsed state.
-
-          6. **Autonomous ideas included** — the per-collection accent color, pinning, and Smart Collections are themselves autonomous features beyond the literal request.
-
-          All v4.2.0 polish is preserved: the fixed mode-toggle, single-accent-everywhere token system, minimal N lettermark logo + icon, pure black/white aesthetic.
+          All v4.3.0 functionality preserved: collections system, Smart Collections, collapsible/customizable sidebar, per-collection accent, pinning, real platform logos.
 
           **Downloads:**
-          - NEXUS-Setup-4.3.0.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-4.3.0.exe — single-file portable build.
+          - NEXUS-Setup-4.3.1.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-4.3.1.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@

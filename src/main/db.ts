@@ -193,7 +193,9 @@ function migrate(conn: import("better-sqlite3").Database) {
   // v4.3.0 — Collections: icon, kind, description, pinned, sortOrder.
   // The collections table existed since v2.0 with just (id, name, color, createdAt).
   // We add the new columns idempotently so existing user collections keep working.
-  addColumnIfMissing(conn, "collections", "icon", "TEXT DEFAULT '📁'");
+  // v4.3.1 — the icon column stores an icon KEY (e.g. "folder", "trophy"),
+  // resolved to a lucide SVG in the renderer. Never an emoji.
+  addColumnIfMissing(conn, "collections", "icon", "TEXT DEFAULT 'folder'");
   addColumnIfMissing(conn, "collections", "kind", "TEXT DEFAULT 'manual'");
   addColumnIfMissing(conn, "collections", "description", "TEXT");
   addColumnIfMissing(conn, "collections", "pinned", "INTEGER DEFAULT 0");
@@ -202,23 +204,27 @@ function migrate(conn: import("better-sqlite3").Database) {
   // v4.3.0 — Seed the built-in Smart Collections (auto:*) on first run.
   // These are read-only virtual collections whose membership is computed from
   // the games table at read time. They have stable negative ids so the seed is
-  // idempotent across reinstalls. (We use INSERT OR IGNORE.)
+  // idempotent across reinstalls.
+  // v4.3.1 — icons are now lucide KEYS, not emojis. We UPSERT so existing
+  // rows (seeded in v4.3.0 with emojis) get their icon + name refreshed.
   const SMART_COLLECTIONS: Array<{ id: number; name: string; icon: string; kind: CollectionKind; description: string; sortOrder: number }> = [
-    { id: -1, name: "All Games", icon: "📚", kind: "manual", description: "Every game in your library", sortOrder: -100 },
-    { id: -2, name: "Favorites", icon: "⭐", kind: "auto:favorites", description: "Games you've starred", sortOrder: -99 },
-    { id: -3, name: "Recently Played", icon: "🕒", kind: "auto:recent", description: "Played in the last 30 days", sortOrder: -98 },
-    { id: -4, name: "Currently Playing", icon: "🎮", kind: "auto:playing", description: "Games marked as Playing", sortOrder: -97 },
-    { id: -5, name: "Backlog", icon: "📋", kind: "auto:backlog", description: "Games you plan to play", sortOrder: -96 },
-    { id: -6, name: "Never Played", icon: "🆕", kind: "auto:never", description: "Games you haven't launched yet", sortOrder: -95 },
-    { id: -7, name: "Top 10 Played", icon: "🏆", kind: "auto:top", description: "Your most-played games", sortOrder: -94 },
+    { id: -1, name: "All Games", icon: "library", kind: "manual", description: "Every game in your library", sortOrder: -100 },
+    { id: -2, name: "Favorites", icon: "star", kind: "auto:favorites", description: "Games you've starred", sortOrder: -99 },
+    { id: -3, name: "Recently Played", icon: "clock", kind: "auto:recent", description: "Played in the last 30 days", sortOrder: -98 },
+    { id: -4, name: "Currently Playing", icon: "gamepad", kind: "auto:playing", description: "Games marked as Playing", sortOrder: -97 },
+    { id: -5, name: "Backlog", icon: "clipboard", kind: "auto:backlog", description: "Games you plan to play", sortOrder: -96 },
+    { id: -6, name: "Never Played", icon: "sparkles", kind: "auto:never", description: "Games you haven't launched yet", sortOrder: -95 },
+    { id: -7, name: "Top 10 Played", icon: "trophy", kind: "auto:top", description: "Your most-played games", sortOrder: -94 },
   ];
-  // We store the Smart Collections with negative ids. SQLite allows negative
-  // PRIMARY KEY integers, so this works. Use INSERT OR IGNORE to be idempotent.
-  const seedSmart = conn.prepare(
-    "INSERT OR IGNORE INTO collections (id, name, icon, kind, description, sortOrder, pinned, color) VALUES (?, ?, ?, ?, ?, ?, 1, '')"
+  // UPSERT: insert if absent, otherwise refresh icon/name/description/kind/sortOrder.
+  // This upgrades v4.3.0 seeds (which had emoji icons) to the new key-based icons.
+  const upsertSmart = conn.prepare(
+    "INSERT INTO collections (id, name, icon, kind, description, sortOrder, pinned, color) " +
+    "VALUES (?, ?, ?, ?, ?, ?, 1, '') " +
+    "ON CONFLICT(id) DO UPDATE SET name=excluded.name, icon=excluded.icon, kind=excluded.kind, description=excluded.description, sortOrder=excluded.sortOrder"
   );
   for (const sc of SMART_COLLECTIONS) {
-    seedSmart.run(sc.id, sc.name, sc.icon, sc.kind, sc.description, sc.sortOrder);
+    upsertSmart.run(sc.id, sc.name, sc.icon, sc.kind, sc.description, sc.sortOrder);
   }
 
   const row = conn.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as
@@ -935,7 +941,7 @@ function rowToCollection(r: CollectionRow): Collection {
   return {
     id: r.id,
     name: r.name,
-    icon: r.icon ?? "📁",
+    icon: r.icon ?? "folder",
     color: r.color ?? "",
     kind: (r.kind as CollectionKind) ?? "manual",
     description: r.description ?? null,
@@ -995,7 +1001,7 @@ export interface CreateCollectionInput {
 
 export function createCollection(input: CreateCollectionInput): Collection {
   const conn = db();
-  const icon = input.icon || "📁";
+  const icon = input.icon || "folder";
   const color = input.color || "";
   const info = conn.prepare(
     "INSERT INTO collections (name, icon, color, kind, description, pinned, sortOrder) VALUES (?, ?, ?, 'manual', ?, 0, 0)"
@@ -1119,33 +1125,39 @@ export interface AchievementDef {
 }
 
 const ACHIEVEMENT_DEFS: AchievementDef[] = [
-  { id: "first_game", name: "Welcome Aboard", description: "Add your first game to the library", icon: "🎮", maxProgress: 1 },
-  { id: "ten_games", name: "Collector", description: "Have 10 games in your library", icon: "📚", maxProgress: 10 },
-  { id: "fifty_games", name: "Library Master", description: "Have 50 games in your library", icon: "🏆", maxProgress: 50 },
-  { id: "first_play", name: "Let's Play", description: "Launch a game for the first time", icon: "▶️", maxProgress: 1 },
-  { id: "ten_launches", name: "Gamer", description: "Launch games 10 times total", icon: "🎯", maxProgress: 10 },
-  { id: "hundred_launches", name: "Dedicated", description: "Launch games 100 times total", icon: "🔥", maxProgress: 100 },
-  { id: "first_fav", name: "Favorites", description: "Favorite your first game", icon: "⭐", maxProgress: 1 },
-  { id: "ten_favs", name: "Curator", description: "Favorite 10 games", icon: "💖", maxProgress: 10 },
-  { id: "first_complete", name: "Finished", description: "Mark a game as Completed", icon: "✅", maxProgress: 1 },
-  { id: "ten_complete", name: "Completionist", description: "Mark 10 games as Completed", icon: "🎖️", maxProgress: 10 },
-  { id: "first_rating", name: "Critic", description: "Rate your first game", icon: "📝", maxProgress: 1 },
-  { id: "first_scan", name: "Explorer", description: "Run your first system scan", icon: "🔍", maxProgress: 1 },
-  { id: "first_patch", name: "Enricher", description: "Patch metadata for a game", icon: "✨", maxProgress: 1 },
-  { id: "ten_hours", name: "Marathon", description: "Play for 10 hours total", icon: "⏰", maxProgress: 600 },
-  { id: "hundred_hours", name: "Centurion", description: "Play for 100 hours total", icon: "⌛", maxProgress: 6000 },
-  { id: "all_platforms", name: "United", description: "Have games from all 8 platforms", icon: "🌐", maxProgress: 8 },
-  { id: "first_edit", name: "Customizer", description: "Edit a game's details", icon: "⚙️", maxProgress: 1 },
-  { id: "first_collection", name: "Organizer", description: "Create your first collection", icon: "📁", maxProgress: 1 },
-  { id: "export_backup", name: "Safe Keeper", description: "Export your library", icon: "💾", maxProgress: 1 },
-  { id: "deep_scan", name: "Deep Diver", description: "Run a deep filesystem scan", icon: "🤿", maxProgress: 1 },
+  { id: "first_game", name: "Welcome Aboard", description: "Add your first game to the library", icon: "gamepad", maxProgress: 1 },
+  { id: "ten_games", name: "Collector", description: "Have 10 games in your library", icon: "library", maxProgress: 10 },
+  { id: "fifty_games", name: "Library Master", description: "Have 50 games in your library", icon: "trophy", maxProgress: 50 },
+  { id: "first_play", name: "Let's Play", description: "Launch a game for the first time", icon: "play", maxProgress: 1 },
+  { id: "ten_launches", name: "Gamer", description: "Launch games 10 times total", icon: "target", maxProgress: 10 },
+  { id: "hundred_launches", name: "Dedicated", description: "Launch games 100 times total", icon: "flame", maxProgress: 100 },
+  { id: "first_fav", name: "Favorites", description: "Favorite your first game", icon: "star", maxProgress: 1 },
+  { id: "ten_favs", name: "Curator", description: "Favorite 10 games", icon: "heart", maxProgress: 10 },
+  { id: "first_complete", name: "Finished", description: "Mark a game as Completed", icon: "check", maxProgress: 1 },
+  { id: "ten_complete", name: "Completionist", description: "Mark 10 games as Completed", icon: "award", maxProgress: 10 },
+  { id: "first_rating", name: "Critic", description: "Rate your first game", icon: "pencil", maxProgress: 1 },
+  { id: "first_scan", name: "Explorer", description: "Run your first system scan", icon: "search", maxProgress: 1 },
+  { id: "first_patch", name: "Enricher", description: "Patch metadata for a game", icon: "sparkles", maxProgress: 1 },
+  { id: "ten_hours", name: "Marathon", description: "Play for 10 hours total", icon: "clock", maxProgress: 600 },
+  { id: "hundred_hours", name: "Centurion", description: "Play for 100 hours total", icon: "hourglass", maxProgress: 6000 },
+  { id: "all_platforms", name: "United", description: "Have games from all 8 platforms", icon: "globe", maxProgress: 8 },
+  { id: "first_edit", name: "Customizer", description: "Edit a game's details", icon: "settings", maxProgress: 1 },
+  { id: "first_collection", name: "Organizer", description: "Create your first collection", icon: "folder", maxProgress: 1 },
+  { id: "export_backup", name: "Safe Keeper", description: "Export your library", icon: "save", maxProgress: 1 },
+  { id: "deep_scan", name: "Deep Diver", description: "Run a deep filesystem scan", icon: "waves", maxProgress: 1 },
 ];
 
 export function getAchievements(): Array<AchievementDef & { unlockedAt: string | null; progress: number }> {
   const conn = db();
-  // Ensure all achievement defs exist in DB
+  // v4.3.1 — UPSERT every achievement def so the icon column gets refreshed
+  // from the old emoji value (v4.3.0) to the new lucide KEY. name/description/
+  // maxProgress are refreshed too in case of copy edits.
+  const upsertAch = conn.prepare(
+    "INSERT INTO achievements (id, name, description, icon, maxProgress) VALUES (?, ?, ?, ?, ?) " +
+    "ON CONFLICT(id) DO UPDATE SET name=excluded.name, description=excluded.description, icon=excluded.icon, maxProgress=excluded.maxProgress"
+  );
   for (const def of ACHIEVEMENT_DEFS) {
-    conn.prepare("INSERT OR IGNORE INTO achievements (id, name, description, icon, maxProgress) VALUES (?, ?, ?, ?, ?)").run(def.id, def.name, def.description, def.icon, def.maxProgress);
+    upsertAch.run(def.id, def.name, def.description, def.icon, def.maxProgress);
   }
   const rows = conn.prepare("SELECT * FROM achievements ORDER BY id").all() as Array<{ id: string; name: string; description: string; icon: string; unlockedAt: string | null; progress: number; maxProgress: number }>;
   return rows;

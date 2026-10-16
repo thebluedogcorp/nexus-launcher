@@ -5,6 +5,7 @@ import { Icon } from "./components/Icons";
 import { NexusMark } from "./components/Logo";
 import { ModeToggle } from "./components/ModeToggle";
 import { PlatformMark } from "./components/PlatformMark";
+import { IconGlyph } from "./components/IconGlyph";
 import { CreateCollectionDialog } from "./components/CreateCollectionDialog";
 import { CollectionPicker } from "./components/CollectionPicker";
 import { GamePage } from "./components/GamePage";
@@ -153,7 +154,7 @@ export function App() {
           setAchievements(achs);
           res.newlyUnlocked.forEach((id: string) => {
             const a = achs.find((x: { id: string }) => x.id === id);
-            if (a) toast("success", `🏆 Achievement Unlocked!`, `${a.name} — ${a.description}`);
+            if (a) toast("success", "Achievement Unlocked", `${a.name} — ${a.description}`);
           });
         } else {
           setAchievements(await window.nexus.getAchievements());
@@ -668,7 +669,7 @@ export function App() {
                     onContextMenu={(e) => { e.preventDefault(); setEditColl(c); }}
                     title={c.description ?? c.name}
                   >
-                    <span className="dt-coll-emoji">{c.icon}</span>
+                    <span className="dt-coll-emoji"><IconGlyph k={c.icon} size={15} /></span>
                     <span className="dt-coll-name">{c.name}</span>
                     {c.pinned && <span className="dt-coll-pin" title="Pinned"><Icon.Star size={10} filled /></span>}
                     <span className="dt-coll-count">{c.gameCount}</span>
@@ -676,7 +677,7 @@ export function App() {
                 ))}
                 {collections.length === 0 && (
                   <button className="dt-coll-item" onClick={() => setCreateCollOpen(true)}>
-                    <span className="dt-coll-emoji">＋</span>
+                    <span className="dt-coll-emoji"><Icon.Plus size={14} /></span>
                     <span className="dt-coll-name" style={{ color: "var(--text-faint)" }}>Create your first collection</span>
                   </button>
                 )}
@@ -749,12 +750,12 @@ export function App() {
                     const pct = a.maxProgress > 0 ? Math.round((a.progress / a.maxProgress) * 100) : 0;
                     return (
                       <div key={a.id} className={`ach-card ${unlocked ? "unlocked" : "locked"}`}>
-                        <div className={`ach-icon ${unlocked ? "unlocked" : "locked"}`}>{a.icon}</div>
+                        <div className={`ach-icon ${unlocked ? "unlocked" : "locked"}`}><IconGlyph k={a.icon} size={20} /></div>
                         <div className="ach-body">
                           <div className="ach-name">{a.name}</div>
                           <div className="ach-desc">{a.description}</div>
                           {!unlocked && a.maxProgress > 1 && (<><div className="ach-progress"><div style={{ width: `${pct}%` }} /></div><div className="ach-pct">{a.progress} / {a.maxProgress} ({pct}%)</div></>)}
-                          {unlocked && <div className="ach-pct" style={{ color: "var(--accent)" }}>✓ Unlocked</div>}
+                          {unlocked && <div className="ach-pct" style={{ color: "var(--accent)", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon.Check size={12} /> Unlocked</div>}
                         </div>
                       </div>
                     );
@@ -789,7 +790,7 @@ export function App() {
                   if (!c) return null;
                   return (
                     <div className="dt-view-header">
-                      <span className="emoji">{c.icon}</span>
+                      <span className="emoji"><IconGlyph k={c.icon} size={28} /></span>
                       <div className="stack">
                         <div className="title" style={{ ["--coll-accent" as string]: c.color || undefined, color: c.color || "#fff" }}>{c.name}</div>
                         <div className="meta">{c.gameCount} game{c.gameCount === 1 ? "" : "s"}{c.description ? " · " + c.description : ""}{c.kind !== "manual" ? " · auto-generated" : ""}</div>
@@ -981,7 +982,7 @@ export function App() {
                 const pct = a.maxProgress > 0 ? Math.round((a.progress / a.maxProgress) * 100) : 0;
                 return (
                   <div key={a.id} className={`ach-card ${unlocked ? "unlocked" : "locked"}`}>
-                    <div className={`ach-icon ${unlocked ? "unlocked" : "locked"}`}>{a.icon}</div>
+                    <div className={`ach-icon ${unlocked ? "unlocked" : "locked"}`}><IconGlyph k={a.icon} size={20} /></div>
                     <div className="ach-body">
                       <div className="ach-name">{a.name}</div>
                       <div className="ach-desc">{a.description}</div>
@@ -991,7 +992,7 @@ export function App() {
                           <div className="ach-pct">{a.progress} / {a.maxProgress} ({pct}%)</div>
                         </>
                       )}
-                      {unlocked && <div className="ach-pct" style={{ color: "var(--accent)" }}>✓ Unlocked</div>}
+                      {unlocked && <div className="ach-pct" style={{ color: "var(--accent)", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon.Check size={12} /> Unlocked</div>}
                     </div>
                   </div>
                 );
@@ -1037,7 +1038,7 @@ export function App() {
             <div className="filter-sep" />
             {collections.slice(0, 6).map((c) => (
               <button key={c.id} className={activeCollection === c.id ? "filter-pill active" : "filter-pill"} onClick={() => selectCollection(activeCollection === c.id ? null : c.id)} title={c.description ?? c.name}>
-                <span style={{ fontSize: 11 }}>{c.icon}</span> {c.name}
+                <span style={{ fontSize: 11, display: "inline-flex", alignItems: "center" }}><IconGlyph k={c.icon} size={13} /></span> {c.name}
               </button>
             ))}
           </>)}
@@ -1227,7 +1228,7 @@ export function App() {
                 <div className="dash-stat-row"><span className="name">Launches</span><span className="val">{stats.totalLaunches}</span></div>
                 <div className="dash-stat-row"><span className="name">Disk</span><span className="val">{formatSize(stats.totalSizeBytes)}</span></div>
                 <div className="dash-stat-row"><span className="name">Favorites</span><span className="val">{stats.favorites}</span></div>
-                {stats.avgRating && <div className="dash-stat-row"><span className="name">Avg ★</span><span className="val">{stats.avgRating.toFixed(1)}</span></div>}
+                {stats.avgRating && <div className="dash-stat-row"><span className="name" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><Icon.Star size={11} /> Avg</span><span className="val">{stats.avgRating.toFixed(1)}</span></div>}
               </div>
             </div>
             {/* Center: Game facts / news / trivia about focused game */}
@@ -1315,7 +1316,7 @@ export function App() {
       )}
       {statsOpen && <StatsDashboard onClose={() => setStatsOpen(false)} onExport={handleExport} onImport={handleImportFile} onCheckMissing={handleCheckMissing} />}
 
-      {controllerConnected && !pageGame && <div className="hints-bar"><span className="hint"><span className="k">↑↓</span> {gpZone === "topbar" ? "Top Bar" : gpZone === "filters" ? "Filters" : gpZone === "carousel" ? "Games" : "Actions"}</span><span className="hint"><span className="k">←→</span> Navigate</span><span className="hint"><span className="k r">A</span> Select</span><span className="hint"><span className="k r">X</span> Play</span><span className="hint"><span className="k r">Y</span> Details</span><span className="hint"><span className="k r">B</span> Back</span><span className="hint"><span className="k">☰</span> Settings</span></div>}
+      {controllerConnected && !pageGame && <div className="hints-bar"><span className="hint"><span className="k">↑↓</span> {gpZone === "topbar" ? "Top Bar" : gpZone === "filters" ? "Filters" : gpZone === "carousel" ? "Games" : "Actions"}</span><span className="hint"><span className="k">←→</span> Navigate</span><span className="hint"><span className="k r">A</span> Select</span><span className="hint"><span className="k r">X</span> Play</span><span className="hint"><span className="k r">Y</span> Details</span><span className="hint"><span className="k r">B</span> Back</span><span className="hint"><span className="k"><Icon.Settings size={10} /></span> Settings</span></div>}
 
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>

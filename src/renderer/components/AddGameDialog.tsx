@@ -121,10 +121,10 @@ export function AddGameDialog({ onClose, onAdd }: Props) {
                     )}
                     <div className="suggest-info">
                       <div className="suggest-title">{r.title}</div>
-                      <div className="suggest-sub">
-                        {r.developer || "Unknown"}
-                        {r.releaseDate ? ` · ${r.releaseDate.slice(0, 4)}` : ""}
-                        {r.rating ? ` · ★ ${r.rating.toFixed(1)}` : ""}
+                      <div className="suggest-sub" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <span>{r.developer || "Unknown"}</span>
+                        {r.releaseDate ? <span>· {r.releaseDate.slice(0, 4)}</span> : null}
+                        {r.rating ? <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><Icon.Star size={10} filled /> {r.rating.toFixed(1)}</span> : null}
                       </div>
                     </div>
                     <Icon.Chevron size={14} />
