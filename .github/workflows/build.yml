@@ -50,36 +50,22 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v4.4.0"
-          $title = "NEXUS v4.4.0 — Theme Studio: visual drag-free theme builder with live preview, presets, undo/redo, save/import/export"
+          $tag = "v4.4.1"
+          $title = "NEXUS v4.4.1 — Critical fix: 'Cannot find module @shared/theme-types' crash on startup (v4.4.0 hotfix)"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
-          **v4.4.0 — Theme Studio.** A full visual theme builder that lets every user transform the launcher into their own personalized gaming environment. Built on a versioned theme schema + design-token system; drives the REAL launcher via ~60 CSS custom properties (the existing variable-driven stylesheet re-themes instantly), so changes affect the actual interface, not a mockup.
+          **v4.4.1 — Critical hotfix for v4.4.0.**
 
-          **What's new:**
+          **The bug:** v4.4.0 introduced the Theme Studio, whose main-process DB layer imported DEFAULT_THEME and PRESET_THEMES from '@shared/theme-types' / '@shared/theme-presets' using the TypeScript path alias. The main process is compiled to CommonJS, and while tsc resolves the alias at TYPE-CHECK time, it does NOT rewrite it in the emitted JavaScript — so the packaged db.js contained 'require("@shared/theme-types")' verbatim. Node's CommonJS runtime resolver does not understand the @shared/* alias, so on startup the main process threw 'Error: Cannot find module @shared/theme-types' and the app never opened. (The existing '@shared/types' imports were 'import type' — erased at emit — so they never tripped this; only the new VALUE imports did.)
 
-          1. **Theme Studio editor** (open via the palette button in the topbar) — a 4-area full-screen editor:
-             * **Top toolbar** — preset/theme picker, undo, redo, reset, import, export, Save As, Apply, Cancel. Keyboard shortcuts: Ctrl+Z undo, Ctrl+Shift+Z redo, Ctrl+S apply.
-             * **Layer explorer (left)** — select which component to edit (Game Card, Library Grid, Sidebar, Topbar, Background, Typography, Colors & Accent, Animations, Layout).
-             * **Live preview canvas (center)** — a mini launcher (topbar + sidebar + game grid) reusing the REAL launcher's CSS classes so it reflects the draft instantly. pointer-events:none.
-             * **Property inspector (right)** — categorized controls (sliders, color pickers, selects, toggles, segmented buttons) bound to the draft.
+          **The fix:** changed the two value imports in src/main/db.ts to relative paths ('../shared/theme-types' and '../shared/theme-presets') so Node resolves them at runtime. Verified: the emitted dist-electron/main/db.js now contains 'require("../shared/theme-types")' and zero 'require("@shared/...') calls remain anywhere in the main process. The renderer (bundled by Vite, which resolves the alias at build time) was always fine.
 
-          2. **What's customizable** — colors (bg, surfaces, borders, text, accent, danger), typography (font family, base/title sizes, line height, letter spacing), radius scale (sm/md/lg/xl), spacing multiplier, shadows (low/mid/high), game card (aspect ratio 3:4/2:3/1:1/16:9, min width, gap, radius, border opacity, shadow level, hover lift, density compact/cozy/comfortable, show title/platform/playtime), sidebar (width 180-320, position left/right, background), topbar (height, background, transparency, border opacity), background (solid/gradient/image, blur, overlay opacity, parallax), animations (speed multiplier, hover effects, card entrance, reduced motion), color mode (dark/light), library view (grid/list), section visibility.
-
-          3. **10 built-in presets** — NEXUS Default, Minimalist Dark, Modern Gaming Dashboard, Steam-Inspired Library, Cyberpunk Neon, Glassmorphism, AMOLED Black, Retro Gaming, Clean Light, Artwork-Focused Immersive, Compact Power-User. Start from a preset and customize everything.
-
-          4. **Personal themes + persistence** — multiple saved themes per user; name, duplicate, rename, delete; live preview before applying; undo/redo (100-step stack); reset to default; import/export theme JSON; recovery from broken configs (validateTheme fills missing fields; applyTheme never throws — reverts to default on error). Themes stored as versioned JSON in a new 'themes' DB table. The active theme applies on startup.
-
-          5. **Architecture** — React + TypeScript; Zustand for editor state + undo/redo; CSS custom properties + design tokens for live theming; the existing Electron stack (no new desktop framework). Presets are seeded into the DB as read-only builtin rows; personal themes are editable copies.
-
-          6. **Stability** — theme failures can't prevent the launcher from opening (applyTheme wraps in try/catch + reverts to DEFAULT_THEME). Game detection, launching, platform integrations, and all v4.3.x functionality are unchanged. Editor state is separate from saved config.
-
-          **Roadmap (documented, not in this release):** full drag-reorder of sidebar sections (dnd-kit installed for this), dashboard widget drag-resize (react-grid-layout), per-component reusable style presets, theme sharing, cloud sync.
+          All v4.4.0 Theme Studio functionality is preserved — this is purely the startup-crash fix. If you installed v4.4.0 and it would not open, install v4.4.1 over it; your library, collections, and any saved themes are unaffected.
 
           **Downloads:**
-          - NEXUS-Setup-4.4.0.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-4.4.0.exe — single-file portable build.
+          - NEXUS-Setup-4.4.1.exe — NSIS installer (recommended, supports auto-update; if you had v4.4.0 installed, this updater will also fix the crash).
+          - NEXUS-Portable-4.4.1.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@

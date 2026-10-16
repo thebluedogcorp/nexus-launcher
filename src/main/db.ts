@@ -14,9 +14,17 @@ import { app } from "electron";
 import { join, dirname } from "path";
 import { mkdirSync, existsSync } from "fs";
 import type { Game, DetectedGame, LauncherSettings, Collection, CollectionKind } from "@shared/types";
-import type { ThemeConfig, SavedTheme } from "@shared/theme-types";
-import { DEFAULT_THEME } from "@shared/theme-types";
-import { PRESET_THEMES } from "@shared/theme-presets";
+// v4.4.1 — CRITICAL: the main process is compiled to CommonJS, and Node's
+// runtime resolver does NOT understand the @shared/* path alias (only tsc
+// type-checking + the Vite-bundled renderer do). These are VALUE imports
+// (DEFAULT_THEME + PRESET_THEMES are runtime objects), so they MUST use a
+// relative path — otherwise the packaged app crashes on startup with
+// "Cannot find module '@shared/theme-types'". Type-only imports are erased
+// at emit and are safe to leave on the alias, but we use relative here too
+// for unambiguity.
+import type { ThemeConfig, SavedTheme } from "../shared/theme-types";
+import { DEFAULT_THEME } from "../shared/theme-types";
+import { PRESET_THEMES } from "../shared/theme-presets";
 
 type BetterSqlite3Module = typeof import("better-sqlite3");
 type SqliteDatabase = import("better-sqlite3").Database;

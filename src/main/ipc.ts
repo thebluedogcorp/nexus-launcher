@@ -350,8 +350,8 @@ export function registerIpc(): void {
   // v4.4.0 — Themes (Theme Studio)
   ipcMain.handle("themes:list", () => listThemes());
   ipcMain.handle("themes:get", (_e, id: number) => getTheme(id));
-  ipcMain.handle("themes:create", (_e, name: string, config: import("@shared/theme-types").ThemeConfig) => createTheme(name, config));
-  ipcMain.handle("themes:update", (_e, id: number, patch: { name?: string; config?: import("@shared/theme-types").ThemeConfig }) => updateTheme(id, patch));
+  ipcMain.handle("themes:create", (_e, name: string, config: import("../shared/theme-types").ThemeConfig) => createTheme(name, config));
+  ipcMain.handle("themes:update", (_e, id: number, patch: { name?: string; config?: import("../shared/theme-types").ThemeConfig }) => updateTheme(id, patch));
   ipcMain.handle("themes:delete", (_e, id: number) => { deleteTheme(id); return true; });
   ipcMain.handle("themes:duplicate", (_e, id: number, newName: string) => duplicateTheme(id, newName));
 
