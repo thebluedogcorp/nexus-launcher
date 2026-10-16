@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { Game, PlatformId } from "@shared/types";
 import { PLATFORM_LIST } from "@shared/types";
 import { Icon } from "./Icons";
+import { PlatformMark } from "./PlatformMark";
 import {
   formatDate, formatPlaytime, formatSize, relativeTime, platformLabel, platformColor, gradientFor, initials,
 } from "../lib/helpers";
@@ -15,6 +16,7 @@ interface Props {
   onToggleFav: (g: Game) => void;
   onUpdate: (g: Game, patch: Record<string, unknown>) => Promise<void>;
   onOpenDir: (g: Game) => void;
+  onAddToCollection: (g: Game) => void;   // v4.3.0
 }
 
 const COMPLETION_STATUSES = [
@@ -27,7 +29,7 @@ const COMPLETION_STATUSES = [
 ] as const;
 
 /** Full-screen dedicated game page with immersive customization/edit mode. */
-export function GamePage({ game, onClose, onLaunch, onPatch, onDelete, onToggleFav, onUpdate, onOpenDir }: Props) {
+export function GamePage({ game, onClose, onLaunch, onPatch, onDelete, onToggleFav, onUpdate, onOpenDir, onAddToCollection }: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [scrollY, setScrollY] = useState(0);
@@ -141,7 +143,7 @@ export function GamePage({ game, onClose, onLaunch, onPatch, onDelete, onToggleF
             <div className="gp-hero-content">
               <div className="gp-chips">
                 <span className="chip" style={{ background: "rgba(0,0,0,0.55)" }}>
-                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: platformColor(game.platform), display: "inline-block" }} />
+                  <span className="pm" style={{ display: "inline-flex", alignItems: "center" }}><PlatformMark platform={game.platform} size={11} /></span>
                   {platformLabel(game.platform)}
                 </span>
                 <span className={game.source === "auto" ? "chip auto" : "chip manual"}>
@@ -165,6 +167,9 @@ export function GamePage({ game, onClose, onLaunch, onPatch, onDelete, onToggleF
                 <button className="gp-play" onClick={() => onLaunch(game)}><Icon.Play size={18} /> Play Now</button>
                 <button className="btn btn-ghost" style={{ height: 52, padding: "0 22px", fontSize: 15 }} onClick={() => onPatch(game)}>
                   <Icon.Refresh size={17} /> Patch
+                </button>
+                <button className="btn btn-outline" style={{ height: 52, padding: "0 22px", fontSize: 14 }} onClick={() => onAddToCollection(game)} title="Add to collection">
+                  <Icon.Folder size={16} /> Collection
                 </button>
                 <button className={game.favorite ? "btn btn-outline" : "btn btn-ghost"} style={{ height: 52, width: 52, padding: 0, justifyContent: "center" }} onClick={() => onToggleFav(game)} title="Favorite">
                   <Icon.Star size={18} filled={game.favorite} />

@@ -50,34 +50,41 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v4.2.0"
-          $title = "NEXUS v4.2.0 — UI polish: fixed mode-toggle, pure black/white + single accent, minimal N lettermark logo + icon"
+          $tag = "v4.3.0"
+          $title = "NEXUS v4.3.0 — Collections system, platform logos, collapsible sidebar, Smart Collections"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
-          **v4.2.0 — UI polish & minimalism pass.** Every button, badge, and bar cleaned up so the whole launcher follows ONE design rule: pure black + white + a single user-configurable accent color.
+          **v4.3.0 — Library organization & personalization pass.** A full collections system (user-curated groups + auto-generated Smart Collections), real platform logos instead of colored dots, and a collapsible, customizable sidebar.
 
-          **What's fixed / changed:**
+          **What's new:**
 
-          1. **Mode toggle bug fixed** — the Console/Desktop switch in the top bar had a hardcoded "active" state on the Desktop button, so it always looked selected (even in Console mode). The active class is now driven by the actual 'uiMode' state via a dedicated '<ModeToggle>' component, so the switch reflects the real layout every time. Both topbars (Console and Desktop) share the same component.
+          1. **Collections system** — create your own groups to organize your library however you like. Build a 'GTA' collection, a 'Currently Playing' shelf, a 'Backlog', anything. Each collection is fully customizable:
+             * **Folder emoji** picker (24 marks) when creating.
+             * **Per-collection accent color** — give the collection its own accent (or inherit the global accent). The active collection's color shows on the sidebar item + view header.
+             * **Optional description** + **pinning** (pinned collections float to the top).
+             * **Add games** from the right-click context menu, the game detail page, or a dedicated picker dialog that lists every collection with live checkmarks.
+             * **Edit / delete** from the collection view header or Settings -> Sidebar.
+             * Collections export/import with the library backup.
 
-          2. **Single accent color, everywhere live** — introduced an '--accent-rgb' token. Every teal tint (favorites, ratings, status pills, progress bars, badges, focus rings, scan sweep, hover-play, toast borders, etc.) is now 'rgba(var(--accent-rgb), ...)' so when you pick a new accent in Settings → Appearance it propagates to the whole UI instantly — and survives a restart (the saved accent is applied on startup, before the first paint). The old gold/blue second hues are gone; favorites and ratings now use the accent.
+          2. **Smart Collections (auto-generated)** — 7 built-in, read-only collections seeded on first run whose membership is computed live from your activity:
+             * **All Games**, **Favorites**, **Recently Played** (last 30 days), **Currently Playing** (status=playing), **Backlog** (status=backlog), **Never Played**, **Top 10 Played**.
+             * They update automatically as you play, favorite, and change statuses — no manual curation needed.
+             * Can't be deleted (they're virtual), but can be hidden via the collapse chevron.
 
-          3. **No gradients on fills** — the logo, the primary "Add" button, the "Play" CTA, progress bars, the empty-state box, the about card, achievement unlocked cards, the enrichment banner, and all stat/dash/progress bars are now SOLID. Backgrounds are pure black ('#000') with near-black surface lifts. Buttons lift on hover with subtle elevation, no glow.
+          3. **Real platform logos** — replaced the generic colored dots beside platform names with crisp, original SVG logo marks for Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot, Xbox, Manual, and Custom. Shown in the sidebar, on game cards, in the console filter pills, and on the game detail page. Monochrome (inherit the accent in active states).
 
-          4. **Minimal N lettermark logo** — replaced the Gamepad icon with a crisp geometric "N" drawn from a single SVG path ('NexusMark'). Used identically in the top bar (accent on black), the desktop sidebar header, the Settings → About card, and the app icon. The old gradient logo tile is gone.
+          4. **Collapsible sidebar (both modes)** — the Collections and Platforms sections each have a chevron that collapses them; your choice persists across restarts. The console-mode filter row respects the same visibility settings.
 
-          5. **New app icon** — regenerated 'resources/icon.ico' (multi-res 16–256) and 'resources/icon.png' (1024) as a solid black rounded square with the single accent "N" — matching the in-app logo exactly.
+          5. **Customizable platform list (Settings -> Sidebar)** — toggle which platforms appear in the sidebar list. Hidden platforms still show on game cards, they just don't clutter your nav. A 'Manage Collections' panel lets you pin/unpin/delete from one place. A 'Collapse Behavior' section sets the default expanded/collapsed state.
 
-          6. **Sleek desktop sidebar** — added a compact brand header (black tile + accent N + "LIBRARY" label) and a crisp left accent bar on the active nav item (like VS Code / Epic). Mode-toggle active state is now an accent-tinted pill.
+          6. **Autonomous ideas included** — the per-collection accent color, pinning, and Smart Collections are themselves autonomous features beyond the literal request.
 
-          7. **Broken 'var(--nx-accent)' references fixed** — AddGameDialog, ScanDialog, UpdateDialog, and SettingsDialog referenced an undefined '--nx-accent' CSS variable; all now use the real '--accent' token.
-
-          All existing functionality preserved: Console carousel + controller nav, Desktop grid, achievements, activity, real playtime tracking, in-game overlay, game detail page, collections, scan wizard, add-game dialog, RAWG metadata patch, stats dashboard, enrich-all, startup & close behavior.
+          All v4.2.0 polish is preserved: the fixed mode-toggle, single-accent-everywhere token system, minimal N lettermark logo + icon, pure black/white aesthetic.
 
           **Downloads:**
-          - NEXUS-Setup-4.2.0.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-4.2.0.exe — single-file portable build.
+          - NEXUS-Setup-4.3.0.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-4.3.0.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@

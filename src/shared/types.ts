@@ -126,6 +126,11 @@ export interface LauncherSettings {
   closeBehavior: "exit" | "minimize" | "ask";
   // v4.0.0 — UI mode (console carousel vs desktop grid)
   uiMode: "console" | "desktop";
+  // v4.3.0 — which platform ids are hidden in the sidebar (pipe-separated).
+  // Empty string means "all visible".
+  hiddenPlatforms: string;
+  // v4.3.0 — whether the platform section in the sidebar starts collapsed.
+  sidebarCollapsed: boolean;
 }
 
 export type SortKey = "recent" | "name" | "playtime" | "rating";
@@ -137,6 +142,38 @@ export const SORT_LABELS: Record<SortKey, string> = {
   playtime: "Most Played",
   rating: "Top Rated",
 };
+
+// v4.3.0 — Collections.
+// A collection is either a user-curated group (kind="manual", membership in
+// the collection_games junction) or an auto-generated Smart Collection
+// (kind="auto:*", membership computed from the games table at read time).
+export type CollectionKind =
+  | "manual"
+  | "auto:recent"
+  | "auto:favorites"
+  | "auto:never"
+  | "auto:playing"
+  | "auto:backlog"
+  | "auto:top";
+
+export interface Collection {
+  id: number;
+  name: string;
+  icon: string;          // emoji or icon key, e.g. "📁", "🎮", "🏆"
+  color: string;         // hex accent override (or "" for "use global accent")
+  kind: CollectionKind;
+  description: string | null;
+  pinned: boolean;
+  sortOrder: number;
+  gameCount: number;     // computed (count of membership)
+  createdAt: string;
+}
+
+export const COLLECTION_ICONS = [
+  "📁", "🎮", "🏆", "⭐", "❤️", "🔥", "🎯", "🎲",
+  "🎨", "🚀", "⚔️", "🛡️", "🌌", "🧟", "🏰", "💎",
+  "🕹️", "🧩", "👾", "🎬", "📚", "💀", "🌟", "⚡",
+] as const;
 
 export interface PlatformInfo {
   id: PlatformId;

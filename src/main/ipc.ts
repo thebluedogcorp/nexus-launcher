@@ -20,10 +20,13 @@ import {
   recordSession,
   listCollections,
   createCollection,
+  updateCollection,
   addGameToCollection,
   removeGameFromCollection,
   deleteCollection,
+  reorderCollections,
   getGamesInCollection,
+  getCollectionsForGame,
 } from "./db";
 import { runScan } from "./detectors";
 import { launchGame } from "./launchers";
@@ -326,13 +329,16 @@ export function registerIpc(): void {
     return true;
   });
 
-  // Collections
+  // Collections (v4.3.0 — extended: icon/kind/pinned/sortOrder + Smart Collections)
   ipcMain.handle("collections:list", () => listCollections());
-  ipcMain.handle("collections:create", (_e, name: string, color: string) => createCollection(name, color));
+  ipcMain.handle("collections:create", (_e, input: { name: string; icon?: string; color?: string; description?: string }) => createCollection(input));
+  ipcMain.handle("collections:update", (_e, id: number, patch: { name?: string; icon?: string; color?: string; description?: string; pinned?: boolean; sortOrder?: number }) => updateCollection(id, patch));
   ipcMain.handle("collections:addGame", (_e, collectionId: number, gameId: number) => { addGameToCollection(collectionId, gameId); return true; });
   ipcMain.handle("collections:removeGame", (_e, collectionId: number, gameId: number) => { removeGameFromCollection(collectionId, gameId); return true; });
   ipcMain.handle("collections:delete", (_e, id: number) => { deleteCollection(id); return true; });
+  ipcMain.handle("collections:reorder", (_e, ids: number[]) => { reorderCollections(ids); return true; });
   ipcMain.handle("collections:getGames", (_e, collectionId: number) => getGamesInCollection(collectionId));
+  ipcMain.handle("collections:forGame", (_e, gameId: number) => getCollectionsForGame(gameId));
 
   // ===== Achievements =====
   ipcMain.handle("achievements:list", () => getAchievements());

@@ -13,7 +13,7 @@
 import { app } from "electron";
 import { join, dirname } from "path";
 import { mkdirSync, existsSync } from "fs";
-import type { Game, DetectedGame, LauncherSettings } from "@shared/types";
+import type { Game, DetectedGame, LauncherSettings, Collection, CollectionKind } from "@shared/types";
 
 type BetterSqlite3Module = typeof import("better-sqlite3");
 type SqliteDatabase = import("better-sqlite3").Database;
@@ -189,6 +189,37 @@ function migrate(conn: import("better-sqlite3").Database) {
   addColumnIfMissing(conn, "games", "lastSessionAt", "TEXT");
   addColumnIfMissing(conn, "games", "sessionMinutes", "INTEGER DEFAULT 0");
   addColumnIfMissing(conn, "games", "sortOrder", "INTEGER DEFAULT 0");
+
+  // v4.3.0 — Collections: icon, kind, description, pinned, sortOrder.
+  // The collections table existed since v2.0 with just (id, name, color, createdAt).
+  // We add the new columns idempotently so existing user collections keep working.
+  addColumnIfMissing(conn, "collections", "icon", "TEXT DEFAULT '📁'");
+  addColumnIfMissing(conn, "collections", "kind", "TEXT DEFAULT 'manual'");
+  addColumnIfMissing(conn, "collections", "description", "TEXT");
+  addColumnIfMissing(conn, "collections", "pinned", "INTEGER DEFAULT 0");
+  addColumnIfMissing(conn, "collections", "sortOrder", "INTEGER DEFAULT 0");
+
+  // v4.3.0 — Seed the built-in Smart Collections (auto:*) on first run.
+  // These are read-only virtual collections whose membership is computed from
+  // the games table at read time. They have stable negative ids so the seed is
+  // idempotent across reinstalls. (We use INSERT OR IGNORE.)
+  const SMART_COLLECTIONS: Array<{ id: number; name: string; icon: string; kind: CollectionKind; description: string; sortOrder: number }> = [
+    { id: -1, name: "All Games", icon: "📚", kind: "manual", description: "Every game in your library", sortOrder: -100 },
+    { id: -2, name: "Favorites", icon: "⭐", kind: "auto:favorites", description: "Games you've starred", sortOrder: -99 },
+    { id: -3, name: "Recently Played", icon: "🕒", kind: "auto:recent", description: "Played in the last 30 days", sortOrder: -98 },
+    { id: -4, name: "Currently Playing", icon: "🎮", kind: "auto:playing", description: "Games marked as Playing", sortOrder: -97 },
+    { id: -5, name: "Backlog", icon: "📋", kind: "auto:backlog", description: "Games you plan to play", sortOrder: -96 },
+    { id: -6, name: "Never Played", icon: "🆕", kind: "auto:never", description: "Games you haven't launched yet", sortOrder: -95 },
+    { id: -7, name: "Top 10 Played", icon: "🏆", kind: "auto:top", description: "Your most-played games", sortOrder: -94 },
+  ];
+  // We store the Smart Collections with negative ids. SQLite allows negative
+  // PRIMARY KEY integers, so this works. Use INSERT OR IGNORE to be idempotent.
+  const seedSmart = conn.prepare(
+    "INSERT OR IGNORE INTO collections (id, name, icon, kind, description, sortOrder, pinned, color) VALUES (?, ?, ?, ?, ?, ?, 1, '')"
+  );
+  for (const sc of SMART_COLLECTIONS) {
+    seedSmart.run(sc.id, sc.name, sc.icon, sc.kind, sc.description, sc.sortOrder);
+  }
 
   const row = conn.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as
     | { value?: string }
@@ -694,6 +725,9 @@ export function getAllSettings(): LauncherSettings {
     launchOnStartup: getSetting("launchOnStartup") === "true",
     closeBehavior: (getSetting("closeBehavior") as LauncherSettings["closeBehavior"]) ?? "ask",
     uiMode: (getSetting("uiMode") as LauncherSettings["uiMode"]) ?? "console",
+    // v4.3.0 — platform visibility + sidebar collapse
+    hiddenPlatforms: getSetting("hiddenPlatforms") ?? "",
+    sidebarCollapsed: getSetting("sidebarCollapsed") === "true",
   };
 }
 
@@ -706,6 +740,8 @@ export function setAllSettings(s: Partial<LauncherSettings>): LauncherSettings {
   if (s.launchOnStartup !== undefined) setSetting("launchOnStartup", String(s.launchOnStartup));
   if (s.closeBehavior !== undefined) setSetting("closeBehavior", s.closeBehavior);
   if (s.uiMode !== undefined) setSetting("uiMode", s.uiMode);
+  if (s.hiddenPlatforms !== undefined) setSetting("hiddenPlatforms", s.hiddenPlatforms);
+  if (s.sidebarCollapsed !== undefined) setSetting("sidebarCollapsed", String(s.sidebarCollapsed));
   return getAllSettings();
 }
 
@@ -855,34 +891,165 @@ export function recordSession(gameId: number, minutes: number): void {
   conn.prepare("UPDATE games SET lastSessionAt = ?, sessionMinutes = ? WHERE id = ?").run(now, minutes, gameId);
 }
 
-// ===== Collections =====
+// ===== Collections (v4.3.0 — extended) =====
+// A collection is either:
+//   - manual: membership stored in collection_games junction (user-curated)
+//   - auto:* : membership computed from the games table at read time
+// Smart Collections are seeded with negative ids on migrate() (see above).
 
-export interface Collection {
+export interface CollectionRow {
   id: number;
   name: string;
+  icon: string;
   color: string;
+  kind: string;
+  description: string | null;
+  pinned: number;
+  sortOrder: number;
+  createdAt: string;
   gameCount: number;
+}
+
+/** Resolve a Smart Collection kind → SQL fragment matching the games table. */
+function autoCollectionWhere(kind: string): string | null {
+  switch (kind) {
+    case "auto:favorites":
+      return "favorite = 1";
+    case "auto:recent":
+      // lastPlayedAt within the last 30 days
+      return "lastPlayedAt IS NOT NULL AND lastPlayedAt >= datetime('now','-30 days')";
+    case "auto:playing":
+      return "completionStatus = 'playing'";
+    case "auto:backlog":
+      return "completionStatus = 'backlog'";
+    case "auto:never":
+      return "lastPlayedAt IS NULL";
+    case "auto:top":
+      return "playtimeSec > 0";
+    default:
+      return null; // manual or unknown → use junction
+  }
+}
+
+function rowToCollection(r: CollectionRow): Collection {
+  return {
+    id: r.id,
+    name: r.name,
+    icon: r.icon ?? "📁",
+    color: r.color ?? "",
+    kind: (r.kind as CollectionKind) ?? "manual",
+    description: r.description ?? null,
+    pinned: r.pinned === 1,
+    sortOrder: r.sortOrder ?? 0,
+    gameCount: r.gameCount ?? 0,
+    createdAt: r.createdAt,
+  };
 }
 
 export function listCollections(): Collection[] {
   const conn = db();
-  const rows = conn.prepare(`
-    SELECT c.id, c.name, c.color, COUNT(cg.gameId) as gameCount
-    FROM collections c
-    LEFT JOIN collection_games cg ON c.id = cg.collectionId
-    GROUP BY c.id
-    ORDER BY c.name
-  `).all() as Array<{ id: number; name: string; color: string; gameCount: number }>;
-  return rows;
+  // Manual collections: count via the junction. Smart collections: count via
+  // the auto-where clause. We compute counts in JS to handle both cleanly.
+  const all = conn.prepare(
+    "SELECT id, name, icon, color, kind, description, pinned, sortOrder, createdAt FROM collections"
+  ).all() as Array<Omit<CollectionRow, "gameCount">>;
+
+  const countStmt = conn.prepare("SELECT COUNT(*) as n FROM games WHERE hidden = 0");
+  const autoCountStmt = (where: string) =>
+    conn.prepare(`SELECT COUNT(*) as n FROM games WHERE hidden = 0 AND ${where}`).get() as { n: number };
+  const manualCountStmt = conn.prepare(
+    "SELECT COUNT(*) as n FROM collection_games cg JOIN games g ON g.id = cg.gameId WHERE cg.collectionId = ? AND g.hidden = 0"
+  );
+
+  const out: Collection[] = [];
+  for (const r of all) {
+    let gameCount = 0;
+    if (r.id === -1) {
+      // "All Games" special
+      gameCount = (countStmt.get() as { n: number }).n;
+    } else {
+      const w = autoCollectionWhere(r.kind);
+      if (w) {
+        gameCount = autoCountStmt(w).n;
+      } else {
+        gameCount = (manualCountStmt.get(r.id) as { n: number }).n;
+      }
+    }
+    out.push(rowToCollection({ ...r, gameCount }));
+  }
+  // Sort: pinned first, then sortOrder asc, then name asc.
+  out.sort((a, b) => {
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+    if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+    return a.name.localeCompare(b.name);
+  });
+  return out;
 }
 
-export function createCollection(name: string, color: string): Collection {
+export interface CreateCollectionInput {
+  name: string;
+  icon?: string;
+  color?: string;
+  description?: string;
+}
+
+export function createCollection(input: CreateCollectionInput): Collection {
   const conn = db();
-  const info = conn.prepare("INSERT INTO collections (name, color) VALUES (?, ?)").run(name, color || "#4ade80");
-  return { id: Number(info.lastInsertRowid), name, color: color || "#4ade80", gameCount: 0 };
+  const icon = input.icon || "📁";
+  const color = input.color || "";
+  const info = conn.prepare(
+    "INSERT INTO collections (name, icon, color, kind, description, pinned, sortOrder) VALUES (?, ?, ?, 'manual', ?, 0, 0)"
+  ).run(input.name, icon, color, input.description ?? null);
+  const id = Number(info.lastInsertRowid);
+  const row = conn.prepare(
+    "SELECT id, name, icon, color, kind, description, pinned, sortOrder, createdAt FROM collections WHERE id = ?"
+  ).get(id) as Omit<CollectionRow, "gameCount">;
+  return rowToCollection({ ...row, gameCount: 0 });
+}
+
+export interface UpdateCollectionInput {
+  name?: string;
+  icon?: string;
+  color?: string;
+  description?: string;
+  pinned?: boolean;
+  sortOrder?: number;
+}
+
+export function updateCollection(id: number, patch: UpdateCollectionInput): Collection | null {
+  const conn = db();
+  const cur = conn.prepare("SELECT id FROM collections WHERE id = ?").get(id);
+  if (!cur) return null;
+  const sets: string[] = [];
+  const vals: (string | number | null)[] = [];
+  if (patch.name !== undefined) { sets.push("name = ?"); vals.push(patch.name); }
+  if (patch.icon !== undefined) { sets.push("icon = ?"); vals.push(patch.icon); }
+  if (patch.color !== undefined) { sets.push("color = ?"); vals.push(patch.color); }
+  if (patch.description !== undefined) { sets.push("description = ?"); vals.push(patch.description); }
+  if (patch.pinned !== undefined) { sets.push("pinned = ?"); vals.push(patch.pinned ? 1 : 0); }
+  if (patch.sortOrder !== undefined) { sets.push("sortOrder = ?"); vals.push(patch.sortOrder); }
+  if (sets.length > 0) {
+    vals.push(id);
+    conn.prepare(`UPDATE collections SET ${sets.join(", ")} WHERE id = ?`).run(...vals);
+  }
+  const row = conn.prepare(
+    "SELECT id, name, icon, color, kind, description, pinned, sortOrder, createdAt FROM collections WHERE id = ?"
+  ).get(id) as Omit<CollectionRow, "gameCount">;
+  // recompute count
+  const w = autoCollectionWhere(row.kind);
+  let gameCount = 0;
+  if (row.id === -1) {
+    gameCount = (conn.prepare("SELECT COUNT(*) as n FROM games WHERE hidden = 0").get() as { n: number }).n;
+  } else if (w) {
+    gameCount = (conn.prepare(`SELECT COUNT(*) as n FROM games WHERE hidden = 0 AND ${w}`).get() as { n: number }).n;
+  } else {
+    gameCount = (conn.prepare("SELECT COUNT(*) as n FROM collection_games cg JOIN games g ON g.id = cg.gameId WHERE cg.collectionId = ? AND g.hidden = 0").get(id) as { n: number }).n;
+  }
+  return rowToCollection({ ...row, gameCount });
 }
 
 export function addGameToCollection(collectionId: number, gameId: number): void {
+  // Only manual collections accept junction rows. Smart collections are virtual.
   db().prepare("INSERT OR IGNORE INTO collection_games (collectionId, gameId) VALUES (?, ?)").run(collectionId, gameId);
 }
 
@@ -891,17 +1058,54 @@ export function removeGameFromCollection(collectionId: number, gameId: number): 
 }
 
 export function deleteCollection(id: number): void {
+  // Never delete the built-in Smart Collections (negative ids).
+  if (id < 0) return;
   db().prepare("DELETE FROM collections WHERE id = ?").run(id);
 }
 
+/** Reorder manual collections by passing the desired id order. */
+export function reorderCollections(ids: number[]): void {
+  const conn = db();
+  const stmt = conn.prepare("UPDATE collections SET sortOrder = ? WHERE id = ?");
+  ids.forEach((id, i) => stmt.run(i, id));
+}
+
+/** Resolve the games in a collection (manual via junction, smart via query). */
 export function getGamesInCollection(collectionId: number): Game[] {
   const conn = db();
-  const rows = conn.prepare(`
-    SELECT g.* FROM games g
-    JOIN collection_games cg ON g.id = cg.gameId
-    WHERE cg.collectionId = ?
-  `).all(collectionId) as GameRow[];
+  const col = conn.prepare("SELECT kind FROM collections WHERE id = ?").get(collectionId) as { kind: string } | undefined;
+  if (!col) return [];
+
+  // Special-case "All Games"
+  if (collectionId === -1) {
+    const rows = conn.prepare("SELECT * FROM games WHERE hidden = 0 ORDER BY sortOrder ASC, title ASC").all() as GameRow[];
+    return rows.map(rowToGame);
+  }
+
+  const w = autoCollectionWhere(col.kind);
+  let rows: GameRow[];
+  if (w) {
+    let order = "ORDER BY lastPlayedAt DESC";
+    if (col.kind === "auto:top") order = "ORDER BY playtimeSec DESC LIMIT 10";
+    if (col.kind === "auto:favorites") order = "ORDER BY title ASC";
+    if (col.kind === "auto:backlog" || col.kind === "auto:playing" || col.kind === "auto:never") order = "ORDER BY title ASC";
+    rows = conn.prepare(`SELECT * FROM games WHERE hidden = 0 AND ${w} ${order}`).all() as GameRow[];
+  } else {
+    rows = conn.prepare(`
+      SELECT g.* FROM games g
+      JOIN collection_games cg ON g.id = cg.gameId
+      WHERE cg.collectionId = ? AND g.hidden = 0
+      ORDER BY cg.rowid ASC
+    `).all(collectionId) as GameRow[];
+  }
   return rows.map(rowToGame);
+}
+
+/** Which collection ids contain a given game (for the "Add to collection" menu). */
+export function getCollectionsForGame(gameId: number): number[] {
+  const conn = db();
+  const rows = conn.prepare("SELECT collectionId FROM collection_games WHERE gameId = ?").all(gameId) as Array<{ collectionId: number }>;
+  return rows.map((r) => r.collectionId);
 }
 
 // ===== Achievements =====

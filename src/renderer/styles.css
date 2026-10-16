@@ -1182,3 +1182,162 @@ textarea.field-input{height:auto;padding:11px 13px;resize:vertical;font-family:"
   .dt-sidebar{display:none}
   .desktop-layout{flex-direction:column}
 }
+
+/* ===================================================================
+   v4.3.0 — Collections + Collapsible sidebar + Platform logos
+   =================================================================== */
+
+/* Collapsible sidebar section header (chevron + label) */
+.dt-section-head{
+  display:flex;align-items:center;gap:6px;
+  width:100%;
+  padding:8px 10px 4px;
+  margin-bottom:2px;
+  background:none;
+  cursor:pointer;
+  color:var(--text-faint);
+  font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;
+  transition:color var(--t-fast);
+}
+.dt-section-head:hover{color:var(--text-dim)}
+.dt-section-head .chev{
+  display:inline-flex;align-items:center;justify-content:center;
+  transition:transform var(--t-fast);
+}
+.dt-section-head.collapsed .chev{transform:rotate(-90deg)}
+.dt-section-head .lbl{flex:1;text-align:left}
+.dt-section-head .count{
+  font-size:9px;font-weight:600;color:var(--text-faint);
+  background:var(--surface-2);padding:1px 6px;border-radius:var(--r-sm);
+}
+/* When a section is collapsed, hide its body */
+.dt-section-body{display:flex;flex-direction:column;gap:2px}
+.dt-section-body.collapsed{display:none}
+
+/* Collections section in the sidebar */
+.dt-coll-add{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:22px;height:22px;border-radius:var(--r-sm);
+  background:transparent;border:1px solid var(--border-2);
+  color:var(--text-faint);
+  transition:background var(--t-fast),color var(--t-fast),border-color var(--t-fast);
+  flex-shrink:0;
+}
+.dt-coll-add:hover{background:rgba(var(--accent-rgb),0.14);color:var(--accent);border-color:rgba(var(--accent-rgb),0.4)}
+.dt-coll-item{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 12px;
+  border-radius:var(--r-md);
+  font-size:13px;font-weight:500;
+  color:var(--text-dim);
+  transition:background var(--t-fast),color var(--t-fast);
+  text-align:left;width:100%;
+  position:relative;
+}
+.dt-coll-item:hover{background:var(--surface);color:var(--text)}
+.dt-coll-item.active{background:var(--surface);color:var(--text);font-weight:600}
+.dt-coll-item.active::before{
+  content:"";position:absolute;left:0;top:8px;bottom:8px;
+  width:2px;border-radius:2px;
+  background:var(--coll-accent, var(--accent));
+}
+.dt-coll-emoji{
+  width:20px;height:20px;
+  display:inline-flex;align-items:center;justify-content:center;
+  font-size:13px;line-height:1;flex-shrink:0;
+}
+.dt-coll-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dt-coll-count{
+  font-size:10px;font-weight:700;color:var(--text-faint);
+  background:var(--surface-2);padding:1px 6px;border-radius:var(--r-sm);
+  flex-shrink:0;font-variant-numeric:tabular-nums;
+}
+.dt-coll-pin{color:var(--accent);flex-shrink:0}
+
+/* Platform mark inside the sidebar nav item (replaces the colored dot) */
+.dt-plat-mark{
+  width:18px;height:18px;flex-shrink:0;
+  display:inline-flex;align-items:center;justify-content:center;
+  color:var(--text-faint);
+  transition:color var(--t-fast);
+}
+.dt-nav-item:hover .dt-plat-mark{color:var(--text-dim)}
+.dt-nav-item.active .dt-plat-mark{color:var(--accent)}
+
+/* Collection view header (shown above the grid when a collection is active) */
+.dt-view-header{
+  display:flex;align-items:center;gap:14px;
+  padding:4px 0 18px;
+  border-bottom:1px solid var(--border);
+  margin-bottom:18px;
+}
+.dt-view-header .emoji{font-size:30px;line-height:1}
+.dt-view-header .stack{flex:1;min-width:0}
+.dt-view-header .title{font-size:22px;font-weight:800;color:#fff;letter-spacing:-0.02em}
+.dt-view-header .meta{font-size:12px;color:var(--text-dim);margin-top:3px}
+.dt-view-header .actions{display:flex;gap:var(--s-2)}
+
+/* Create-collection dialog: icon picker grid */
+.coll-icon-grid{
+  display:grid;
+  grid-template-columns:repeat(8, 1fr);
+  gap:6px;
+}
+.coll-icon-swatch{
+  aspect-ratio:1;
+  border-radius:var(--r-sm);
+  border:1px solid var(--border);
+  background:var(--surface);
+  display:flex;align-items:center;justify-content:center;
+  font-size:17px;line-height:1;
+  transition:background var(--t-fast),border-color var(--t-fast),transform var(--t-fast);
+}
+.coll-icon-swatch:hover{background:var(--surface-2);border-color:var(--border-2);transform:scale(1.06)}
+.coll-icon-swatch.active{background:rgba(var(--accent-rgb),0.14);border-color:rgba(var(--accent-rgb),0.5)}
+
+/* Collection picker (add-to-collection) list */
+.coll-pick-list{display:flex;flex-direction:column;gap:3px}
+.coll-pick-row{
+  display:flex;align-items:center;gap:10px;
+  width:100%;text-align:left;
+  padding:9px 11px;
+  border-radius:var(--r-md);
+  border:1px solid var(--border);
+  background:var(--surface);
+  color:var(--text-dim);
+  font-size:13px;font-weight:500;
+  transition:background var(--t-fast),border-color var(--t-fast),color var(--t-fast);
+  cursor:pointer;
+}
+.coll-pick-row:hover{background:var(--surface-2);color:var(--text);border-color:var(--border-2)}
+.coll-pick-row.checked{border-color:rgba(var(--accent-rgb),0.5);background:rgba(var(--accent-rgb),0.08);color:var(--text)}
+.coll-pick-emoji{width:20px;font-size:14px;text-align:center;flex-shrink:0}
+.coll-pick-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.coll-pick-count{font-size:10px;color:var(--text-faint);font-variant-numeric:tabular-nums}
+.coll-pick-check{
+  width:20px;height:20px;border-radius:var(--r-sm);
+  display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--border-2);
+  color:transparent;
+  transition:background var(--t-fast),color var(--t-fast),border-color var(--t-fast);
+  flex-shrink:0;
+}
+.coll-pick-check.on{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.coll-pick-readonly{
+  font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;
+  color:var(--text-faint);background:var(--surface-2);
+  padding:2px 6px;border-radius:var(--r-sm);flex-shrink:0;
+}
+.coll-pick-empty{
+  padding:14px;text-align:center;color:var(--text-faint);font-size:12px;
+  border:1px dashed var(--border-2);border-radius:var(--r-md);
+}
+
+/* Platform logo on game cards (replaces the colored dot) */
+.gc-platform .pm, .chip .pm, .info-meta .pm, .gp-meta .pm{
+  display:inline-flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+
+/* Console-mode filter pills now carry the platform mark */
+.filter-pill .pm{color:inherit}

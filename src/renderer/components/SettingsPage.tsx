@@ -1,9 +1,10 @@
 import { useState, useEffect, type ReactNode } from "react";
-import type { LauncherSettings, SortKey } from "@shared/types";
-import { SORT_LABELS } from "@shared/types";
+import type { LauncherSettings, SortKey, Collection } from "@shared/types";
+import { SORT_LABELS, PLATFORM_LIST } from "@shared/types";
 import { Icon } from "./Icons";
 import { applyAccent } from "../lib/accent";
 import { NexusMark } from "./Logo";
+import { PlatformMark } from "./PlatformMark";
 
 interface Props {
   initial: LauncherSettings;
@@ -12,13 +13,14 @@ interface Props {
   onCheckUpdates: () => void;
 }
 
-type TabId = "general" | "appearance" | "library" | "startup" | "overlay" | "about";
+type TabId = "general" | "appearance" | "library" | "sidebar" | "startup" | "overlay" | "about";
 
 interface TabDef { id: TabId; label: string; icon: ReactNode }
 const TABS: TabDef[] = [
   { id: "general", label: "General", icon: <Icon.Settings size={15} /> },
   { id: "appearance", label: "Appearance", icon: <Icon.Sparkles size={15} /> },
   { id: "library", label: "Library", icon: <Icon.Library size={15} /> },
+  { id: "sidebar", label: "Sidebar", icon: <Icon.Folder size={15} /> },
   { id: "startup", label: "Startup & Close", icon: <Icon.Shield size={15} /> },
   { id: "overlay", label: "Overlay", icon: <Icon.Gamepad size={15} /> },
   { id: "about", label: "About", icon: <Icon.Info size={15} /> },
@@ -60,6 +62,13 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
   const [tab, setTab] = useState<TabId>("general");
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ type: "info" | "success" | "error"; msg: string } | null>(null);
+  // v4.3.0 — sidebar customization state.
+  const [hiddenPlatforms, setHiddenPlatforms] = useState<Set<string>>(
+    () => new Set((initial.hiddenPlatforms ?? "").split("|").filter(Boolean))
+  );
+  const [collections, setCollections] = useState<Collection[]>([]);
+  // Load collections for the management section.
+  useEffect(() => { (async () => { try { setCollections(await window.nexus.listCollections()); } catch { /* ignore */ } })(); }, []);
 
   // Read the actual registry state for launch-on-startup on mount
   useEffect(() => {
@@ -151,7 +160,12 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
       localStorage.setItem("nx-haptics", haptics ? "on" : "off");
       localStorage.setItem("nx-uimode", uiMode);
       applyAccent(accentColor);
-      await onSave({ autoScanOnStart: autoScan, defaultSort, scanPaths, launchOnStartup, closeBehavior, uiMode });
+      await onSave({
+        autoScanOnStart: autoScan, defaultSort, scanPaths, launchOnStartup, closeBehavior, uiMode,
+        // v4.3.0 — persist platform visibility (pipe-separated) + sidebar collapse default
+        hiddenPlatforms: Array.from(hiddenPlatforms).join("|"),
+        sidebarCollapsed: localStorage.getItem("nx-plat-collapsed") === "1",
+      });
       flash("success", "Settings saved.");
     } catch (e) {
       flash("error", "Couldn't save: " + (e instanceof Error ? e.message : String(e)));
@@ -353,6 +367,89 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
               </>
             )}
 
+            {/* ===== SIDEBAR TAB (v4.3.0) ===== */}
+            {tab === "sidebar" && (
+              <>
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />Platform Visibility</div>
+                  <div className="settings-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 8, padding: "14px 16px" }}>
+                    <div className="label-stack" style={{ marginBottom: 6 }}>
+                      <div className="t">Show these platforms in the sidebar</div>
+                      <div className="d">Hidden platforms still appear on game cards, but won't clutter your sidebar list. Click a row to toggle.</div>
+                    </div>
+                    {PLATFORM_LIST.filter((p) => p.id !== "custom").map((p) => {
+                      const hidden = hiddenPlatforms.has(p.id);
+                      return (
+                        <button
+                          key={p.id}
+                          className="settings-choice"
+                          style={{ minWidth: 0, flexDirection: "row", alignItems: "center", justifyContent: "space-between", opacity: hidden ? 0.55 : 1 }}
+                          onClick={() => setHiddenPlatforms((prev) => { const n = new Set(prev); if (n.has(p.id)) n.delete(p.id); else n.add(p.id); return n; })}
+                        >
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 9 }}>
+                            <span style={{ color: "var(--text-faint)", display: "inline-flex" }}><PlatformMark platform={p.id} size={16} /></span>
+                            <span style={{ color: "var(--text)" }}>{p.label}</span>
+                          </span>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: hidden ? "var(--text-faint)" : "var(--accent)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                            {hidden ? "Hidden" : "Visible"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />Collapse Behavior</div>
+                  <div className="settings-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 10 }}>
+                    <div className="label-stack">
+                      <div className="t">Default sidebar sections</div>
+                      <div className="d">You can also collapse the Collections and Platforms sections at any time with the chevron in the sidebar — your choice persists across restarts.</div>
+                    </div>
+                    <div className="settings-choice-row">
+                      <button className="settings-choice" style={{ minWidth: 0 }} onClick={() => { localStorage.setItem("nx-coll-collapsed", "0"); localStorage.setItem("nx-plat-collapsed", "0"); flash("success", "Both sidebar sections will start expanded"); }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Icon.Library size={14} /> Expand Both</span>
+                      </button>
+                      <button className="settings-choice" style={{ minWidth: 0 }} onClick={() => { localStorage.setItem("nx-plat-collapsed", "1"); flash("success", "Platforms section will start collapsed"); }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Icon.Chevron size={14} /> Collapse Platforms</span>
+                      </button>
+                      <button className="settings-choice" style={{ minWidth: 0 }} onClick={() => { localStorage.setItem("nx-coll-collapsed", "1"); localStorage.setItem("nx-plat-collapsed", "1"); flash("success", "Both sections will start collapsed"); }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Icon.Chevron size={14} /> Collapse Both</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />Manage Collections</div>
+                  <div className="settings-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 6, padding: "12px 14px" }}>
+                    {collections.length === 0 && (
+                      <div style={{ fontSize: 12, color: "var(--text-faint)", padding: "8px 4px" }}>No collections. Create one from the sidebar.</div>
+                    )}
+                    {collections.map((c) => (
+                      <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 8px", borderRadius: "var(--r-sm)", background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)" }}>
+                        <span style={{ fontSize: 15 }}>{c.icon}</span>
+                        <span style={{ flex: 1, fontSize: 13, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
+                        <span style={{ fontSize: 10, color: "var(--text-faint)" }}>{c.gameCount} games</span>
+                        {c.pinned && <span style={{ color: "var(--accent)" }} title="Pinned"><Icon.Star size={12} filled /></span>}
+                        <span style={{ fontSize: 9, fontWeight: 700, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{c.kind === "manual" ? "manual" : c.kind.startsWith("auto:") ? "auto" : c.kind}</span>
+                        {c.id >= 0 && c.kind === "manual" && (
+                          <>
+                            <button className="ctx-item" style={{ padding: "4px 8px", fontSize: 11 }} onClick={async () => { await window.nexus.updateCollection(c.id, { pinned: !c.pinned }); setCollections(await window.nexus.listCollections()); }} title={c.pinned ? "Unpin" : "Pin"}>
+                              <Icon.Star size={12} filled={c.pinned} />
+                            </button>
+                            <button className="ctx-item danger" style={{ padding: "4px 8px", fontSize: 11 }} onClick={async () => { await window.nexus.deleteCollection(c.id); setCollections(await window.nexus.listCollections()); flash("success", "Collection deleted"); }} title="Delete">
+                              <Icon.Trash size={12} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
             {/* ===== STARTUP & CLOSE TAB ===== */}
             {tab === "startup" && (
               <>
@@ -462,7 +559,7 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
                     <div className="logo"><NexusMark size={28} /></div>
                     <div>
                       <div className="name">NEXUS Launcher</div>
-                      <div className="ver">Version 4.2.0 — Universal Game Launcher for Windows</div>
+                      <div className="ver">Version 4.3.0 — Universal Game Launcher for Windows</div>
                       <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 6 }}>
                         Auto-detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox. Patches rich metadata via RAWG + Steam APIs. Launches natively.
                       </div>

@@ -6,6 +6,7 @@
 
 import { contextBridge, ipcRenderer } from "electron";
 import type {
+  Collection,
   DetectedGame,
   Game,
   LauncherSettings,
@@ -108,12 +109,18 @@ const api = {
     neverPlayed: number; completionRate: number;
   }>,
   recordSession: (gameId: number, minutes: number) => ipcRenderer.invoke("games:recordSession", gameId, minutes) as Promise<boolean>,
-  // Collections
-  listCollections: () => ipcRenderer.invoke("collections:list") as Promise<Array<{ id: number; name: string; color: string; gameCount: number }>>,
-  createCollection: (name: string, color: string) => ipcRenderer.invoke("collections:create", name, color) as Promise<{ id: number; name: string; color: string; gameCount: number }>,
+  // Collections (v4.3.0 — extended: icon/kind/pinned + Smart Collections)
+  listCollections: () => ipcRenderer.invoke("collections:list") as Promise<Collection[]>,
+  createCollection: (input: { name: string; icon?: string; color?: string; description?: string }) =>
+    ipcRenderer.invoke("collections:create", input) as Promise<Collection>,
+  updateCollection: (id: number, patch: { name?: string; icon?: string; color?: string; description?: string; pinned?: boolean; sortOrder?: number }) =>
+    ipcRenderer.invoke("collections:update", id, patch) as Promise<Collection | null>,
   addGameToCollection: (collectionId: number, gameId: number) => ipcRenderer.invoke("collections:addGame", collectionId, gameId) as Promise<boolean>,
   removeGameFromCollection: (collectionId: number, gameId: number) => ipcRenderer.invoke("collections:removeGame", collectionId, gameId) as Promise<boolean>,
   deleteCollection: (id: number) => ipcRenderer.invoke("collections:delete", id) as Promise<boolean>,
+  reorderCollections: (ids: number[]) => ipcRenderer.invoke("collections:reorder", ids) as Promise<boolean>,
+  getGamesInCollection: (collectionId: number) => ipcRenderer.invoke("collections:getGames", collectionId) as Promise<Game[]>,
+  getCollectionsForGame: (gameId: number) => ipcRenderer.invoke("collections:forGame", gameId) as Promise<number[]>,
   // Achievements
   getAchievements: () => ipcRenderer.invoke("achievements:list") as Promise<Array<{ id: string; name: string; description: string; icon: string; unlockedAt: string | null; progress: number; maxProgress: number }>>,
   checkAchievements: () => ipcRenderer.invoke("achievements:check") as Promise<{ newlyUnlocked: string[] }>,

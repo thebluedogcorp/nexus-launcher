@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { DetectedGame, Game, LauncherSettings, PlatformId, SortKey, Stats } from "@shared/types";
-import { PLATFORM_LIST } from "@shared/types";
+import type { DetectedGame, Game, LauncherSettings, PlatformId, SortKey, Stats, Collection } from "@shared/types";
+import { PLATFORM_LIST, PLATFORMS } from "@shared/types";
 import { Icon } from "./components/Icons";
 import { NexusMark } from "./components/Logo";
 import { ModeToggle } from "./components/ModeToggle";
+import { PlatformMark } from "./components/PlatformMark";
+import { CreateCollectionDialog } from "./components/CreateCollectionDialog";
+import { CollectionPicker } from "./components/CollectionPicker";
 import { GamePage } from "./components/GamePage";
 import { AddGameDialog } from "./components/AddGameDialog";
 import { ScanDialog } from "./components/ScanDialog";
@@ -60,20 +63,55 @@ export function App() {
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
   // Playtime tracking state — shows live playtime when a game is running.
   const [activePlaytime, setActivePlaytime] = useState<{ gameId: number; gameTitle: string; elapsedSec: number; startedAt: number } | null>(null);
+  // v4.3.0 — Collections + collapsible sidebar + platform visibility.
+  const [collections, setCollections] = useState<Collection[]>([]);
+  const [activeCollection, setActiveCollection] = useState<number | null>(null); // null = no collection filter (All Games / platform)
+  const [createCollOpen, setCreateCollOpen] = useState(false);
+  const [editColl, setEditColl] = useState<Collection | null>(null);
+  const [collPickerGame, setCollPickerGame] = useState<{ id: number; title: string } | null>(null);
+  // Per-section collapse state (Collections + Platforms) — persisted in localStorage.
+  const [collectionsCollapsed, setCollectionsCollapsed] = useState(() => localStorage.getItem("nx-coll-collapsed") === "1");
+  const [platformsCollapsed, setPlatformsCollapsed] = useState(() => localStorage.getItem("nx-plat-collapsed") === "1");
 
   const toast = useCallback((type: Toast["type"], title: string, desc?: string) => {
     setToasts((prev) => [...prev, { id: Date.now() + Math.random(), type, title, desc }]);
   }, []);
   const dismissToast = useCallback((id: number) => setToasts((prev) => prev.filter((t) => t.id !== id)), []);
 
+  const refreshCollections = useCallback(async () => {
+    try { setCollections(await window.nexus.listCollections()); } catch { /* ignore */ }
+  }, []);
+
+  // Derived: which platforms are hidden from the sidebar (from settings).
+  const hiddenPlatformSet = useMemo(() => {
+    const s = settings?.hiddenPlatforms ?? "";
+    return new Set(s.split("|").filter(Boolean));
+  }, [settings]);
+  const visiblePlatforms = useMemo(
+    () => PLATFORM_LIST.filter((p) => p.id !== "custom" && !hiddenPlatformSet.has(p.id)),
+    [hiddenPlatformSet]
+  );
+
   const refreshGames = useCallback(async () => {
+    // v4.3.0 — if a collection is selected, load its games directly (and apply
+    // the search query client-side); otherwise use the normal platform/fav filter.
+    if (activeCollection !== null) {
+      let list: Game[] = [];
+      try { list = await window.nexus.getGamesInCollection(activeCollection); } catch { /* ignore */ }
+      if (filters.query.trim()) {
+        const q = filters.query.toLowerCase();
+        list = list.filter((g) => g.title.toLowerCase().includes(q));
+      }
+      setGames(list);
+      return;
+    }
     setGames(await window.nexus.listGames({ platform: filters.platform, favOnly: filters.favOnly, query: filters.query, sort: filters.sort }));
-  }, [filters]);
+  }, [filters, activeCollection]);
   const refreshStats = useCallback(async () => setStats(await window.nexus.getStats()), []);
   const refreshAll = useCallback(async () => {
     setLoading(true);
-    try { await Promise.all([refreshGames(), refreshStats()]); } finally { setLoading(false); }
-  }, [refreshGames, refreshStats]);
+    try { await Promise.all([refreshGames(), refreshStats(), refreshCollections()]); } finally { setLoading(false); }
+  }, [refreshGames, refreshStats, refreshCollections]);
 
   useEffect(() => {
     // v4.2.0 — Apply the saved accent color on startup BEFORE painting the
@@ -143,7 +181,7 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => { if (!loading) refreshGames(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters]);
+  useEffect(() => { if (!loading) refreshGames(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters, activeCollection]);
 
   const openPage = useCallback(async (id: number) => setPageGame(await window.nexus.getGame(id)), []);
   const handleLaunch = useCallback(async (g: Game) => {
@@ -207,6 +245,53 @@ export function App() {
     localStorage.setItem("nx-uimode", mode);
     try { await window.nexus.setSettings({ uiMode: mode }); } catch {}
   }, []);
+
+  // v4.3.0 — Collection actions.
+  const selectCollection = useCallback((id: number | null) => {
+    // selecting a collection clears the platform/fav filter (collection view takes over)
+    setActiveCollection(id);
+    if (id !== null) setFilters((f) => ({ ...f, platform: "all", favOnly: false }));
+  }, []);
+  const handleCreateCollection = useCallback(async (data: { name: string; icon: string; color: string; description: string }) => {
+    try {
+      const c = await window.nexus.createCollection(data);
+      await refreshCollections();
+      toast("success", "Collection created", `"${c.name}" is ready in your sidebar.`);
+    } catch (e) { toast("error", "Couldn't create collection", e instanceof Error ? e.message : String(e)); }
+  }, [refreshCollections, toast]);
+  const handleUpdateCollection = useCallback(async (id: number, data: { name: string; icon: string; color: string; description: string }) => {
+    try {
+      await window.nexus.updateCollection(id, data);
+      await refreshCollections();
+      toast("success", "Collection updated");
+    } catch (e) { toast("error", "Couldn't update collection", e instanceof Error ? e.message : String(e)); }
+  }, [refreshCollections, toast]);
+  const handleDeleteCollection = useCallback(async (c: Collection) => {
+    if (c.id < 0) { toast("info", "Built-in collections can't be deleted"); return; }
+    try {
+      await window.nexus.deleteCollection(c.id);
+      if (activeCollection === c.id) setActiveCollection(null);
+      await refreshCollections();
+      toast("success", "Collection deleted", `"${c.name}" was removed.`);
+    } catch (e) { toast("error", "Couldn't delete collection", e instanceof Error ? e.message : String(e)); }
+  }, [activeCollection, refreshCollections, toast]);
+  const handleToggleGameInCollection = useCallback(async (collectionId: number, gameId: number, add: boolean) => {
+    try {
+      if (add) await window.nexus.addGameToCollection(collectionId, gameId);
+      else await window.nexus.removeGameFromCollection(collectionId, gameId);
+      await refreshCollections();
+    } catch { /* ignore */ }
+  }, [refreshCollections]);
+  const toggleCollectionPin = useCallback(async (c: Collection) => {
+    try { await window.nexus.updateCollection(c.id, { pinned: !c.pinned }); await refreshCollections(); } catch { /* ignore */ }
+  }, [refreshCollections]);
+  const toggleCollectionsCollapsed = useCallback(() => {
+    setCollectionsCollapsed((v) => { const n = !v; localStorage.setItem("nx-coll-collapsed", n ? "1" : "0"); return n; });
+  }, []);
+  const togglePlatformsCollapsed = useCallback(() => {
+    setPlatformsCollapsed((v) => { const n = !v; localStorage.setItem("nx-plat-collapsed", n ? "1" : "0"); return n; });
+  }, []);
+
   const handleCheckUpdates = useCallback(async () => {
     toast("info", "Checking for updates…");
     try {
@@ -487,8 +572,21 @@ export function App() {
   if (pageGame) {
     return (
       <>
-        <GamePage game={pageGame} onClose={() => setPageGame(null)} onLaunch={handleLaunch} onPatch={handlePatch} onDelete={handleDelete} onToggleFav={handleToggleFav} onUpdate={handleUpdateFromPage} onOpenDir={handleOpenDir} />
+        <GamePage game={pageGame} onClose={() => setPageGame(null)} onLaunch={handleLaunch} onPatch={handlePatch} onDelete={handleDelete} onToggleFav={handleToggleFav} onUpdate={handleUpdateFromPage} onOpenDir={handleOpenDir} onAddToCollection={(g) => setCollPickerGame({ id: g.id, title: g.title })} />
         {controllerConnected && <div className="hints-bar"><span className="hint"><span className="k r">B</span> Back</span><span className="hint"><span className="k r">A</span>/<span className="k r">X</span> Play</span></div>}
+        {/* v4.3.0 — Collection dialogs accessible from the game page too */}
+        {createCollOpen && <CreateCollectionDialog onClose={() => setCreateCollOpen(false)} onSave={handleCreateCollection} />}
+        {editColl && <CreateCollectionDialog initial={editColl} onClose={() => setEditColl(null)} onSave={(d) => handleUpdateCollection(editColl.id, d)} />}
+        {collPickerGame && (
+          <CollectionPicker
+            gameId={collPickerGame.id}
+            gameTitle={collPickerGame.title}
+            collections={collections}
+            onClose={() => setCollPickerGame(null)}
+            onToggle={(cid, add) => handleToggleGameInCollection(cid, collPickerGame.id, add)}
+            onCreateNew={() => { setCollPickerGame(null); setCreateCollOpen(true); }}
+          />
+        )}
         <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       </>
     );
@@ -542,29 +640,81 @@ export function App() {
               <span className="dt-sidebar-mark"><NexusMark size={16} /></span>
               <span className="dt-sidebar-title">Library</span>
             </div>
-            <div className="dt-sidebar-nav">
-              <button className={filters.platform === "all" && !filters.favOnly ? "dt-nav-item active" : "dt-nav-item"} onClick={() => setFilters((f) => ({ ...f, platform: "all", favOnly: false }))}>
-                <Icon.Library size={16} /> <span>All Games</span>
-                {stats && <span className="dt-nav-count">{stats.totalGames}</span>}
-              </button>
-              <button className={filters.favOnly ? "dt-nav-item active" : "dt-nav-item"} onClick={() => setFilters((f) => ({ ...f, favOnly: !f.favOnly }))}>
-                <Icon.Star size={16} /> <span>Favorites</span>
-                {stats && <span className="dt-nav-count">{stats.favorites}</span>}
-              </button>
-            </div>
+
+            {/* Collections section (collapsible) */}
             <div className="dt-sidebar-section">
-              <div className="dt-sidebar-label">Platforms</div>
-              {PLATFORM_LIST.filter((p) => p.id !== "custom").map((p) => {
-                const count = stats?.byPlatform?.[p.id] ?? 0;
-                return (
-                  <button key={p.id} className={filters.platform === p.id ? "dt-nav-item active" : "dt-nav-item"} onClick={() => setFilters((f) => ({ ...f, platform: p.id, favOnly: false }))}>
-                    <span className="dt-plat-dot" style={{ background: p.accent }} />
-                    <span>{p.label}</span>
-                    {count > 0 && <span className="dt-nav-count">{count}</span>}
+              <button
+                className={collectionsCollapsed ? "dt-section-head collapsed" : "dt-section-head"}
+                onClick={toggleCollectionsCollapsed}
+                aria-expanded={!collectionsCollapsed}
+              >
+                <span className="chev"><Icon.Chevron size={11} /></span>
+                <span className="lbl">Collections</span>
+                <span className="count">{collections.length}</span>
+                <span className="dt-coll-add" role="button" tabIndex={0}
+                  onClick={(e) => { e.stopPropagation(); setCreateCollOpen(true); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); setCreateCollOpen(true); } }}
+                  title="New collection"
+                  aria-label="New collection"
+                ><Icon.Plus size={12} /></span>
+              </button>
+              <div className={collectionsCollapsed ? "dt-section-body collapsed" : "dt-section-body"}>
+                {collections.map((c) => (
+                  <button
+                    key={c.id}
+                    className={activeCollection === c.id ? "dt-coll-item active" : "dt-coll-item"}
+                    style={{ ["--coll-accent" as string]: c.color || undefined }}
+                    onClick={() => selectCollection(activeCollection === c.id ? null : c.id)}
+                    onContextMenu={(e) => { e.preventDefault(); setEditColl(c); }}
+                    title={c.description ?? c.name}
+                  >
+                    <span className="dt-coll-emoji">{c.icon}</span>
+                    <span className="dt-coll-name">{c.name}</span>
+                    {c.pinned && <span className="dt-coll-pin" title="Pinned"><Icon.Star size={10} filled /></span>}
+                    <span className="dt-coll-count">{c.gameCount}</span>
                   </button>
-                );
-              })}
+                ))}
+                {collections.length === 0 && (
+                  <button className="dt-coll-item" onClick={() => setCreateCollOpen(true)}>
+                    <span className="dt-coll-emoji">＋</span>
+                    <span className="dt-coll-name" style={{ color: "var(--text-faint)" }}>Create your first collection</span>
+                  </button>
+                )}
+              </div>
             </div>
+
+            {/* Platforms section (collapsible, respects per-platform visibility) */}
+            <div className="dt-sidebar-section">
+              <button
+                className={platformsCollapsed ? "dt-section-head collapsed" : "dt-section-head"}
+                onClick={togglePlatformsCollapsed}
+                aria-expanded={!platformsCollapsed}
+              >
+                <span className="chev"><Icon.Chevron size={11} /></span>
+                <span className="lbl">Platforms</span>
+                <span className="count">{visiblePlatforms.length}</span>
+              </button>
+              <div className={platformsCollapsed ? "dt-section-body collapsed" : "dt-section-body"}>
+                {visiblePlatforms.map((p) => {
+                  const count = stats?.byPlatform?.[p.id] ?? 0;
+                  return (
+                    <button
+                      key={p.id}
+                      className={filters.platform === p.id && activeCollection === null ? "dt-nav-item active" : "dt-nav-item"}
+                      onClick={() => { setActiveCollection(null); setFilters((f) => ({ ...f, platform: p.id, favOnly: false })); }}
+                    >
+                      <span className="dt-plat-mark"><PlatformMark platform={p.id} size={16} /></span>
+                      <span>{p.label}</span>
+                      {count > 0 && <span className="dt-nav-count">{count}</span>}
+                    </button>
+                  );
+                })}
+                {visiblePlatforms.length === 0 && (
+                  <div style={{ padding: "8px 12px", fontSize: 11, color: "var(--text-faint)" }}>All platforms hidden — enable some in Settings → Sidebar.</div>
+                )}
+              </div>
+            </div>
+
             <div className="dt-sidebar-section">
               <div className="dt-sidebar-label">Library Stats</div>
               <div className="dt-stat-mini"><span>Playtime</span><strong>{stats ? formatPlaytimeShort(stats.totalPlaytimeSec) : "—"}</strong></div>
@@ -633,6 +783,29 @@ export function App() {
             ) : (
               /* Games tab — grid view */
               <div className="dt-scroll">
+                {/* v4.3.0 — Collection view header (only when a collection is selected) */}
+                {activeCollection !== null && (() => {
+                  const c = collections.find((x) => x.id === activeCollection);
+                  if (!c) return null;
+                  return (
+                    <div className="dt-view-header">
+                      <span className="emoji">{c.icon}</span>
+                      <div className="stack">
+                        <div className="title" style={{ ["--coll-accent" as string]: c.color || undefined, color: c.color || "#fff" }}>{c.name}</div>
+                        <div className="meta">{c.gameCount} game{c.gameCount === 1 ? "" : "s"}{c.description ? " · " + c.description : ""}{c.kind !== "manual" ? " · auto-generated" : ""}</div>
+                      </div>
+                      <div className="actions">
+                        {c.id >= 0 && c.kind === "manual" && (
+                          <>
+                            <button className="btn btn-ghost btn-sm" onClick={() => toggleCollectionPin(c)} title={c.pinned ? "Unpin" : "Pin to top"}><Icon.Star size={13} filled={c.pinned} /></button>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setEditColl(c)} title="Edit collection"><Icon.FileCog size={13} /> Edit</button>
+                            <button className="btn btn-danger btn-sm" onClick={() => handleDeleteCollection(c)} title="Delete collection"><Icon.Trash size={13} /></button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
                 {loading ? (
                   <div className="desktop-grid">
                     {Array.from({ length: 12 }).map((_, i) => (
@@ -675,7 +848,7 @@ export function App() {
                             )}
                             <div className="gc-overlay" />
                             <div className="gc-chips">
-                              <span className="gc-platform"><span className="dot" style={{ background: platformColor(g.platform) }} />{platformLabel(g.platform)}</span>
+                              <span className="gc-platform"><span className="pm"><PlatformMark platform={g.platform} size={11} /></span>{platformLabel(g.platform)}</span>
                               <button className={g.favorite ? "gc-fav on" : "gc-fav"} onClick={(e) => { e.stopPropagation(); handleToggleFav(g); }} title={g.favorite ? "Remove favorite" : "Add favorite"}>
                                 <Icon.Star size={13} filled={g.favorite} />
                               </button>
@@ -716,12 +889,26 @@ export function App() {
             <button className="ctx-item" onClick={() => { openPage(ctxMenu.game.id); setCtxMenu(null); }}><Icon.Info size={15} /> Details</button>
             <div className="ctx-sep" />
             <button className="ctx-item" onClick={() => { handleToggleFav(ctxMenu.game); setCtxMenu(null); }}><Icon.Star size={15} filled={ctxMenu.game.favorite} /> {ctxMenu.game.favorite ? "Unfavorite" : "Favorite"}</button>
+            <button className="ctx-item" onClick={() => { setCollPickerGame({ id: ctxMenu.game.id, title: ctxMenu.game.title }); setCtxMenu(null); }}><Icon.Folder size={15} /> Add to Collection</button>
             <button className="ctx-item" onClick={() => { handleOpenDir(ctxMenu.game); setCtxMenu(null); }}><Icon.Folder size={15} /> Open Directory</button>
             <button className="ctx-item" onClick={() => { handlePatch(ctxMenu.game); setCtxMenu(null); }}><Icon.Refresh size={15} /> Patch Metadata</button>
             <button className="ctx-item" onClick={() => { setEditorGame(ctxMenu.game); setCtxMenu(null); }}><Icon.FileCog size={15} /> Edit Game</button>
             <div className="ctx-sep" />
             <button className="ctx-item danger" onClick={() => { handleDelete(ctxMenu.game); setCtxMenu(null); }}><Icon.Trash size={15} /> Remove</button>
           </div>
+        )}
+        {/* v4.3.0 — Collection dialogs (create/edit + add-to-collection picker) */}
+        {createCollOpen && <CreateCollectionDialog onClose={() => setCreateCollOpen(false)} onSave={handleCreateCollection} />}
+        {editColl && <CreateCollectionDialog initial={editColl} onClose={() => setEditColl(null)} onSave={(d) => handleUpdateCollection(editColl.id, d)} />}
+        {collPickerGame && (
+          <CollectionPicker
+            gameId={collPickerGame.id}
+            gameTitle={collPickerGame.title}
+            collections={collections}
+            onClose={() => setCollPickerGame(null)}
+            onToggle={(cid, add) => handleToggleGameInCollection(cid, collPickerGame.id, add)}
+            onCreateNew={() => { setCollPickerGame(null); setCreateCollOpen(true); }}
+          />
         )}
         {editorGame && <GameEditor game={editorGame} onSave={(patch) => handleEditGame(editorGame, patch)} onClose={() => setEditorGame(null)} />}
 
@@ -834,18 +1021,26 @@ export function App() {
         ) : (
         /* ===== GAMES TAB ===== */
         <>
-        {/* Filter pills */}
+        {/* Filter pills — v4.3.0: platform logos + collection-aware + respects visibility */}
         <div className="filter-row">
-          <button className={filters.platform === "all" && !filters.favOnly ? "filter-pill active" : "filter-pill"} onClick={() => setFilters((f) => ({ ...f, platform: "all", favOnly: false }))}>All</button>
+          <button className={filters.platform === "all" && !filters.favOnly && activeCollection === null ? "filter-pill active" : "filter-pill"} onClick={() => { setActiveCollection(null); setFilters((f) => ({ ...f, platform: "all", favOnly: false })); }}>All</button>
           <button className={filters.favOnly ? "filter-pill active" : "filter-pill"} onClick={() => setFilters((f) => ({ ...f, favOnly: !f.favOnly }))}><Icon.Star size={11} filled={filters.favOnly} /> Favorites</button>
           <div className="filter-sep" />
-          {PLATFORM_LIST.filter((p) => p.id !== "custom").map((p) => (
-            <button key={p.id} className={filters.platform === p.id ? "filter-pill active" : "filter-pill"} onClick={() => setFilters((f) => ({ ...f, platform: p.id, favOnly: false }))}>
-              <span className="d" style={{ background: p.accent }} />
+          {visiblePlatforms.map((p) => (
+            <button key={p.id} className={filters.platform === p.id && activeCollection === null ? "filter-pill active" : "filter-pill"} onClick={() => { setActiveCollection(null); setFilters((f) => ({ ...f, platform: p.id, favOnly: false })); }}>
+              <span className="pm"><PlatformMark platform={p.id} size={12} /></span>
               {p.label}
               {stats?.byPlatform?.[p.id] ? <span style={{ opacity: 0.6 }}>{stats.byPlatform[p.id]}</span> : null}
             </button>
           ))}
+          {collections.length > 0 && (<>
+            <div className="filter-sep" />
+            {collections.slice(0, 6).map((c) => (
+              <button key={c.id} className={activeCollection === c.id ? "filter-pill active" : "filter-pill"} onClick={() => selectCollection(activeCollection === c.id ? null : c.id)} title={c.description ?? c.name}>
+                <span style={{ fontSize: 11 }}>{c.icon}</span> {c.name}
+              </button>
+            ))}
+          </>)}
         </div>
 
         {/* Enrichment banner */}
@@ -906,7 +1101,7 @@ export function App() {
                     )}
                     <div className="gc-overlay" />
                     <div className="gc-chips">
-                      <span className="gc-platform"><span className="dot" style={{ background: platformColor(g.platform) }} />{platformLabel(g.platform)}</span>
+                      <span className="gc-platform"><span className="pm"><PlatformMark platform={g.platform} size={11} /></span>{platformLabel(g.platform)}</span>
                       <button className={g.favorite ? "gc-fav on" : "gc-fav"} onClick={(e) => { e.stopPropagation(); handleToggleFav(g); }} title={g.favorite ? "Remove favorite" : "Add favorite"}>
                         <Icon.Star size={13} filled={g.favorite} />
                       </button>
@@ -967,7 +1162,7 @@ export function App() {
                 <div className="info-left">
                   <h1 className="info-title">{focusedGame.title}</h1>
                   <div className="info-meta">
-                    <span className="pat"><span style={{ width: 7, height: 7, borderRadius: "50%", background: platformColor(focusedGame.platform), display: "inline-block" }} />{platformLabel(focusedGame.platform)}</span>
+                    <span className="pat"><span className="pm"><PlatformMark platform={focusedGame.platform} size={11} /></span>{platformLabel(focusedGame.platform)}</span>
                     {focusedGame.developer && <><span className="dot" />{focusedGame.developer}</>}
                     {focusedGame.releaseDate && <><span className="dot" />{focusedGame.releaseDate.slice(0, 4)}</>}
                     {focusedGame.rating !== null && <><span className="dot" /><span className="rating"><Icon.Star size={12} filled /> {focusedGame.rating.toFixed(1)}</span></>}
@@ -1089,6 +1284,7 @@ export function App() {
           <button className="ctx-item" onClick={() => { openPage(ctxMenu.game.id); setCtxMenu(null); }}><Icon.Info size={15} /> Details</button>
           <div className="ctx-sep" />
           <button className="ctx-item" onClick={() => { handleToggleFav(ctxMenu.game); setCtxMenu(null); }}><Icon.Star size={15} filled={ctxMenu.game.favorite} /> {ctxMenu.game.favorite ? "Unfavorite" : "Favorite"}</button>
+          <button className="ctx-item" onClick={() => { setCollPickerGame({ id: ctxMenu.game.id, title: ctxMenu.game.title }); setCtxMenu(null); }}><Icon.Folder size={15} /> Add to Collection</button>
           <button className="ctx-item" onClick={() => { handleOpenDir(ctxMenu.game); setCtxMenu(null); }}><Icon.Folder size={15} /> Open Directory</button>
           <button className="ctx-item" onClick={() => { handlePatch(ctxMenu.game); setCtxMenu(null); }}><Icon.Refresh size={15} /> Patch Metadata</button>
           <button className="ctx-item" onClick={() => { setEditorGame(ctxMenu.game); setCtxMenu(null); }}><Icon.FileCog size={15} /> Edit Game</button>
@@ -1104,7 +1300,19 @@ export function App() {
       {/* Game editor */}
       {editorGame && <GameEditor game={editorGame} onSave={(patch) => handleEditGame(editorGame, patch)} onClose={() => setEditorGame(null)} />}
 
-      {/* Stats dashboard */}
+      {/* v4.3.0 — Collection dialogs (create/edit + add-to-collection picker) */}
+      {createCollOpen && <CreateCollectionDialog onClose={() => setCreateCollOpen(false)} onSave={handleCreateCollection} />}
+      {editColl && <CreateCollectionDialog initial={editColl} onClose={() => setEditColl(null)} onSave={(d) => handleUpdateCollection(editColl.id, d)} />}
+      {collPickerGame && (
+        <CollectionPicker
+          gameId={collPickerGame.id}
+          gameTitle={collPickerGame.title}
+          collections={collections}
+          onClose={() => setCollPickerGame(null)}
+          onToggle={(cid, add) => handleToggleGameInCollection(cid, collPickerGame.id, add)}
+          onCreateNew={() => { setCollPickerGame(null); setCreateCollOpen(true); }}
+        />
+      )}
       {statsOpen && <StatsDashboard onClose={() => setStatsOpen(false)} onExport={handleExport} onImport={handleImportFile} onCheckMissing={handleCheckMissing} />}
 
       {controllerConnected && !pageGame && <div className="hints-bar"><span className="hint"><span className="k">↑↓</span> {gpZone === "topbar" ? "Top Bar" : gpZone === "filters" ? "Filters" : gpZone === "carousel" ? "Games" : "Actions"}</span><span className="hint"><span className="k">←→</span> Navigate</span><span className="hint"><span className="k r">A</span> Select</span><span className="hint"><span className="k r">X</span> Play</span><span className="hint"><span className="k r">Y</span> Details</span><span className="hint"><span className="k r">B</span> Back</span><span className="hint"><span className="k">☰</span> Settings</span></div>}
