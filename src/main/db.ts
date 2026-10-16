@@ -209,6 +209,8 @@ function migrate(conn: import("better-sqlite3").Database) {
   addColumnIfMissing(conn, "games", "sortOrder", "INTEGER DEFAULT 0");
   // v4.5.0 — install state. Default 1 (existing detected games are installed).
   addColumnIfMissing(conn, "games", "installed", "INTEGER NOT NULL DEFAULT 1");
+  // v4.6.0 — trailer URL (RAWG clip mp4) for the muted preview.
+  addColumnIfMissing(conn, "games", "trailerUrl", "TEXT");
 
   // v4.3.0 — Collections: icon, kind, description, pinned, sortOrder.
   // The collections table existed since v2.0 with just (id, name, color, createdAt).
@@ -290,6 +292,7 @@ interface GameRow {
   launchCommand: string | null;
   coverImage: string | null;
   bannerImage: string | null;
+  trailerUrl: string | null;
   screenshots: string | null;
   description: string | null;
   developer: string | null;
@@ -338,6 +341,7 @@ function rowToGame(r: GameRow): Game {
     launchCommand: r.launchCommand,
     coverImage: r.coverImage,
     bannerImage: r.bannerImage,
+    trailerUrl: r.trailerUrl ?? null,
     screenshots: r.screenshots ? r.screenshots.split("|").filter(Boolean) : [],
     description: r.description,
     developer: r.developer,
@@ -452,6 +456,7 @@ export function createGame(input: {
   launchCommand?: string | null;
   coverImage?: string | null;
   bannerImage?: string | null;
+  trailerUrl?: string | null;
   screenshots?: string[];
   description?: string | null;
   developer?: string | null;
@@ -485,13 +490,13 @@ export function createGame(input: {
   const stmt = conn.prepare(`
     INSERT INTO games (
       title, platform, source, executable, installDir, launchCommand,
-      coverImage, bannerImage, screenshots, description, developer, publisher, releaseDate, rating, ratingCount,
+      coverImage, bannerImage, trailerUrl, screenshots, description, developer, publisher, releaseDate, rating, ratingCount,
       genres, rawgId, sizeBytes,
       steamAppId, epicAppName, gogId, battlenetUid, eaOfferId, ubisoftId, riotId,
       xboxPackageFamilyName, xboxAppId, installedAt, installed
     ) VALUES (
       @title, @platform, @source, @executable, @installDir, @launchCommand,
-      @coverImage, @bannerImage, @screenshots, @description, @developer, @publisher, @releaseDate, @rating, @ratingCount,
+      @coverImage, @bannerImage, @trailerUrl, @screenshots, @description, @developer, @publisher, @releaseDate, @rating, @ratingCount,
       @genres, @rawgId, @sizeBytes,
       @steamAppId, @epicAppName, @gogId, @battlenetUid, @eaOfferId, @ubisoftId, @riotId,
       @xboxPackageFamilyName, @xboxAppId, datetime('now'), @installed
@@ -506,6 +511,7 @@ export function createGame(input: {
     launchCommand: input.launchCommand ?? null,
     coverImage: input.coverImage ?? null,
     bannerImage: input.bannerImage ?? null,
+    trailerUrl: input.trailerUrl ?? null,
     screenshots: input.screenshots?.length ? input.screenshots.join("|") : null,
     description: input.description ?? null,
     developer: input.developer ?? null,
@@ -541,6 +547,7 @@ export function updateGame(id: number, patch: Record<string, unknown>): Game | n
     launchCommand: "launchCommand",
     coverImage: "coverImage",
     bannerImage: "bannerImage",
+    trailerUrl: "trailerUrl",
     screenshots: "screenshots",
     description: "description",
     developer: "developer",

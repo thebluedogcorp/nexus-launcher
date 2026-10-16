@@ -8,6 +8,7 @@ import { PlatformMark } from "./components/PlatformMark";
 import { IconGlyph } from "./components/IconGlyph";
 import { ThemeStudio } from "./components/theme/ThemeStudio";
 import { AcquisitionPicker } from "./components/AcquisitionPicker";
+import { GameTrailer } from "./components/GameTrailer";
 import { CreateCollectionDialog } from "./components/CreateCollectionDialog";
 import { CollectionPicker } from "./components/CollectionPicker";
 import { GamePage } from "./components/GamePage";
@@ -70,6 +71,18 @@ export function App() {
   // v4.5.x — Acquisition: when the user clicks Get on a non-installed game,
   // open the intelligent store-link picker (no download system).
   const [acquireGame, setAcquireGame] = useState<{ id: number; title: string; installed: boolean } | null>(null);
+  // v4.6.0 — Trailer hover preview. Only ONE card's trailer plays at a time
+  // (the last hovered). 400ms debounce so quick mouse-overs don't trigger playback.
+  const [trailerHoverId, setTrailerHoverId] = useState<number | null>(null);
+  const trailerHoverTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const onCardHover = useCallback((g: Game) => {
+    clearTimeout(trailerHoverTimer.current);
+    trailerHoverTimer.current = setTimeout(() => setTrailerHoverId(g.id), 400);
+  }, []);
+  const onCardLeave = useCallback(() => {
+    clearTimeout(trailerHoverTimer.current);
+    setTrailerHoverId(null);
+  }, []);
   // Playtime tracking state — shows live playtime when a game is running.
   const [activePlaytime, setActivePlaytime] = useState<{ gameId: number; gameTitle: string; elapsedSec: number; startedAt: number } | null>(null);
   // v4.3.0 — Collections + collapsible sidebar + platform visibility.
@@ -855,8 +868,11 @@ export function App() {
                           style={{ animationDelay: `${Math.min(i * 25, 400)}ms` }}
                           onClick={() => openPage(g.id)}
                           onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, game: g }); }}
+                          onMouseEnter={() => onCardHover(g)}
+                          onMouseLeave={onCardLeave}
                         >
                           <div className="gc-cover">
+                            <div className="gc-trailer"><GameTrailer url={g.trailerUrl} posterUrl={banner} active={trailerHoverId === g.id} /></div>
                             {banner ? (
                               <img src={banner} alt={g.title} loading="lazy" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
                             ) : (
@@ -1373,6 +1389,10 @@ function DynamicBackground({ games, focusedIdx, focusedGame }: { games: Game[]; 
   return (
     <>
       <div className="bg-layer">
+        {/* v4.6.0 — cinematic trailer behind the console UI (muted, one at a time) */}
+        {focusedGame?.trailerUrl && (
+          <div className="bg-trailer"><GameTrailer url={focusedGame.trailerUrl} posterUrl={focusedGame.bannerImage || focusedGame.coverImage} active /></div>
+        )}
         {visible.map((v, i) => <div key={v.id} className={i === 0 ? "bg-slide active" : "bg-slide"} style={{ backgroundImage: v.image.startsWith("radial") ? v.image : `url(${v.image})` }} />)}
       </div>
       <div className="bg-overlay" />

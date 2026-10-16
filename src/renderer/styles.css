@@ -1607,3 +1607,107 @@ html:not([data-card-entrance="0"]) .gc{animation:gcIn var(--t-slow)}
 /* In-card progress bar shown when a download is active for this game */
 /* The "Not installed" badge on the card footer */
 .gc-not-installed{font-size:9px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--accent);padding:2px 6px;border-radius:var(--r-sm);background:rgba(var(--accent-rgb),0.12);border:1px solid rgba(var(--accent-rgb),0.3);display:inline-block;margin-top:2px}
+
+/* ===================================================================
+   v4.6.0 — Game trailer preview system + premium visual polish
+   =================================================================== */
+
+/* Trailer overlay on the game card cover */
+.gc-trailer{
+  position:absolute;inset:0;z-index:1;
+  overflow:hidden;
+}
+.gc-trailer video,
+.gc-trailer img{
+  width:100%;height:100%;object-fit:cover;
+}
+/* The cover img sits behind the trailer (z-index 0); when the trailer is
+   active, it overlays smoothly. */
+.gc-cover img{position:relative;z-index:0}
+.gc-cover .gc-proc{position:relative;z-index:0}
+
+/* Trailer overlay on the game-detail hero */
+.gp-hero-trailer{
+  position:absolute;inset:0;z-index:1;
+  overflow:hidden;
+}
+.gp-hero-trailer video,
+.gp-hero-trailer img{
+  width:100%;height:100%;object-fit:cover;
+}
+
+/* v4.6.0 — Premium card hover: cinematic zoom + accent glow on the cover */
+.gc-cover img,.gc-cover .gc-proc{
+  transition:transform var(--t-slow),filter var(--t-slow);
+}
+.gc:hover .gc-cover img,.gc:hover .gc-cover .gc-proc{
+  transform:scale(1.08);
+  filter:saturate(1.12) contrast(1.05);
+}
+/* The trailer video also zooms slightly on hover for a cinematic feel */
+.gc:hover .gc-trailer video{transform:scale(1.04);transition:transform var(--t-slow)}
+
+/* Refined card border on hover — subtle accent ring instead of plain border */
+.gc:hover{
+  border-color:rgba(var(--accent-rgb),0.22);
+  box-shadow:0 0 0 1px rgba(var(--accent-rgb),0.12),var(--shadow-mid);
+}
+
+/* Atmospheric topbar — a faint accent-tinted sheen along the bottom edge */
+.topbar::after{
+  content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(var(--accent-rgb),0.20),transparent);
+  pointer-events:none;
+}
+.topbar{position:relative}
+
+/* Smooth modal entrance — already have .modal animation; add a subtle scale */
+.modal{
+  animation:mr var(--t-slow);
+}
+@keyframes mr{
+  from{opacity:0;transform:translateY(10px) scale(0.98)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+
+/* Loading skeleton refinement — shimmer pulse */
+.shimmer{
+  background:linear-gradient(90deg,rgba(255,255,255,0.02) 0%,rgba(255,255,255,0.06) 50%,rgba(255,255,255,0.02) 100%);
+  background-size:200% 100%;
+  animation:sh 1.6s linear infinite;
+}
+@keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* Focus-visible ring for keyboard navigation — accent, consistent everywhere */
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{
+  outline:2px solid rgba(var(--accent-rgb),0.6);
+  outline-offset:2px;
+  border-radius:var(--r-sm);
+}
+
+/* Game-page hero: slow cinematic parallax zoom on the bg image */
+.gp-hero-bg{
+  animation:heroZoom 20s ease-out forwards;
+}
+@keyframes heroZoom{from{transform:scale(1.12)}to{transform:scale(1.05)}}
+[data-reduced-motion] .gp-hero-bg{animation:none}
+
+/* Staggered nav-tab entrance */
+.nav-tab{animation:tabIn var(--t-base) both}
+@keyframes tabIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.nav-tab:nth-child(1){animation-delay:0ms}
+.nav-tab:nth-child(2){animation-delay:40ms}
+.nav-tab:nth-child(3){animation-delay:80ms}
+
+/* Sidebar section collapse transition */
+.dt-section-body{transition:max-height var(--t-base),opacity var(--t-fast);overflow:hidden}
+.dt-section-body.collapsed{max-height:0;opacity:0}
+
+/* Console-mode background trailer — full-screen cinematic */
+.bg-trailer{
+  position:absolute;inset:0;z-index:0;overflow:hidden;
+  opacity:0;animation:bgTrailerIn 1.2s ease forwards;
+}
+.bg-trailer video,.bg-trailer img{width:100%;height:100%;object-fit:cover}
+@keyframes bgTrailerIn{from{opacity:0}to{opacity:0.85}}
+[data-reduced-motion] .bg-trailer{animation:none;opacity:0.85}

@@ -50,39 +50,34 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v4.5.3"
-          $title = "NEXUS v4.5.3 — Fixed install detection (manual games now show Get, not Play) + removed all download-management residue"
+          $tag = "v4.6.0"
+          $title = "NEXUS v4.6.0 — Immersive game trailer previews, premium visual polish, cinematic animations"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
-          **v4.5.3 — Two fixes.**
+          **v4.6.0 — Immersive trailer previews + premium visual polish.**
 
-          **1. Fixed the install-detection bug (the real issue).** A manually-added game with no files on disk was still showing 'Play Now'. Root cause: createGame relied on the column default (installed=1), so every freshly-added game was marked installed immediately — even with no executable. Fix:
-          - createGame now computes the REAL install state at insert time via computeInstalled(): installed = (executable exists on disk) OR (installDir exists) OR (launchCommand is a known GAME protocol — steam://, com.epicgames.launcher://, gog://, battlenet://, etc.). http(s):// store URLs do NOT count as installed (they're web links, not launchable installs).
-          - verifyInstalled/verifyAllInstalled use the same launchable-game-URI check (was too permissive — matched http://).
-          - updateGame recomputes installed when executable/installDir/launchCommand change (so editing a game flips Play<->Get immediately).
-          - verifyAllInstalled runs on startup, so any pre-v4.5.3 manual games flagged wrong get corrected on next launch.
-          Now: a game with no executable + no game-protocol launchCommand shows 'Get' (opens the official store picker). A game with a real executable or a steam:// URI shows 'Play Now'.
+          **1. Game trailer preview system.** Games with a RAWG trailer clip now show a muted, looping video preview in three places:
+          - **Game cards (desktop grid):** hover a card for 400ms -> the trailer plays over the cover art. Only ONE card plays at a time (the last hovered). Quick mouse-overs don't trigger playback (debounced).
+          - **Game detail hero:** the cinematic hero banner shows the trailer overlaid on the background art.
+          - **Console-mode background:** the focused game's trailer plays full-screen behind the entire UI (cinematic immersive mode).
+          Trailers are muted by default, loop, playsInline. On error/unavailable -> graceful fallback to the static poster. When auto-play is off or the user has requested reduced motion -> always shows the poster. Never blank, never stuck loading.
 
-          **2. Completely removed the download-management system.** The launcher now manages EXISTING installed games + redirects to official stores for acquisition — it does not handle downloads. Removed:
-          - The download engine (src/main/downloads/manager.ts — the HTTP streaming/Range-resume/sha256 engine).
-          - The source adapter registry + open-source catalog (registry.ts, catalog.ts).
-          - The downloads DB table + all download-job CRUD (listDownloads/getDownload/createDownload/updateDownload/deleteDownload/markGameInstalled).
-          - The user-HTTP source system (listHttpSources/saveHttpSources + the Settings -> Downloads tab + the SourceEditor modal + import/export).
-          - The DownloadsPanel UI + useDownloads hook + the Downloads topbar button.
-          - The download-progress events (onDownloadProgress/Added/Removed/Completed).
-          - The in-card progress bar + 'View download' hover variant on game cards.
-          - The corresponding types (DownloadJob/DownloadStatus/DownloadSourceKind/DownloadSourceDescriptor/DownloadSourceCapability/HttpSourceEntry).
-          - The download-engine smoke test.
-          Kept: the intelligent store-link resolver (stores.ts — Steam/GOG/Epic/Xbox official-page resolution), the AcquisitionPicker (now store-focused, zero-config), the install-verification system, the 'Get' button.
+          **Auto-play setting:** Settings -> Appearance -> Game Trailers -> 'Auto-play game trailers' toggle (On/Off). Persists across restarts. Default: On.
 
-          The Get flow is now consistent everywhere: not installed -> 'Get' button -> opens the official store picker (Get on Steam / Get on GOG / Search on Epic / Search on Xbox / Search the web) -> opens the store page in the browser. No download sourcing, no residue, no inconsistency.
+          **Trailer metadata architecture:** the RAWG clip field (mp4 URLs at 320/640/1280 resolution) is extracted during metadata patching + stored in a new 'trailerUrl' DB column. The metadata patcher + the enrich-all flow + the add-game flow all capture it. The trailer is associated by RAWG game id (stable), not by title. No video files are downloaded or stored — the mp4 is streamed from RAWG's CDN at view time.
 
-          All prior functionality preserved: library, collections, platform detection, launching, playtime tracking, achievements, overlay, Theme Studio, Smart Collections, collapsible sidebar, real platform logos, lucide icons.
+          **NOTE:** The built-in default RAWG API key has expired (401). To get trailers + all metadata (cover art, descriptions, etc.), set your own free RAWG key in Settings -> General -> RAWG API Key (get one at https://rawg.io/apilogin). This is a pre-existing issue affecting all metadata, not just trailers.
+
+          **2. Premium visual polish.** Cinematic card hover (cover zoom + accent glow), atmospheric topbar sheen, staggered nav-tab entrance, focus-visible rings for keyboard nav, hero parallax zoom, smoother modal transitions, refined loading skeletons.
+
+          **3. Animations + microinteractions.** Staggered card entrance (gcIn), smooth modal scale-in, sidebar collapse transition, tab entrance stagger, focus-visible accent rings, hero parallax zoom (20s ease-out), shimmer loading skeletons. All respect [data-reduced-motion].
+
+          All existing functionality preserved: library, collections, platform detection, launching, playtime tracking, achievements, overlay, Theme Studio, Smart Collections, collapsible sidebar, real platform logos, intelligent Get button, install detection (Play/Get).
 
           **Downloads:**
-          - NEXUS-Setup-4.5.3.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-4.5.3.exe — single-file portable build.
+          - NEXUS-Setup-4.6.0.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-4.6.0.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@

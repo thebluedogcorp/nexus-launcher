@@ -73,6 +73,7 @@ export function registerIpc(): void {
       launchCommand: input.launchCommand ?? null,
       coverImage: meta?.coverImage ?? null,
       bannerImage: meta?.bannerImage ?? null,
+      trailerUrl: meta?.trailerUrl ?? null,
       screenshots: meta?.screenshots ?? [],
       description: meta?.description ?? null,
       developer: meta?.developer ?? null,
@@ -144,6 +145,7 @@ export function registerIpc(): void {
       return updateGame(id, {
         coverImage: meta.coverImage ?? game.coverImage,
         bannerImage: meta.bannerImage ?? game.bannerImage,
+        trailerUrl: meta.trailerUrl ?? game.trailerUrl,
         screenshots: meta.screenshots && meta.screenshots.length ? meta.screenshots : game.screenshots,
         description: meta.description ?? game.description,
         developer: meta.developer ?? game.developer,
@@ -420,6 +422,7 @@ async function patchGamesInBackground(
       const updated = updateGame(g.id, {
         coverImage: meta.coverImage ?? g.coverImage,
         bannerImage: meta.bannerImage ?? g.bannerImage,
+        trailerUrl: meta.trailerUrl ?? g.trailerUrl,
         screenshots: meta.screenshots && meta.screenshots.length ? meta.screenshots : g.screenshots,
         description: meta.description ?? g.description,
         developer: meta.developer ?? g.developer,

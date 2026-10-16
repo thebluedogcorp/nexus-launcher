@@ -26,6 +26,7 @@ export interface Game {
   // RAWG / metadata
   coverImage: string | null;
   bannerImage: string | null;       // wide hero image (RAWG background_image)
+  trailerUrl: string | null;       // v4.6.0 — RAWG clip mp4 URL (muted autoplay preview)
   screenshots: string[];            // RAWG screenshot gallery
   description: string | null;
   developer: string | null;
@@ -106,6 +107,7 @@ export interface MetadataResult {
   description?: string;
   coverImage?: string;
   bannerImage?: string;       // wide hero image
+  trailerUrl?: string;        // v4.6.0 — clip mp4 URL for the muted preview
   screenshots?: string[];      // gallery
 }
 

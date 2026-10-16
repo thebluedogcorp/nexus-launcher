@@ -18,6 +18,26 @@ import { getSetting } from "../db";
 
 const BASE = "https://api.rawg.io/api";
 
+/** v4.6.0 — Extract the best-quality mp4 URL from a RAWG clip object.
+ *  RAWG clip shape: { clips: { "1280": "...mp4", "640": "...mp4", "320": "...mp4" }, preview: "...jpg" }
+ *  Returns the highest-resolution mp4 URL, or null if none. */
+function extractClipUrl(clip: unknown): string | undefined {
+  if (!clip || typeof clip !== "object") return undefined;
+  const c = clip as Record<string, unknown>;
+  const clips = c.clips;
+  if (!clips || typeof clips !== "object") return undefined;
+  const urls = clips as Record<string, unknown>;
+  // Prefer 1280 → 640 → 480 → 320 → first available.
+  for (const res of ["1280", "640", "480", "320"]) {
+    const u = urls[res];
+    if (typeof u === "string" && /^https?:\/\//.test(u)) return u;
+  }
+  for (const v of Object.values(urls)) {
+    if (typeof v === "string" && /^https?:\/\//.test(v)) return v;
+  }
+  return undefined;
+}
+
 // Built-in default key so the launcher works out of the box. The user can
 // override this in Settings → RAWG API Key.
 const DEFAULT_API_KEY = "b40b7e92960a8a24bae2e6df1b40a";
@@ -155,6 +175,9 @@ export async function fetchRawg(rawgId: number): Promise<MetadataResult | null> 
           : undefined,
       coverImage: banner,
       bannerImage: banner,
+      // v4.6.0 — RAWG clip: { clips: { 320, 640, 1280 }, preview }. Pick the
+      // best available quality for the muted trailer preview.
+      trailerUrl: extractClipUrl(r.clip),
       screenshots,
     };
   } catch {

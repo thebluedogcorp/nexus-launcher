@@ -54,6 +54,8 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
   const [tileSize, setTileSize] = useState(Number(localStorage.getItem("nx-tile-size")) || 150);
   const [transitionSpeed, setTransitionSpeed] = useState(Number(localStorage.getItem("nx-transition")) || 300);
   const [haptics, setHaptics] = useState(localStorage.getItem("nx-haptics") !== "off");
+  // v4.6.0 — auto-play game trailers (muted, one at a time, reduced-motion-respected).
+  const [autoplayTrailers, setAutoplayTrailers] = useState(localStorage.getItem("nx-autoplay-trailers") !== "0");
   const [uiMode, setUiMode] = useState<"console" | "desktop">(
     (localStorage.getItem("nx-uimode") as "console" | "desktop") || initial.uiMode || "console"
   );
@@ -159,6 +161,7 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
       localStorage.setItem("nx-tile-size", String(tileSize));
       localStorage.setItem("nx-transition", String(transitionSpeed));
       localStorage.setItem("nx-haptics", haptics ? "on" : "off");
+      localStorage.setItem("nx-autoplay-trailers", autoplayTrailers ? "1" : "0");
       localStorage.setItem("nx-uimode", uiMode);
       applyAccent(accentColor);
       await onSave({
@@ -322,6 +325,19 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
                       <div className="d">Vibrate on navigation and button presses when a controller is connected.</div>
                     </div>
                     <button onClick={() => setHaptics(!haptics)} className={`settings-toggle ${haptics ? "on" : ""}`}>
+                      <span className="knob" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />Game Trailers</div>
+                  <div className="settings-row">
+                    <div className="label-stack">
+                      <div className="t">Auto-play game trailers</div>
+                      <div className="d">When enabled, games with a valid trailer show a muted, looping video preview on hover (cards) and on the game detail page. Only one trailer plays at a time. Falls back to the static poster when off, unavailable, or if the user has requested reduced motion.</div>
+                    </div>
+                    <button onClick={() => setAutoplayTrailers(!autoplayTrailers)} className={`settings-toggle ${autoplayTrailers ? "on" : ""}`}>
                       <span className="knob" />
                     </button>
                   </div>
@@ -560,7 +576,7 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
                     <div className="logo"><NexusMark size={28} /></div>
                     <div>
                       <div className="name">NEXUS Launcher</div>
-                      <div className="ver">Version 4.5.3 — Universal Game Launcher for Windows</div>
+                      <div className="ver">Version 4.6.0 — Universal Game Launcher for Windows</div>
                       <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 6 }}>
                         Auto-detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox. Patches rich metadata via RAWG + Steam APIs. Launches natively.
                       </div>
