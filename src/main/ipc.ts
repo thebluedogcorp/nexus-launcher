@@ -50,6 +50,7 @@ import {
   setDownloadWindow, recoverDownloadsOnStartup,
 } from "./downloads/manager";
 import { resolveAcquisitionOptions, searchCatalog, SOURCE_DESCRIPTORS } from "./downloads/registry";
+import { resolveStoreLinks } from "./downloads/stores";
 import type {
   DetectedGame,
   Game,
@@ -396,6 +397,16 @@ export function registerIpc(): void {
   ipcMain.handle("sources:listHttp", () => listHttpSources());
   ipcMain.handle("sources:saveHttp", (_e, list: HttpSourceEntry[]) => { saveHttpSources(list); return listHttpSources(); });
   ipcMain.handle("catalog:search", (_e, query: string) => searchCatalog(query ?? ""));
+
+  // v4.5.2 — Intelligent store-link resolution. Given a game, returns the
+  // official store page(s) where it can be bought/gotten — zero-config.
+  // Deep-links to the exact app page when a platform id is known or the live
+  // Steam/GOG search finds a match; else falls back to the store's search page.
+  ipcMain.handle("sources:resolveStoreLinks", async (_e, gameId: number) => {
+    const game = await getGame(gameId);
+    if (!game) return [];
+    try { return await resolveStoreLinks(game); } catch { return []; }
+  });
 
   // ===== Achievements =====
   ipcMain.handle("achievements:list", () => getAchievements());

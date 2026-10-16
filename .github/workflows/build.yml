@@ -50,31 +50,28 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v4.5.1"
-          $title = "NEXUS v4.5.1 — Download-source management UI: add/edit/remove/import/export direct HTTP(S) sources"
+          $tag = "v4.5.2"
+          $title = "NEXUS v4.5.2 — Intelligent zero-config Get button: auto-resolves the official store page (Steam deep-link, GOG, Epic, Xbox) for any game"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
-          **v4.5.1 — Download-source management UI (the missing piece from v4.5.0).**
+          **v4.5.2 — Intelligent Get button (zero-config store redirect).**
 
-          v4.5.0 shipped the download engine + adapter backend but no UI to actually add sources. This release adds a full Settings -> Downloads tab:
+          When a game isn't installed, clicking Get no longer requires any source setup. The launcher figures out which official store carries the game and opens its buy/store page in the browser:
 
-          **1. Direct Download Sources** — add, edit, and remove user HTTP(S) sources. Each entry is a direct-download URL you are authorized to use (free games, your own hosted files, official direct downloads). These appear as "Download" options in the Get-game picker for every game in your library. An Add/Edit modal validates the URL (http/https only) and captures a name + optional note.
+          - **Steam** — if the game has a steamAppId (from detection), deep-links straight to store.steampowered.com/app/<id>. Otherwise, a live search of the public Steam storesearch API finds the exact app by title and deep-links to it. Verified: 'Elden Ring' -> app 1245620, 'Celeste' -> app 504230. Falls back to Steam's search-results page if no match.
+          - **GOG** — deep-links to the GOG game page when a gogId is known or the catalog search finds a match; else opens GOG's search-results page.
+          - **Epic Games** — opens the Epic Games Store search results for the title (no reliable public per-game API).
+          - **Xbox / Microsoft Store** — opens the Microsoft Store search results.
+          - **Web search** — catch-all that opens a web search for buying the game.
 
-          **2. Import / Export JSON** — export your source list to an open-schema JSON file, or import one. The schema is documented inline:
-          {
-            "schema": "nexus-sources/v1",
-            "sources": [ { "id": "...", "name": "...", "url": "https://...", "note": "..." } ]
-          }
-          Import accepts either {sources:[...]} or a bare array, validates each entry, and dedupes by URL.
+          The Get-game picker (AcquisitionPicker) is now store-focused: it lists 'Get on Steam', 'Get on GOG', 'Search on Epic', 'Search on Xbox', 'Search the web'. Click any -> opens that official site in the default browser. No download sourcing, no user configuration, no piracy — just intelligent redirection to the legitimate store page where the user can buy or download the game.
 
-          **3. Source JSON format + Hydra compatibility note** — a clear in-app explanation that only http(s) direct-download URLs are accepted (no magnets/torrents), and that Hydra Launcher's source files (which contain unauthorized commercial-game repack/torrent links) are not supported. The NEXUS format is the legitimate equivalent — an open schema for any authorized direct-download URL.
-
-          All v4.5.0 functionality preserved: availability-aware actions (Get/Play), the open-source catalog (10 real free games), official store links, the download manager (Range resume, pause/cancel/retry, sha256 verification, persistent jobs), the Downloads panel, and the security model (http(s)-only, path-traversal-safe, never auto-execute).
+          All v4.5.x functionality preserved: availability-aware actions (Get/Play), download manager (for direct HTTP sources a user is authorized to use, with Range resume + integrity verification), the open-source catalog, the Downloads panel, Theme Studio, collections.
 
           **Downloads:**
-          - NEXUS-Setup-4.5.1.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-4.5.1.exe — single-file portable build.
+          - NEXUS-Setup-4.5.2.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-4.5.2.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@

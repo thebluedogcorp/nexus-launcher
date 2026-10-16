@@ -615,7 +615,7 @@ export function App() {
         )}
         <ToastContainer toasts={toasts} onDismiss={dismissToast} />
         {studioOpen && <ThemeStudio onClose={() => setStudioOpen(false)} />}
-        {acquireGame && <AcquisitionPicker gameId={acquireGame.id} gameTitle={acquireGame.title} installed={acquireGame.installed} onClose={() => setAcquireGame(null)} onStarted={() => { setAcquireGame(null); setDownloadsOpen(true); }} />}
+        {acquireGame && <AcquisitionPicker gameId={acquireGame.id} gameTitle={acquireGame.title} installed={acquireGame.installed} onClose={() => setAcquireGame(null)} onStarted={() => setAcquireGame(null)} />}
         {downloadsOpen && <DownloadsPanel onClose={() => setDownloadsOpen(false)} />}
       </>
     );
@@ -959,7 +959,7 @@ export function App() {
 
         <ToastContainer toasts={toasts} onDismiss={dismissToast} />
         {studioOpen && <ThemeStudio onClose={() => setStudioOpen(false)} />}
-        {acquireGame && <AcquisitionPicker gameId={acquireGame.id} gameTitle={acquireGame.title} installed={acquireGame.installed} onClose={() => setAcquireGame(null)} onStarted={() => { setAcquireGame(null); setDownloadsOpen(true); }} />}
+        {acquireGame && <AcquisitionPicker gameId={acquireGame.id} gameTitle={acquireGame.title} installed={acquireGame.installed} onClose={() => setAcquireGame(null)} onStarted={() => setAcquireGame(null)} />}
         {downloadsOpen && <DownloadsPanel onClose={() => setDownloadsOpen(false)} />}
       </div>
     );
@@ -1369,7 +1369,7 @@ export function App() {
 
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
         {studioOpen && <ThemeStudio onClose={() => setStudioOpen(false)} />}
-        {acquireGame && <AcquisitionPicker gameId={acquireGame.id} gameTitle={acquireGame.title} installed={acquireGame.installed} onClose={() => setAcquireGame(null)} onStarted={() => { setAcquireGame(null); setDownloadsOpen(true); }} />}
+        {acquireGame && <AcquisitionPicker gameId={acquireGame.id} gameTitle={acquireGame.title} installed={acquireGame.installed} onClose={() => setAcquireGame(null)} onStarted={() => setAcquireGame(null)} />}
         {downloadsOpen && <DownloadsPanel onClose={() => setDownloadsOpen(false)} />}
     </div>
   );

@@ -138,6 +138,10 @@ const api = {
   // v4.5.0 — Downloads + acquisition
   listDownloads: () => ipcRenderer.invoke("downloads:list") as Promise<DownloadJob[]>,
   resolveAcquisitionOptions: (gameId: number) => ipcRenderer.invoke("downloads:resolveOptions", gameId) as Promise<AcquisitionOption[]>,
+  // v4.5.2 — Intelligent store links (zero-config): returns the official store
+  // page(s) for the game — exact app page when resolvable, else the store's
+  // search results.
+  resolveStoreLinks: (gameId: number) => ipcRenderer.invoke("sources:resolveStoreLinks", gameId) as Promise<AcquisitionOption[]>,
   startDownload: (gameId: number, option: AcquisitionOption) => ipcRenderer.invoke("downloads:start", gameId, option) as Promise<DownloadJob | { error: string }>,
   pauseDownload: (id: number) => ipcRenderer.invoke("downloads:pause", id) as Promise<boolean>,
   resumeDownload: (id: number) => ipcRenderer.invoke("downloads:resume", id) as Promise<boolean>,
