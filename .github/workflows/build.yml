@@ -50,34 +50,57 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v4.8.1"
-          $title = "NEXUS v4.8.1 — RAWG API key buttons hidden under trailer layer + per-game trailer URL field + auto-detect trailers on startup"
+          $tag = "v4.9.0"
+          $title = "NEXUS v4.9.0 — Plugin system UI overhaul: Lucide icons, fixed Installed Plugins word-wrap, broadened HostAPI (topbar/status/commands/settings/dialogs/toasts/network/clipboard/system), per-plugin custom UI"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
-          **v4.8.1 — Immersive trailer previews + premium visual polish.**
+          **v4.9.0 — Plugin system UI overhaul + broadened HostAPI.**
 
-          **1. Game trailer preview system.** Games with a RAWG trailer clip now show a muted, looping video preview in three places:
-          - **Game cards (desktop grid):** hover a card for 400ms -> the trailer plays over the cover art. Only ONE card plays at a time (the last hovered). Quick mouse-overs don't trigger playback (debounced).
-          - **Game detail hero:** the cinematic hero banner shows the trailer overlaid on the background art.
-          - **Console-mode background:** the focused game's trailer plays full-screen behind the entire UI (cinematic immersive mode).
-          Trailers are muted by default, loop, playsInline. On error/unavailable -> graceful fallback to the static poster. When auto-play is off or the user has requested reduced motion -> always shows the poster. Never blank, never stuck loading.
+          **1. Emojis replaced with Lucide icons.** Every first-party plugin (12 total) now references a Lucide icon by NAME ('music', 'rocket', 'palette', ...) instead of embedding emojis. New PluginIcon.tsx registry whitelists ~130 Lucide names; plugins call api.ui.icon('name', size) to get inline SVG for innerHTML composition. Sidebar items, topbar actions, status indicators, gallery cards, installed rows, dialog chrome — all use real icons from the icon library. No emojis anywhere.
 
-          **Auto-play setting:** Settings -> Appearance -> Game Trailers -> 'Auto-play game trailers' toggle (On/Off). Persists across restarts. Default: On.
+          **2. Fixed the broken Installed Plugins layout.** The previous Installed Plugins row used flex with no word-break on the description and joined all permissions into one long string that overflowed horizontally. Now uses flex items-start + min-w-0 + flex-col body; descriptions have overflow-wrap:break-word, word-break:break-word, hyphens:auto, line-clamp:2. Each permission renders as its own chip that wraps naturally. Status badge is a colored pill (.status-enabled=accent, .status-error=danger, etc.). Settings + toggle + remove actions are 30x30 square buttons with Lucide icons.
 
-          **Trailer metadata architecture:** the RAWG clip field (mp4 URLs at 320/640/1280 resolution) is extracted during metadata patching + stored in a new 'trailerUrl' DB column. The metadata patcher + the enrich-all flow + the add-game flow all capture it. The trailer is associated by RAWG game id (stable), not by title. No video files are downloaded or stored — the mp4 is streamed from RAWG's CDN at view time.
+          **3. Broadened HostAPI — 6 new UI surfaces + 3 new host services.** Plugins can now register their own custom UI in extraordinary ways:
 
-          **NOTE:** The built-in default RAWG API key has expired (401). To get trailers + all metadata (cover art, descriptions, etc.), set your own free RAWG key in Settings -> General -> RAWG API Key (get one at https://rawg.io/apilogin). This is a pre-existing issue affecting all metadata, not just trailers.
+          New UI surfaces:
+          - ui:topbar — add buttons to the topbar (registerTopbarAction)
+          - ui:statusbar — add live widgets to the topbar (registerStatusIndicator — renders into a small host-provided container)
+          - ui:commands — register command palette entries (registerCommand) invokable via Ctrl+K
+          - ui:settings — register a per-plugin settings panel (registerSettingsPanel) shown in Settings -> Plugins
+          - ui:dialogs — open modal dialogs with custom bodies (openDialog with bodyHTML or bodyRender callback)
+          - ui:toasts — show toast notifications via api.ui.toast({type,title,desc})
 
-          **2. Premium visual polish.** Cinematic card hover (cover zoom + accent glow), atmospheric topbar sheen, staggered nav-tab entrance, focus-visible rings for keyboard nav, hero parallax zoom, smoother modal transitions, refined loading skeletons.
+          New host services:
+          - network.fetch(url, opts) — host-proxied HTTP(S) requests with 15s timeout + scheme validation (refuses file://, data:)
+          - clipboard.readText / writeText — read + write the system clipboard
+          - system.openExternal(url) + system.showItemInFolder(path) — open URLs in browser, reveal files in Explorer
 
-          **3. Animations + microinteractions.** Staggered card entrance (gcIn), smooth modal scale-in, sidebar collapse transition, tab entrance stagger, focus-visible accent rings, hero parallax zoom (20s ease-out), shimmer loading skeletons. All respect [data-reduced-motion].
+          The plugin-runtime creates the HostAPI per-plugin, gates every method by manifest.permissions, and dispatches toast/dialog requests as window CustomEvents that App.tsx listens for + renders in React (consistent styling).
 
-          All existing functionality preserved: library, collections, platform detection, launching, playtime tracking, achievements, overlay, Theme Studio, Smart Collections, collapsible sidebar, real platform logos, intelligent Get button, install detection (Play/Get).
+          **4. Per-plugin custom UI.** Plugins register pages with mount(container) + unmount(container). The host provides shared CSS classes (.plugin-page, .plugin-hero, .plugin-stat-grid, .plugin-stat, .plugin-card, .plugin-list, .plugin-list-item, .plugin-btn, .plugin-input, .plugin-tabs, .plugin-swatch, .plugin-now-playing) so plugins compose beautiful UI with classnames instead of inline styles. The SettingsPage PluginsTab now has a per-plugin settings button that expands the row to reveal the plugin's registered settings panel inline.
+
+          **5. Redesigned PluginsTab in Settings.** Search box (with clear button) + category chips (Productivity/Library/Customization/Media/Utilities). Featured section using FeaturedPluginCard (larger card with featured strip, 44x44 icon tile, accent gradient header, name + tagline, Installed badge). Browse All section using PluginGalleryCard (240px min cards with 36x36 accent-tinted icon, 3-line description with proper word-break, permission chips, accent Install button). Installed Plugins section using InstalledPluginRow — the previously-broken layout, now fixed with proper flex + break-word + line-clamp + discrete permission chips + status pill + per-plugin settings expand.
+
+          **6. 12 first-party plugins rewritten.** Every plugin's mount(c) function composes the new .plugin-* CSS design system + uses api.ui.icon('name', size) for inline SVG. Examples:
+          - library-insights: 6-stat grid + Game of the Day card
+          - theme-studio: 8-swatch palette + live --accent edit + registerSettingsPanel preset picker
+          - command-palette: registers 4 commands via api.ui.registerCommand + opens a sample dialog with api.ui.openDialog
+          - backlog-manager: tabbed status view + registerGameCardAction + 5 registerCommand calls
+          - playtime-tracker: page + registerTopbarAction + registerStatusIndicator (live total in topbar)
+          - storage-manager: largest installs + api.system.showItemInFolder to reveal in Explorer + status indicator
+          - music-player: page + registerTopbarAction that opens a mini-player dialog + clipboard.writeText on 'Copy Track Info'
+          - launch-profiles: storage-backed profiles + game-card action + clipboard.writeText
+          - game-info-hub: search filter + api.network.fetch('https://httpbin.org/get?game=...') as a live network demo
+          - quick-access-overlay: topbar action that opens a quick-access dialog with recent games + quick actions
+          - hello-world: load-games button + toast on success
+          - custom-dashboard: recently-played + favorites lists
+
+          All existing functionality preserved: library, collections, platform detection, launching, playtime tracking, achievements, overlay, Theme Studio, console/desktop mode, real platform logos, intelligent Get button, install detection, game trailers, sidebar collapse, settings tabs.
 
           **Downloads:**
-          - NEXUS-Setup-4.6.0.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-4.6.0.exe — single-file portable build.
+          - NEXUS-Setup-4.9.0.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-4.9.0.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@

@@ -419,6 +419,58 @@ export function registerIpc(): void {
     return result.canceled ? null : result.filePaths[0];
   });
 
+  // v4.9.0 — Host services for plugins.
+  // Plugins request network/clipboard/file access through the host so we can
+  // gate them by permission + sanitize inputs (no raw Node access in renderer).
+  ipcMain.handle("plugins:networkFetch", async (_e, url: string, opts?: {
+    method?: "GET" | "POST" | "PUT" | "DELETE";
+    headers?: Record<string, string>;
+    body?: string;
+    timeoutMs?: number;
+  }) => {
+    try {
+      // Refuse non-http(s) schemes — prevents file://, data:, etc.
+      const u = new URL(url);
+      if (u.protocol !== "http:" && u.protocol !== "https:") {
+        return { ok: false, status: 0, body: "Only http(s) URLs are permitted." };
+      }
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), opts?.timeoutMs ?? 15000);
+      const resp = await fetch(url, {
+        method: opts?.method ?? "GET",
+        headers: opts?.headers ?? {},
+        body: opts?.body,
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      const body = await resp.text();
+      return { ok: true, status: resp.status, body };
+    } catch (e) {
+      return { ok: false, status: 0, body: e instanceof Error ? e.message : String(e) };
+    }
+  });
+
+  ipcMain.handle("plugins:clipboardRead", async () => {
+    const { clipboard } = await import("electron");
+    return clipboard.readText();
+  });
+
+  ipcMain.handle("plugins:clipboardWrite", async (_e, text: string) => {
+    const { clipboard } = await import("electron");
+    clipboard.writeText(text);
+    return true;
+  });
+
+  ipcMain.handle("plugins:showItemInFolder", async (_e, fullPath: string) => {
+    try {
+      const { shell } = await import("electron");
+      shell.showItemInFolder(fullPath);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, message: e instanceof Error ? e.message : String(e) };
+    }
+  });
+
   // ===== Achievements =====
   ipcMain.handle("achievements:list", () => getAchievements());
   ipcMain.handle("achievements:unlock", (_e, id: string) => {

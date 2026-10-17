@@ -12,6 +12,8 @@ import { GameTrailer } from "./components/GameTrailer";
 import { PluginPageContainer } from "./components/PluginPageContainer";
 import { loadPlugins } from "./lib/plugin-runtime";
 import { usePluginExtensions } from "./lib/plugin-store";
+import { PluginIcon } from "./components/PluginIcon";
+import type { DialogRequest, ToastRequest } from "@shared/plugin-types";
 import { CreateCollectionDialog } from "./components/CreateCollectionDialog";
 import { CollectionPicker } from "./components/CollectionPicker";
 import { GamePage } from "./components/GamePage";
@@ -86,8 +88,12 @@ export function App() {
     clearTimeout(trailerHoverTimer.current);
     setTrailerHoverId(null);
   }, []);
-  // v4.7.0 — Plugin extensions (sidebar items, pages, game-card actions).
-  const { sidebarItems: pluginSidebar, pages: pluginPages, gameCardActions: pluginActions, activePluginPage, setActivePluginPage } = usePluginExtensions();
+  // v4.7.0/v4.9.0 — Plugin extensions (sidebar items, pages, game-card actions,
+  // topbar actions, status indicators, commands, settings panels).
+  const { sidebarItems: pluginSidebar, pages: pluginPages, gameCardActions: pluginActions, topbarActions: pluginTopbar, statusIndicators: pluginStatus, activePluginPage, setActivePluginPage } = usePluginExtensions();
+  // v4.9.0 — Plugin dialog modal (host-rendered on request from a plugin).
+  const [pluginDialog, setPluginDialog] = useState<(DialogRequest & { pluginId: string }) | null>(null);
+  const pluginDialogBodyRef = useRef<HTMLDivElement>(null);
   // Playtime tracking state — shows live playtime when a game is running.
   const [activePlaytime, setActivePlaytime] = useState<{ gameId: number; gameTitle: string; elapsedSec: number; startedAt: number } | null>(null);
   // v4.3.0 — Collections + collapsible sidebar + platform visibility.
@@ -104,6 +110,42 @@ export function App() {
     setToasts((prev) => [...prev, { id: Date.now() + Math.random(), type, title, desc }]);
   }, []);
   const dismissToast = useCallback((id: number) => setToasts((prev) => prev.filter((t) => t.id !== id)), []);
+
+  // v4.9.0 — Plugin toast + dialog listeners. Plugins call api.ui.toast() /
+  // api.ui.openDialog(); the runtime dispatches a window CustomEvent that we
+  // catch here so the host renders them in React (consistent styling).
+  useEffect(() => {
+    const onPluginToast = (e: Event) => {
+      const req = (e as CustomEvent<ToastRequest & { pluginId: string }>).detail;
+      const t: Toast["type"] = req.type === "warning" ? "info" : req.type;
+      toast(t, req.title, req.desc);
+    };
+    const onPluginDialog = (e: Event) => {
+      const req = (e as CustomEvent<DialogRequest & { pluginId: string }>).detail;
+      setPluginDialog(req);
+    };
+    const onPluginCloseDialog = () => setPluginDialog(null);
+    window.addEventListener("nexus:pluginToast", onPluginToast);
+    window.addEventListener("nexus:pluginDialog", onPluginDialog);
+    window.addEventListener("nexus:pluginCloseDialog", onPluginCloseDialog);
+    return () => {
+      window.removeEventListener("nexus:pluginToast", onPluginToast);
+      window.removeEventListener("nexus:pluginDialog", onPluginDialog);
+      window.removeEventListener("nexus:pluginCloseDialog", onPluginCloseDialog);
+    };
+  }, [toast]);
+
+  // v4.9.0 — When a plugin dialog opens with bodyRender(), call it after the
+  // container is mounted. bodyHTML() is applied directly via ref callback.
+  useEffect(() => {
+    if (!pluginDialog) return;
+    const el = pluginDialogBodyRef.current;
+    if (!el) return;
+    if (pluginDialog.bodyHTML) el.innerHTML = pluginDialog.bodyHTML;
+    if (pluginDialog.bodyRender) {
+      try { pluginDialog.bodyRender(el); } catch (err) { el.innerHTML = `<div style="color:var(--danger);font-size:12px">Plugin dialog render failed: ${err instanceof Error ? err.message : String(err)}</div>`; }
+    }
+  }, [pluginDialog]);
 
   const refreshCollections = useCallback(async () => {
     try { setCollections(await window.nexus.listCollections()); } catch { /* ignore */ }
@@ -642,6 +684,7 @@ export function App() {
           />
         )}
         <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+        {pluginDialog && <PluginDialogModal req={pluginDialog} bodyRef={pluginDialogBodyRef} onClose={() => setPluginDialog(null)} />}
         {studioOpen && <ThemeStudio onClose={() => setStudioOpen(false)} />}
         {acquireGame && <AcquisitionPicker gameId={acquireGame.id} gameTitle={acquireGame.title} installed={acquireGame.installed} onClose={() => setAcquireGame(null)} onStarted={() => setAcquireGame(null)} />}
       </>
@@ -683,6 +726,22 @@ export function App() {
             </button>
           )}
           <ModeToggle current={uiMode} onSwitch={setUiModeAndPersist} />
+          {/* v4.9.0 — Plugin status indicators (live widgets in the topbar). */}
+          {pluginStatus.length > 0 && (
+            <div className="plugin-status-strip">
+              {pluginStatus.map((s) => <PluginStatusWidget key={s.id} ext={s} />)}
+            </div>
+          )}
+          {/* v4.9.0 — Plugin topbar actions. */}
+          {pluginTopbar.length > 0 && (
+            <div className="plugin-topbar-actions">
+              {pluginTopbar.map((a) => (
+                <button key={a.id} className="tb-icon" onClick={a.onClick} title={a.label} aria-label={a.label}>
+                  <PluginIcon name={a.icon} size={15} />
+                </button>
+              ))}
+            </div>
+          )}
           <button className="tb-icon" onClick={() => setScanOpen(true)} title="Scan"><Icon.Scan size={16} /></button>
           <button className="tb-icon primary" onClick={() => setAddOpen(true)} title="Add"><Icon.Plus size={15} /> Add</button>
           <button className="tb-icon" onClick={() => setStudioOpen(true)} title="Theme Studio"><IconGlyph k="palette" size={16} /></button>
@@ -785,7 +844,7 @@ export function App() {
                 {pluginSidebar.map((item) => (
                   <button key={item.id} className={activePluginPage === (item.pageId ?? item.id) ? "dt-nav-item active" : "dt-nav-item"}
                     onClick={() => setActivePluginPage(activePluginPage === (item.pageId ?? item.id) ? null : (item.pageId ?? item.id))}>
-                    {item.icon && <span style={{ fontSize: 14 }}>{item.icon}</span>}
+                    <span className="dt-nav-icon"><PluginIcon name={item.icon} size={14} /></span>
                     <span>{item.label}</span>
                   </button>
                 ))}
@@ -1057,6 +1116,22 @@ export function App() {
         )}
         {/* v4.0.0 — Mode toggle: Console carousel ↔ Desktop grid */}
         <ModeToggle current={uiMode} onSwitch={setUiModeAndPersist} />
+        {/* v4.9.0 — Plugin status indicators (live widgets in the topbar). */}
+        {pluginStatus.length > 0 && (
+          <div className="plugin-status-strip">
+            {pluginStatus.map((s) => <PluginStatusWidget key={s.id} ext={s} />)}
+          </div>
+        )}
+        {/* v4.9.0 — Plugin topbar actions. */}
+        {pluginTopbar.length > 0 && (
+          <div className="plugin-topbar-actions">
+            {pluginTopbar.map((a) => (
+              <button key={a.id} className="tb-icon" onClick={a.onClick} title={a.label} aria-label={a.label}>
+                <PluginIcon name={a.icon} size={15} />
+              </button>
+            ))}
+          </div>
+        )}
         <button className="tb-icon" onClick={() => setScanOpen(true)} title="Scan (S)"><Icon.Scan size={16} /></button>
         <button className="tb-icon primary" onClick={() => setAddOpen(true)} title="Add (A)"><Icon.Plus size={15} /> Add</button>
         <button className="tb-icon" onClick={() => setStatsOpen(true)} title="Stats dashboard"><Icon.TrendingUp size={16} /></button>
@@ -1419,6 +1494,7 @@ export function App() {
       {controllerConnected && !pageGame && <div className="hints-bar"><span className="hint"><span className="k">↑↓</span> {gpZone === "topbar" ? "Top Bar" : gpZone === "filters" ? "Filters" : gpZone === "carousel" ? "Games" : "Actions"}</span><span className="hint"><span className="k">←→</span> Navigate</span><span className="hint"><span className="k r">A</span> Select</span><span className="hint"><span className="k r">X</span> Play</span><span className="hint"><span className="k r">Y</span> Details</span><span className="hint"><span className="k r">B</span> Back</span><span className="hint"><span className="k"><Icon.Settings size={10} /></span> Settings</span></div>}
 
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+      {pluginDialog && <PluginDialogModal req={pluginDialog} bodyRef={pluginDialogBodyRef} onClose={() => setPluginDialog(null)} />}
         {studioOpen && <ThemeStudio onClose={() => setStudioOpen(false)} />}
         {acquireGame && <AcquisitionPicker gameId={acquireGame.id} gameTitle={acquireGame.title} installed={acquireGame.installed} onClose={() => setAcquireGame(null)} onStarted={() => setAcquireGame(null)} />}
     </div>
@@ -1577,6 +1653,63 @@ function GameEditor({ game, onSave, onClose }: { game: Game; onSave: (patch: Rec
           <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
           <button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? <Icon.Spinner size={15} /> : <Icon.Check size={15} />} Save Changes</button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// v4.9.0 — Plugin status indicator widget. Mounts the plugin's render fn into
+// a small container in the topbar (live clock, network indicator, etc.).
+function PluginStatusWidget({ ext }: { ext: import("@shared/plugin-types").StatusIndicatorExtension }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    try { ext.mount(el); } catch (e) { console.error(`[plugin:${ext.pluginId}] status indicator mount failed:`, e); }
+    return () => { try { ext.unmount?.(el); } catch { /* ignore */ } };
+  }, [ext]);
+  return <span className="plugin-status-widget" ref={ref} title={ext.label} />;
+}
+
+// v4.9.0 — Plugin dialog modal. Host renders the chrome (overlay + title +
+// action buttons); the body is filled by the plugin via bodyHTML (string) or
+// bodyRender (callback). Plugins can call api.ui.openDialog() to show this.
+function PluginDialogModal({ req, bodyRef, onClose }: {
+  req: DialogRequest & { pluginId: string };
+  bodyRef: React.RefObject<HTMLDivElement | null>;
+  onClose: () => void;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const handleAction = async (action: import("@shared/plugin-types").DialogAction) => {
+    if (action.onClick) {
+      setBusy(action.label);
+      try { await action.onClick(); } catch (e) { console.error(`[plugin:${req.pluginId}] dialog action failed:`, e); }
+      setBusy(null);
+    }
+    onClose();
+  };
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal plugin-dialog" style={{ width: req.width ?? 480 }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className="modal-title">{req.title}</div>
+          <button className="modal-close" onClick={onClose} aria-label="Close dialog"><Icon.Close size={16} /></button>
+        </div>
+        <div className="modal-body" ref={bodyRef} />
+        {req.actions.length > 0 && (
+          <div className="modal-footer">
+            {req.actions.map((a) => (
+              <button
+                key={a.label}
+                className={a.danger ? "btn btn-danger" : a.primary ? "btn btn-primary" : "btn btn-ghost"}
+                onClick={() => handleAction(a)}
+                disabled={busy !== null}
+              >
+                {busy === a.label ? <Icon.Spinner size={14} /> : a.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

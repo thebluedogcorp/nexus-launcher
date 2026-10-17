@@ -1,10 +1,19 @@
-// v4.7.0 — Plugin runtime. Loads enabled plugins, creates their HostAPI,
+// v4.9.0 — Plugin runtime. Loads enabled plugins, creates their HostAPI,
 // calls their entry functions, and manages their lifecycle (cleanup on
 // disable/unload). Plugins are loaded via Blob import (read the JS file
 // content from the main process → create a Blob URL → dynamic import()).
+//
+// The HostAPI exposes a broad surface in v4.9.0:
+//  - ui.registerPage / registerSidebarItem / registerGameCardAction (v1)
+//  - ui.registerTopbarAction / registerStatusIndicator / registerCommand /
+//    registerSettingsPanel (v4.9.0)
+//  - ui.toast / openDialog / closeDialog (host renders, plugin requests)
+//  - ui.icon(name, size) — returns inline SVG for innerHTML composition
+//  - network.fetch / clipboard / system.openExternal / showItemInFolder
 
-import type { PluginManifest, HostAPI, PluginCleanup, PageExtension, SidebarItemExtension, GameCardActionExtension } from "@shared/plugin-types";
+import type { PluginManifest, HostAPI, PluginCleanup, PageExtension, SidebarItemExtension, GameCardActionExtension, TopbarActionExtension, StatusIndicatorExtension, CommandExtension, SettingsPanelExtension, ToastRequest, DialogRequest } from "@shared/plugin-types";
 import { usePluginExtensions } from "./plugin-store";
+import { renderPluginIconSVG } from "../components/PluginIcon";
 import type { Game } from "@shared/types";
 
 // Track active plugin cleanups (pluginId → cleanup function).
@@ -16,6 +25,9 @@ function emitEvent(event: string, data: unknown): void {
   const handlers = eventHandlers.get(event);
   if (handlers) handlers.forEach((h) => { try { h(data); } catch { /* ignore */ } });
 }
+
+// Track which plugin opened which dialog so closeDialog can target it.
+let activeDialogPluginId: string | null = null;
 
 /** Create the HostAPI for a specific plugin. */
 function createHostAPI(manifest: PluginManifest): HostAPI {
@@ -45,6 +57,50 @@ function createHostAPI(manifest: PluginManifest): HostAPI {
         usePluginExtensions.getState().addGameCardAction(full);
         console.log(`[plugin:${pluginId}] registered game-card action: ${ext.id}`);
       },
+
+      registerTopbarAction: (ext) => {
+        if (!has("ui:topbar")) { console.error(`[plugin:${pluginId}] permission denied: ui:topbar`); return; }
+        const full: TopbarActionExtension = { ...ext, pluginId };
+        usePluginExtensions.getState().addTopbarAction(full);
+        console.log(`[plugin:${pluginId}] registered topbar action: ${ext.id}`);
+      },
+      registerStatusIndicator: (ext) => {
+        if (!has("ui:statusbar")) { console.error(`[plugin:${pluginId}] permission denied: ui:statusbar`); return; }
+        const full: StatusIndicatorExtension = { ...ext, pluginId };
+        usePluginExtensions.getState().addStatusIndicator(full);
+        console.log(`[plugin:${pluginId}] registered status indicator: ${ext.id}`);
+      },
+      registerCommand: (ext) => {
+        if (!has("ui:commands")) { console.error(`[plugin:${pluginId}] permission denied: ui:commands`); return; }
+        const full: CommandExtension = { ...ext, pluginId };
+        usePluginExtensions.getState().addCommand(full);
+        console.log(`[plugin:${pluginId}] registered command: ${ext.id}`);
+      },
+      registerSettingsPanel: (ext) => {
+        if (!has("ui:settings")) { console.error(`[plugin:${pluginId}] permission denied: ui:settings`); return; }
+        const full: SettingsPanelExtension = { ...ext, pluginId };
+        usePluginExtensions.getState().addSettingsPanel(full);
+        console.log(`[plugin:${pluginId}] registered settings panel: ${ext.id}`);
+      },
+
+      toast: (req: ToastRequest) => {
+        if (!has("ui:toasts")) { console.error(`[plugin:${pluginId}] permission denied: ui:toasts`); return; }
+        // Dispatch to the host (App.tsx listens for this event).
+        window.dispatchEvent(new CustomEvent("nexus:pluginToast", { detail: { ...req, pluginId } }));
+      },
+      openDialog: (req: DialogRequest) => {
+        if (!has("ui:dialogs")) { console.error(`[plugin:${pluginId}] permission denied: ui:dialogs`); return; }
+        activeDialogPluginId = pluginId;
+        window.dispatchEvent(new CustomEvent("nexus:pluginDialog", { detail: { ...req, pluginId } }));
+      },
+      closeDialog: () => {
+        if (activeDialogPluginId === pluginId) {
+          window.dispatchEvent(new CustomEvent("nexus:pluginCloseDialog"));
+          activeDialogPluginId = null;
+        }
+      },
+
+      icon: (name: string, size = 18) => renderPluginIconSVG(name, size),
     },
 
     games: {
@@ -94,6 +150,33 @@ function createHostAPI(manifest: PluginManifest): HostAPI {
       },
       getCSSVar: (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim(),
     },
+
+    network: {
+      fetch: async (url, opts) => {
+        if (!has("network")) { console.error(`[plugin:${pluginId}] permission denied: network`); return { ok: false, status: 0, body: "permission denied" }; }
+        return await window.nexus.pluginsNetworkFetch(url, opts);
+      },
+    },
+    clipboard: {
+      readText: async () => {
+        if (!has("clipboard")) { console.error(`[plugin:${pluginId}] permission denied: clipboard`); return ""; }
+        return await window.nexus.pluginsClipboardRead();
+      },
+      writeText: async (text: string) => {
+        if (!has("clipboard")) { console.error(`[plugin:${pluginId}] permission denied: clipboard`); return; }
+        await window.nexus.pluginsClipboardWrite(text);
+      },
+    },
+    system: {
+      openExternal: async (url: string) => {
+        if (!has("system")) { console.error(`[plugin:${pluginId}] permission denied: system`); return; }
+        await window.nexus.openExternal(url);
+      },
+      showItemInFolder: async (path: string) => {
+        if (!has("system")) { console.error(`[plugin:${pluginId}] permission denied: system`); return; }
+        await window.nexus.pluginsShowItemInFolder(path);
+      },
+    },
   };
 }
 
@@ -112,9 +195,9 @@ export async function loadPlugins(): Promise<void> {
         // Load the plugin as an ES module via Blob URL.
         const blob = new Blob([code], { type: "text/javascript" });
         const url = URL.createObjectURL(blob);
-        const module = await import(/* @vite-ignore */ url);
+        const mod = await import(/* @vite-ignore */ url);
         URL.revokeObjectURL(url);
-        const entry = module.default;
+        const entry = mod.default;
         if (typeof entry !== "function") {
           await window.nexus.pluginsMarkError(plugin.manifest.id, "Entry module's default export is not a function.");
           continue;

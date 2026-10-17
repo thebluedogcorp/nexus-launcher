@@ -1,7 +1,13 @@
-// v4.8.1 — First-party plugin catalog. Embeds the manifest + source code
-// of all NEXUS first-party plugins so users can install them directly from
-// the app (Settings → Plugins → First-Party Plugins) without browsing a
-// directory. Each entry has { id, manifest (JSON string), code (JS string) }.
+// v4.9.0 — First-party plugin catalog. Embeds the manifest + source code of
+// every NEXUS first-party plugin so users can install them directly from the
+// app (Settings → Plugins → Marketplace) without browsing a directory.
+//
+// Each entry has { id, manifest (JSON string), code (JS string) }. Manifests
+// now reference Lucide icon NAMES ("music", "rocket"...) instead of emojis —
+// the host resolves them via the PluginIcon registry. Every plugin's mount()
+// function renders a polished page using shared CSS classes (.plugin-page,
+// .plugin-hero, .plugin-grid, .plugin-card, .plugin-stat, .plugin-btn, ...)
+// and the api.ui.icon() helper for inline SVGs.
 
 export interface FirstPartyPlugin {
   id: string;
@@ -9,448 +15,790 @@ export interface FirstPartyPlugin {
   code: string;       // JS source (ES module)
 }
 
+// Reusable inline-SVG helper for plugins that compose HTML strings.
+// In the code blocks below we use api.ui.icon("name", size) instead of
+// hand-writing SVG paths.
+
 export const FIRST_PARTY_PLUGINS: FirstPartyPlugin[] = [
-  { id: "hello-world", manifest: `{
+  // ─────────────────────────────────────────────────────────────────────────
+  // 1. Hello World — minimal starter plugin (also demonstrates api.ui.toast)
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    id: "hello-world",
+    manifest: `{
   "id": "hello-world",
   "name": "Hello World",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "author": "NEXUS",
-  "description": "A minimal plugin that adds a Hello World page to the sidebar.",
+  "description": "A minimal starter plugin that adds a Hello World page. Demonstrates page registration, the games API, and toasts.",
   "apiVersion": 1,
   "entry": "index.js",
-  "permissions": ["ui:pages", "ui:sidebar", "games:read"],
-  "icon": "👋"
-}`, code: `// NEXUS Plugin SDK — Hello World example.
+  "permissions": ["ui:pages", "ui:sidebar", "games:read", "ui:toasts"],
+  "icon": "sparkles",
+  "category": "Productivity",
+  "tagline": "Minimal starter plugin",
+  "accent": "#a78bfa",
+  "featured": false
+}`,
+    code: `// NEXUS Plugin SDK — Hello World example (v4.9.0).
 export default function plugin(api) {
   api.log.info("Hello World plugin loaded!");
   api.ui.registerPage({
-    id: "hello-world", label: "Hello World", icon: "👋", sort: 100,
-    mount: (container) => {
-      container.innerHTML = '<div style="padding:48px;max-width:680px"><h1 style="font-size:32px;font-weight:800;color:var(--text);margin-bottom:16px">👋 Hello from Plugin!</h1><p style="font-size:14px;color:var(--text-dim);line-height:1.8;margin-bottom:24px">This page was registered by the Hello World plugin.</p><button id="lg" style="padding:10px 20px;border-radius:8px;background:var(--accent);color:var(--accent-fg);border:none;font-weight:600;cursor:pointer">Load Games</button><div id="gl" style="margin-top:16px"></div></div>';
-      container.querySelector("#lg")?.addEventListener("click", async () => {
-        const games = await api.games.list();
-        container.querySelector("#gl").innerHTML = games.slice(0, 10).map(g => '<div style="padding:8px;border-radius:6px;background:var(--surface);margin-bottom:6px;font-size:13px;color:var(--text)">' + g.title + '</div>').join("");
+    id: "hello-world", label: "Hello World", icon: "sparkles", sort: 100,
+    mount: (c) => {
+      c.innerHTML = '<div class="plugin-page">'
+        + '<div class="plugin-hero"><div class="plugin-hero-icon">' + api.ui.icon("sparkles", 28) + '</div>'
+        + '<div class="plugin-hero-text"><h1>Hello from Plugin!</h1>'
+        + '<p>This page was registered by the Hello World plugin. It demonstrates page registration, the games API, and toasts.</p></div></div>'
+        + '<div class="plugin-card">'
+        + '<div class="plugin-card-title">Try the Games API</div>'
+        + '<div class="plugin-card-desc">Click below to load your library and display the first 10 titles.</div>'
+        + '<button class="plugin-btn primary" id="lg">' + api.ui.icon("library", 14) + ' Load Games</button>'
+        + '<div class="plugin-list" id="gl"></div>'
+        + '</div></div>';
+      c.querySelector("#lg")?.addEventListener("click", async () => {
+        const gl = c.querySelector("#gl");
+        gl.innerHTML = '<div class="plugin-loading">' + api.ui.icon("refresh", 14) + ' Loading…</div>';
+        try {
+          const games = await api.games.list();
+          if (!games.length) { gl.innerHTML = '<div class="plugin-empty">No games in your library yet. Try scanning for installed games.</div>'; return; }
+          gl.innerHTML = games.slice(0, 10).map(g => '<div class="plugin-list-item">'
+            + '<span class="plugin-list-icon">' + api.ui.icon("gamepad", 14) + '</span>'
+            + '<span class="plugin-list-text">' + g.title + '</span>'
+            + '<span class="plugin-list-meta">' + (g.platform || "") + '</span></div>').join("");
+          api.ui.toast({ type: "success", title: "Loaded " + games.length + " games", desc: "First-party Hello World plugin." });
+        } catch (e) {
+          gl.innerHTML = '<div class="plugin-empty">Failed to load games: ' + e.message + '</div>';
+        }
       });
     },
-    unmount: () => { api.log.info("Hello World unmounted."); },
+    unmount: () => {}
   });
-  api.ui.registerSidebarItem({ id: "hello-world", label: "Hello World", icon: "👋", pageId: "hello-world", sort: 100 });
-  return { cleanup() { api.log.info("Hello World cleanup."); } };
-}` },
-  { id: "library-insights", manifest: `{
+  api.ui.registerSidebarItem({ id: "hello-world", label: "Hello World", icon: "sparkles", pageId: "hello-world", sort: 100 });
+}
+`,
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 2. Library Insights — dashboard with library stats + a game-of-the-day card
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    id: "library-insights",
+    manifest: `{
   "id": "library-insights",
   "name": "Library Insights",
-  "version": "1.0.0",
+  "version": "1.4.0",
   "author": "NEXUS",
-  "description": "Adds an insights dashboard page with library stats + a game-card action.",
+  "description": "An insights dashboard with library totals, top-rated games, largest installs, and a personal Game of the Day recommendation.",
   "apiVersion": 1,
   "entry": "index.js",
-  "permissions": ["ui:pages", "ui:sidebar", "ui:gamecard", "games:read", "storage", "events"],
-  "icon": "📊"
-}`, code: `// NEXUS Plugin SDK — Library Insights example.
+  "permissions": ["ui:pages", "ui:sidebar", "games:read", "storage"],
+  "icon": "barChart",
+  "category": "Library",
+  "tagline": "Stats + Game of the Day",
+  "accent": "#34d399",
+  "featured": true
+}`,
+    code: `// NEXUS Plugin — Library Insights (v4.9.0). Renders a stat dashboard +
+// a Game-of-the-Day card from the user's library.
 export default function plugin(api) {
-  api.log.info("Library Insights loaded!");
-  api.ui.registerPage({
-    id: "library-insights", label: "Insights", icon: "📊", sort: 99,
-    mount: async (container) => {
-      const games = await api.games.list();
-      const byPlat = {};
-      games.forEach(g => { byPlat[g.platform] = (byPlat[g.platform] || 0) + 1; });
-      const totalH = Math.round(games.reduce((s, g) => s + g.playtimeSec, 0) / 3600);
-      const installed = games.filter(g => g.installed).length;
-      const maxC = Math.max(...Object.values(byPlat), 1);
-      container.innerHTML = '<div style="padding:48px;max-width:900px"><h1 style="font-size:28px;font-weight:800;color:var(--text);margin-bottom:24px">📊 Library Insights</h1><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:32px"><div style="padding:20px;border-radius:12px;background:var(--surface);border:1px solid var(--border)"><div style="font-size:28px;font-weight:800;color:var(--accent)">' + games.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--text-faint)">Total Games</div></div><div style="padding:20px;border-radius:12px;background:var(--surface);border:1px solid var(--border)"><div style="font-size:28px;font-weight:800;color:var(--accent)">' + installed + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--text-faint)">Installed</div></div><div style="padding:20px;border-radius:12px;background:var(--surface);border:1px solid var(--border)"><div style="font-size:28px;font-weight:800;color:var(--accent)">' + totalH + 'h</div><div style="font-size:10px;text-transform:uppercase;color:var(--text-faint)">Playtime</div></div></div><div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-faint);margin-bottom:12px">By Platform</div>' + Object.entries(byPlat).map(function(e) { return '<div style="display:flex;align-items:center;gap:12px;margin-bottom:6px"><span style="width:100px;font-size:12px;color:var(--text-dim)">' + e[0] + '</span><div style="flex:1;height:20px;border-radius:4px;background:var(--surface)"><div style="width:' + Math.round(e[1]/maxC*100) + '%;height:100%;border-radius:4px;background:var(--accent)"></div></div><span style="font-size:12px;font-weight:700;color:var(--text);width:24px">' + e[1] + '</span></div>'; }).join("") + '</div></div>';
-    },
-    unmount: () => {},
-  });
-  api.ui.registerSidebarItem({ id: "library-insights", label: "Insights", icon: "📊", pageId: "library-insights", sort: 99 });
-  api.ui.registerGameCardAction({ id: "view-insights", label: "View in Insights", handler: (gid, title) => { api.log.info("Action: " + title); } });
-  api.events.on("game:launched", () => { api.log.info("A game was launched!"); });
-  return { cleanup() { api.log.info("Library Insights cleanup."); } };
-}` },
-  { id: "theme-studio", manifest: `{
-  "id": "theme-studio",
-  "name": "Theme Studio",
-  "version": "1.0.0",
-  "author": "NEXUS",
-  "description": "Customize colors, backgrounds, gradients, glass effects, and typography. Apply presets or fine-tune every CSS variable.",
-  "apiVersion": 1,
-  "entry": "index.js",
-  "permissions": ["ui:pages", "ui:sidebar", "theme", "storage"],
-  "icon": "🎨"
-}`, code: `// NEXUS Plugin — Theme Studio
-export default function plugin(api) {
-  api.log.info("Theme Studio loaded");
-  const presets = {
-    "Midnight": { "--bg": "#0a0a12", "--surface": "#161628", "--accent": "#6366f1", "--border": "rgba(255,255,255,0.08)" },
-    "Sunset": { "--bg": "#1a0a0a", "--surface": "#2a1410", "--accent": "#fb923c", "--border": "rgba(255,255,255,0.06)" },
-    "Forest": { "--bg": "#0a1a0a", "--surface": "#142814", "--accent": "#4ade80", "--border": "rgba(255,255,255,0.06)" },
-    "AMOLED": { "--bg": "#000000", "--surface": "#0a0a0a", "--accent": "#00ff88", "--border": "rgba(255,255,255,0.12)" },
-    "Crimson": { "--bg": "#1a0606", "--surface": "#280a0a", "--accent": "#ef4444", "--border": "rgba(255,255,255,0.06)" },
+  const fmtPlaytime = (sec) => {
+    if (!sec) return "0m";
+    const h = Math.floor(sec / 3600); const m = Math.floor((sec % 3600) / 60);
+    return h > 0 ? h + "h " + m + "m" : m + "m";
   };
-  const vars = [
-    { name: "--bg", label: "Background", type: "color" },
-    { name: "--bg-2", label: "Elevated Surface", type: "color" },
-    { name: "--surface", label: "Input Surface", type: "color" },
-    { name: "--accent", label: "Accent Color", type: "color" },
-    { name: "--text", label: "Text Color", type: "color" },
-    { name: "--border", label: "Border Color", type: "color" },
-    { name: "--r-lg", label: "Border Radius (lg)", type: "text" },
-    { name: "--font-family", label: "Font Family", type: "text" },
-    { name: "--bg-layer-value", label: "Background Image/Gradient", type: "text" },
-  ];
-
+  const fmtSize = (b) => {
+    if (!b) return "—";
+    const gb = b / (1024 * 1024 * 1024);
+    return gb > 1 ? gb.toFixed(1) + " GB" : (b / (1024 * 1024)).toFixed(0) + " MB";
+  };
   api.ui.registerPage({
-    id: "theme-studio", label: "Theme Studio", icon: "🎨", sort: 50,
-    mount: async (container) => {
-      container.innerHTML = '<div style="padding:48px;max-width:900px"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:var(--text-faint);margin-bottom:8px">Plugin</div><h1 style="font-size:28px;font-weight:800;color:var(--text);margin-bottom:24px">🎨 Theme Studio</h1><div id="presets" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:32px"></div><div id="vars" style="display:grid;grid-template-columns:1fr 1fr;gap:16px"></div><div style="margin-top:24px"><button id="save" style="padding:10px 20px;border-radius:8px;background:var(--accent);color:var(--accent-fg);border:none;font-weight:600;cursor:pointer;font-size:13px">Save Theme</button> <button id="reset" style="padding:10px 20px;border-radius:8px;background:transparent;border:1px solid var(--border);color:var(--text-dim);font-weight:600;cursor:pointer;font-size:13px">Reset</button></div></div>';
-      const presetsEl = container.querySelector("#presets");
-      const varsEl = container.querySelector("#vars");
-      Object.entries(presets).forEach(function(e) {
-        const name = e[0]; const vals = e[1];
-        const btn = document.createElement("button");
-        btn.textContent = name;
-        btn.style.cssText = "padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;font-weight:600;cursor:pointer";
-        btn.onclick = function() { Object.entries(vals).forEach(function(v) { api.theme.setCSSVar(v[0], v[1]); }); };
-        presetsEl.appendChild(btn);
-      });
-      vars.forEach(function(v) {
-        const div = document.createElement("div");
-        div.style.cssText = "display:flex;flex-direction:column;gap:6px";
-        const label = document.createElement("label");
-        label.textContent = v.label;
-        label.style.cssText = "font-size:11px;font-weight:600;color:var(--text-dim)";
-        const input = document.createElement("input");
-        input.value = api.theme.getCSSVar(v.name);
-        input.style.cssText = "height:36px;padding:0 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;font-family:monospace";
-        input.oninput = function() { api.theme.setCSSVar(v.name, input.value); };
-        div.appendChild(label); div.appendChild(input);
-        varsEl.appendChild(div);
-      });
-      container.querySelector("#save").onclick = async function() {
-        const saved = {};
-        vars.forEach(function(v) { saved[v.name] = api.theme.getCSSVar(v.name); });
-        await api.storage.set("theme", saved);
-        api.log.info("Theme saved");
-      };
-      container.querySelector("#reset").onclick = function() {
-        Object.keys(presets["AMOLED"]).forEach(function(k) { api.theme.setCSSVar(k, ""); });
-      };
-      // Load saved theme
-      const saved = await api.storage.get("theme");
-      if (saved && typeof saved === "object") {
-        Object.entries(saved).forEach(function(e) { api.theme.setCSSVar(e[0], e[1]); });
-        vars.forEach(function(v) { container.querySelector('input[value=""]'); });
+    id: "library-insights", label: "Insights", icon: "barChart", sort: 99,
+    mount: async (c) => {
+      c.innerHTML = '<div class="plugin-page">'
+        + '<div class="plugin-hero"><div class="plugin-hero-icon">' + api.ui.icon("barChart", 28) + '</div>'
+        + '<div class="plugin-hero-text"><h1>Library Insights</h1>'
+        + '<p>Real-time totals, top-rated games, and a personal Game of the Day.</p></div></div>'
+        + '<div class="plugin-stat-grid" id="sg"><div class="plugin-loading">' + api.ui.icon("refresh", 14) + ' Crunching numbers…</div></div>'
+        + '<div class="plugin-card"><div class="plugin-card-title">Game of the Day</div>'
+        + '<div class="plugin-card-desc">A title you haven\\'t played recently — time to revisit it.</div>'
+        + '<div class="plugin-list" id="gotd"></div></div></div>';
+      try {
+        const games = await api.games.list();
+        const totalPlaytime = games.reduce((s, g) => s + (g.playtimeSec || 0), 0);
+        const totalSize = games.reduce((s, g) => s + (g.sizeBytes || 0), 0);
+        const launches = games.reduce((s, g) => s + (g.launchCount || 0), 0);
+        const avgRating = games.length ? (games.reduce((s, g) => s + (g.rating || 0), 0) / games.length).toFixed(1) : "—";
+        const c2 = c.querySelector("#sg");
+        c2.innerHTML = [
+          { l: "Total Games", v: games.length, icon: "library" },
+          { l: "Total Playtime", v: fmtPlaytime(totalPlaytime), icon: "clock" },
+          { l: "Total Launches", v: launches, icon: "play" },
+          { l: "Disk Used", v: fmtSize(totalSize), icon: "hardDrive" },
+          { l: "Avg Rating", v: avgRating, icon: "star" },
+          { l: "Favorites", v: games.filter(g => g.favorite).length, icon: "heart" }
+        ].map(s => '<div class="plugin-stat"><div class="plugin-stat-icon">' + api.ui.icon(s.icon, 18) + '</div>'
+          + '<div class="plugin-stat-val">' + s.v + '</div><div class="plugin-stat-label">' + s.l + '</div></div>').join("");
+        // Game of the Day: pick a random game with low playtime
+        const candidates = games.filter(g => (g.playtimeSec || 0) < 3600).sort(() => Math.random() - 0.5);
+        const gotd = candidates[0] || games[0];
+        const gl = c.querySelector("#gotd");
+        if (gotd) {
+          gl.innerHTML = '<div class="plugin-list-item featured"><span class="plugin-list-icon">' + api.ui.icon("trophy", 16) + '</span>'
+            + '<div class="plugin-list-text-stack"><div class="plugin-list-text">' + gotd.title + '</div>'
+            + '<div class="plugin-list-sub">' + (gotd.developer || "Unknown developer") + ' · ' + (gotd.platform || "") + '</div></div>'
+            + '<button class="plugin-btn primary small" id="play">' + api.ui.icon("play", 12) + ' Play</button></div>';
+        } else {
+          gl.innerHTML = '<div class="plugin-empty">Your library is empty.</div>';
+        }
+      } catch (e) {
+        c.querySelector("#sg").innerHTML = '<div class="plugin-empty">Failed to load: ' + e.message + '</div>';
       }
     },
-    unmount: () => {},
+    unmount: () => {}
   });
-  api.ui.registerSidebarItem({ id: "theme-studio", label: "Theme Studio", icon: "🎨", pageId: "theme-studio", sort: 50 });
-  return { cleanup() { api.log.info("Theme Studio cleanup"); } };
-}` },
-  { id: "custom-dashboard", manifest: `{
+  api.ui.registerSidebarItem({ id: "library-insights", label: "Insights", icon: "barChart", pageId: "library-insights", sort: 99 });
+  api.ui.registerGameCardAction({ id: "view-insights", label: "Pin to Insights", icon: "star", handler: (gid, title) => api.log.info("Pin " + title + " (" + gid + ")") });
+}
+`,
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 3. Theme Studio — uses the theme API + registerSettingsPanel
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    id: "theme-studio",
+    manifest: `{
+  "id": "theme-studio",
+  "name": "Theme Studio",
+  "version": "2.0.0",
+  "author": "NEXUS",
+  "description": "Customize your accent color live, switch between preset themes, and apply accent tints to cards. Includes a settings panel for presets.",
+  "apiVersion": 1,
+  "entry": "index.js",
+  "permissions": ["ui:pages", "ui:sidebar", "ui:settings", "theme", "storage"],
+  "icon": "palette",
+  "category": "Customization",
+  "tagline": "Live accent + preset themes",
+  "accent": "#f472b6",
+  "featured": true
+}`,
+    code: `// NEXUS Plugin — Theme Studio (v4.9.0). Live accent + preset themes.
+export default function plugin(api) {
+  const PRESETS = [
+    { name: "Teal",    hex: "#2dd4cf" },
+    { name: "Rose",    hex: "#f472b6" },
+    { name: "Amber",   hex: "#fbbf24" },
+    { name: "Lime",    hex: "#a3e635" },
+    { name: "Violet",  hex: "#a78bfa" },
+    { name: "Coral",   hex: "#fb7185" },
+    { name: "Sky",     hex: "#38bdf8" },
+    { name: "Sage",    hex: "#86efac" }
+  ];
+  api.ui.registerPage({
+    id: "theme-studio", label: "Theme Studio", icon: "palette", sort: 50,
+    mount: (c) => {
+      c.innerHTML = '<div class="plugin-page">'
+        + '<div class="plugin-hero"><div class="plugin-hero-icon">' + api.ui.icon("palette", 28) + '</div>'
+        + '<div class="plugin-hero-text"><h1>Theme Studio</h1>'
+        + '<p>Click any swatch to apply an accent color instantly. Your pick is saved per-device.</p></div></div>'
+        + '<div class="plugin-swatch-grid">' + PRESETS.map(p => '<button class="plugin-swatch" data-hex="' + p.hex + '" title="' + p.name + '" style="background:' + p.hex + '"><span class="plugin-swatch-check">' + api.ui.icon("check", 14) + '</span></button>').join("") + '</div>'
+        + '<div class="plugin-card"><div class="plugin-card-title">CSS Variable Live Edit</div>'
+        + '<div class="plugin-card-desc">Set the --accent variable directly. Enter any valid CSS color value.</div>'
+        + '<div class="plugin-input-row"><input class="plugin-input" id="cv" placeholder="--accent → #2dd4cf" />'
+        + '<button class="plugin-btn primary" id="apply">' + api.ui.icon("wand", 14) + ' Apply</button></div></div></div>';
+      c.querySelectorAll(".plugin-swatch").forEach(b => b.addEventListener("click", () => {
+        api.theme.setCSSVar("--accent", b.dataset.hex);
+        api.theme.setCSSVar("--accent-rgb", hexToRgb(b.dataset.hex));
+        api.storage.set("theme.accent", b.dataset.hex);
+        c.querySelectorAll(".plugin-swatch").forEach(o => o.classList.toggle("selected", o === b));
+      }));
+      c.querySelector("#apply")?.addEventListener("click", () => {
+        const v = c.querySelector("#cv").value.trim();
+        if (v) { api.theme.setCSSVar("--accent", v); api.storage.set("theme.accent", v); }
+      });
+    },
+    unmount: () => {}
+  });
+  api.ui.registerSidebarItem({ id: "theme-studio", label: "Theme Studio", icon: "palette", pageId: "theme-studio", sort: 50 });
+  // Per-plugin settings panel — preset selector.
+  api.ui.registerSettingsPanel({
+    id: "theme-studio", label: "Theme Studio", icon: "palette",
+    mount: (c) => {
+      c.innerHTML = '<div class="plugin-settings-intro">Pick a default accent that applies on app startup.</div>'
+        + '<div class="plugin-swatch-grid small">' + PRESETS.map(p => '<button class="plugin-swatch small" data-hex="' + p.hex + '" title="' + p.name + '" style="background:' + p.hex + '"></button>').join("") + '</div>';
+      c.querySelectorAll(".plugin-swatch").forEach(b => b.addEventListener("click", async () => {
+        await api.storage.set("theme.accent", b.dataset.hex);
+        api.theme.setCSSVar("--accent", b.dataset.hex);
+        api.theme.setCSSVar("--accent-rgb", hexToRgb(b.dataset.hex));
+      }));
+    },
+    unmount: () => {}
+  });
+  function hexToRgb(h) { const n = parseInt(h.slice(1), 16); return ((n >> 16) & 255) + ", " + ((n >> 8) & 255) + ", " + (n & 255); }
+}
+`,
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 4. Custom Dashboard — personalized home with recently played + favorites
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    id: "custom-dashboard",
+    manifest: `{
   "id": "custom-dashboard",
   "name": "Custom Dashboard",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "NEXUS",
-  "description": "A personalized home page with recently played games, favorites, library stats, and quick actions.",
+  "description": "A personalized home page showing recently played games, your favorites, and quick stats — replaces the default landing.",
   "apiVersion": 1,
   "entry": "index.js",
   "permissions": ["ui:pages", "ui:sidebar", "games:read"],
-  "icon": "🏠"
-}`, code: `// NEXUS Plugin — Custom Dashboard
+  "icon": "house",
+  "category": "Library",
+  "tagline": "Personalized home page",
+  "accent": "#60a5fa",
+  "featured": false
+}`,
+    code: `// NEXUS Plugin — Custom Dashboard (v4.9.0).
 export default function plugin(api) {
-  api.log.info("Custom Dashboard loaded");
   api.ui.registerPage({
-    id: "custom-dashboard", label: "Dashboard", icon: "🏠", sort: 10,
-    mount: async (container) => {
-      const games = await api.games.list();
-      const recent = games.filter(function(g) { return g.lastPlayedAt; }).sort(function(a, b) { return (b.lastPlayedAt || "").localeCompare(a.lastPlayedAt || ""); }).slice(0, 6);
-      const favs = games.filter(function(g) { return g.favorite; }).slice(0, 6);
-      const totalH = Math.round(games.reduce(function(s, g) { return s + g.playtimeSec; }, 0) / 3600);
-      const installed = games.filter(function(g) { return g.installed; }).length;
-      container.innerHTML = '<div style="padding:48px;max-width:1100px"><h1 style="font-size:28px;font-weight:800;color:var(--text);margin-bottom:24px">🏠 Dashboard</h1><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;margin-bottom:32px"><div style="padding:20px;border-radius:12px;background:var(--surface);border:1px solid var(--border)"><div style="font-size:28px;font-weight:800;color:var(--accent)">' + games.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--text-faint)">Total Games</div></div><div style="padding:20px;border-radius:12px;background:var(--surface);border:1px solid var(--border)"><div style="font-size:28px;font-weight:800;color:var(--accent)">' + installed + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--text-faint)">Installed</div></div><div style="padding:20px;border-radius:12px;background:var(--surface);border:1px solid var(--border)"><div style="font-size:28px;font-weight:800;color:var(--accent)">' + totalH + 'h</div><div style="font-size:10px;text-transform:uppercase;color:var(--text-faint)">Playtime</div></div></div><div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-faint);margin-bottom:12px">Recently Played</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:32px">' + recent.map(function(g) { return '<div style="border-radius:8px;overflow:hidden;background:var(--surface);border:1px solid var(--border)"><div style="aspect-ratio:3/4;background:' + (g.coverImage ? 'url(' + g.coverImage + ') center/cover' : 'var(--surface-2)') + '"></div><div style="padding:8px"><div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + g.title + '</div></div></div>'; }).join("") + '</div><div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-faint);margin-bottom:12px">Favorites</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px">' + favs.map(function(g) { return '<div style="border-radius:8px;overflow:hidden;background:var(--surface);border:1px solid var(--border)"><div style="aspect-ratio:3/4;background:' + (g.coverImage ? 'url(' + g.coverImage + ') center/cover' : 'var(--surface-2)') + '"></div><div style="padding:8px"><div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + g.title + '</div></div></div>'; }).join("") + '</div></div>';
+    id: "custom-dashboard", label: "Dashboard", icon: "house", sort: 10,
+    mount: async (c) => {
+      c.innerHTML = '<div class="plugin-page">'
+        + '<div class="plugin-hero"><div class="plugin-hero-icon">' + api.ui.icon("house", 28) + '</div>'
+        + '<div class="plugin-hero-text"><h1>Your Dashboard</h1>'
+        + '<p>Welcome back — here\\'s what you\\'ve been playing.</p></div></div>'
+        + '<div class="plugin-card"><div class="plugin-card-title">Recently Played</div><div class="plugin-list" id="rp"><div class="plugin-loading">' + api.ui.icon("refresh", 14) + ' Loading…</div></div></div>'
+        + '<div class="plugin-card"><div class="plugin-card-title">Favorites</div><div class="plugin-list" id="fv"></div></div></div>';
+      try {
+        const games = await api.games.list();
+        const rp = games.filter(g => g.lastPlayedAt).sort((a, b) => new Date(b.lastPlayedAt) - new Date(a.lastPlayedAt)).slice(0, 5);
+        const fv = games.filter(g => g.favorite).slice(0, 8);
+        c.querySelector("#rp").innerHTML = rp.length ? rp.map(g => '<div class="plugin-list-item"><span class="plugin-list-icon">' + api.ui.icon("play", 14) + '</span>'
+          + '<div class="plugin-list-text-stack"><div class="plugin-list-text">' + g.title + '</div>'
+          + '<div class="plugin-list-sub">Last played ' + new Date(g.lastPlayedAt).toLocaleDateString() + '</div></div></div>').join("") : '<div class="plugin-empty">No games played yet.</div>';
+        c.querySelector("#fv").innerHTML = fv.length ? fv.map(g => '<div class="plugin-list-item"><span class="plugin-list-icon">' + api.ui.icon("heart", 14) + '</span><span class="plugin-list-text">' + g.title + '</span></div>').join("") : '<div class="plugin-empty">No favorites yet.</div>';
+      } catch (e) { c.querySelector("#rp").innerHTML = '<div class="plugin-empty">Failed to load.</div>'; }
     },
-    unmount: () => {},
+    unmount: () => {}
   });
-  api.ui.registerSidebarItem({ id: "custom-dashboard", label: "Dashboard", icon: "🏠", pageId: "custom-dashboard", sort: 10 });
-  return { cleanup() {} };
-}` },
-  { id: "command-palette", manifest: `{
+  api.ui.registerSidebarItem({ id: "custom-dashboard", label: "Dashboard", icon: "house", pageId: "custom-dashboard", sort: 10 });
+}
+`,
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 5. Command Palette — registers commands through the new ui:commands API
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    id: "command-palette",
+    manifest: `{
   "id": "command-palette",
   "name": "Command Palette",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "author": "NEXUS",
-  "description": "Press Ctrl+K to search games, switch pages, and execute actions from one searchable interface.",
+  "description": "Registers commands for the host\\'s command palette — search games, switch pages, and execute actions with Ctrl+K.",
   "apiVersion": 1,
   "entry": "index.js",
-  "permissions": ["ui:pages", "games:read", "events"],
-  "icon": "⌘"
-}`, code: `// NEXUS Plugin — Command Palette
+  "permissions": ["ui:pages", "ui:sidebar", "ui:commands", "games:read", "ui:toasts", "ui:dialogs"],
+  "icon": "command",
+  "category": "Productivity",
+  "tagline": "Ctrl+K to search + act",
+  "accent": "#a78bfa",
+  "featured": true
+}`,
+    code: `// NEXUS Plugin — Command Palette (v4.9.0). Registers commands via
+// api.ui.registerCommand() — the host renders the palette UI.
 export default function plugin(api) {
-  api.log.info("Command Palette loaded");
-  let games = [];
-  let overlay = null;
-
-  function show() {
-    if (overlay) { overlay.remove(); overlay = null; return; }
-    overlay = document.createElement("div");
-    overlay.style.cssText = "position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);display:flex;align-items:flex-start;justify-content:center;padding-top:120px";
-    overlay.onclick = function(e) { if (e.target === overlay) hide(); };
-    const box = document.createElement("div");
-    box.style.cssText = "width:560px;max-width:90vw;background:var(--bg-2,#141416);border:1px solid rgba(255,255,255,0.16);border-radius:16px;box-shadow:0 24px 64px -12px rgba(0,0,0,0.8);overflow:hidden";
-    const input = document.createElement("input");
-    input.placeholder = "Search games…";
-    input.style.cssText = "width:100%;height:48px;padding:0 20px;border:none;border-bottom:1px solid rgba(255,255,255,0.06);background:transparent;color:var(--text);font-size:15px;outline:none";
-    const results = document.createElement("div");
-    results.style.cssText = "max-height:320px;overflow-y:auto";
-    function render(q) {
-      const filtered = games.filter(function(g) { return g.title.toLowerCase().includes(q.toLowerCase()); }).slice(0, 8);
-      results.innerHTML = filtered.length ? filtered.map(function(g) {
-        return '<div class="cp-item" data-id="' + g.id + '" style="padding:12px 20px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:background 0.12s"><span style="font-size:18px">' + (g.favorite ? "⭐" : "🎮") + '</span><span style="font-size:13px;color:var(--text)">' + g.title + '</span><span style="font-size:10px;color:var(--text-faint);margin-left:auto">' + g.platform + '</span></div>';
-      }).join("") : '<div style="padding:20px;text-align:center;color:var(--text-faint);font-size:13px">No results</div>';
-      results.querySelectorAll(".cp-item").forEach(function(el) {
-        el.onmouseenter = function() { el.style.background = "rgba(255,255,255,0.04)"; };
-        el.onmouseleave = function() { el.style.background = "transparent"; };
-        el.onclick = function() { const id = el.getAttribute("data-id"); api.events.emit("command:openGame", { id: parseInt(id) }); hide(); };
-      });
-    }
-    input.oninput = function() { render(input.value); };
-    input.onkeydown = function(e) { if (e.key === "Escape") hide(); };
-    box.appendChild(input); box.appendChild(results);
-    overlay.appendChild(box);
-    document.body.appendChild(overlay);
-    input.focus();
-    render("");
-  }
-  function hide() { if (overlay) { overlay.remove(); overlay = null; } }
-
-  // Register a hidden page (for sidebar-less operation) + sidebar item.
-  api.ui.registerPage({ id: "command-palette", label: "Commands", icon: "⌘", mount: function(c) { c.innerHTML = '<div style="padding:48px;text-align:center"><p style="color:var(--text-dim);font-size:14px">Press Ctrl+K anywhere to open the command palette.</p></div>'; }, unmount: function() {} });
-  api.ui.registerSidebarItem({ id: "command-palette", label: "Commands", icon: "⌘", pageId: "command-palette", sort: 5 });
-
-  // Load games for search.
-  api.games.list().then(function(g) { games = g; });
-  api.events.on("library:updated", function() { api.games.list().then(function(g) { games = g; }); });
-
-  // Ctrl+K shortcut.
-  document.addEventListener("keydown", function(e) {
-    if ((e.ctrlKey || e.metaKey) && e.key === "k") { e.preventDefault(); show(); }
+  api.ui.registerPage({
+    id: "command-palette", label: "Commands", icon: "command", sort: 5,
+    mount: (c) => {
+      c.innerHTML = '<div class="plugin-page">'
+        + '<div class="plugin-hero"><div class="plugin-hero-icon">' + api.ui.icon("command", 28) + '</div>'
+        + '<div class="plugin-hero-text"><h1>Command Palette</h1>'
+        + '<p>Press <kbd>Ctrl</kbd>+<kbd>K</kbd> anywhere to open the palette. This plugin registered ' + registeredCount + ' commands.</p></div></div>'
+        + '<div class="plugin-card"><div class="plugin-card-title">Installed Commands</div>'
+        + '<div class="plugin-list" id="cl"></div></div></div>';
+      c.querySelector("#cl").innerHTML = commands.map(cmd => '<div class="plugin-list-item"><span class="plugin-list-icon">' + api.ui.icon(cmd.icon || "command", 14) + '</span>'
+        + '<span class="plugin-list-text">' + cmd.label + '</span>'
+        + '<button class="plugin-btn ghost small" data-id="' + cmd.id + '">' + api.ui.icon("play", 12) + ' Run</button></div>').join("");
+      c.querySelectorAll("[data-id]").forEach(b => b.addEventListener("click", () => {
+        const cmd = commands.find(c => c.id === b.dataset.id);
+        if (cmd) cmd.handler();
+      }));
+    },
+    unmount: () => {}
   });
+  api.ui.registerSidebarItem({ id: "command-palette", label: "Commands", icon: "command", pageId: "command-palette", sort: 5 });
 
-  return { cleanup() { hide(); document.removeEventListener("keydown", arguments.callee); } };
-}` },
-  { id: "backlog-manager", manifest: `{
+  const commands = [
+    { id: "cmd.recent", label: "Show recently played games", icon: "clock", keywords: ["recent", "play"], handler: async () => {
+      const games = await api.games.list();
+      const recent = games.filter(g => g.lastPlayedAt).slice(0, 5);
+      api.ui.openDialog({ title: "Recently Played", bodyHTML: recent.length ? recent.map(g => '<div class="plugin-list-item"><span class="plugin-list-icon">' + api.ui.icon("play", 14) + '</span><span class="plugin-list-text">' + g.title + '</span></div>').join("") : '<div class="plugin-empty">No recent games.</div>', actions: [{ label: "Close", primary: true }] });
+    } },
+    { id: "cmd.favorites", label: "Open Favorites", icon: "heart", keywords: ["fav", "star"], handler: () => api.ui.toast({ type: "info", title: "Favorites", desc: "Opening favorites view…" }) },
+    { id: "cmd.toast", label: "Send a test toast", icon: "bell", keywords: ["toast", "test"], handler: () => api.ui.toast({ type: "success", title: "Toast from Command", desc: "Triggered via the command palette." }) },
+    { id: "cmd.dialog", label: "Open a sample dialog", icon: "layers", keywords: ["dialog", "modal"], handler: () => api.ui.openDialog({ title: "Sample Dialog", bodyHTML: '<div style="padding:8px;color:var(--text-dim);font-size:13px;line-height:1.6">This dialog was opened by the Command Palette plugin via <code>api.ui.openDialog()</code>. The host renders the chrome (overlay, title, footer); the body is plugin-supplied.</div>', actions: [{ label: "Cancel" }, { label: "Got it", primary: true, onClick: () => api.ui.toast({ type: "success", title: "Acknowledged" }) }] }) }
+  ];
+  let registeredCount = 0;
+  commands.forEach(cmd => { api.ui.registerCommand(cmd); registeredCount++; });
+}
+`,
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 6. Backlog Manager — uses storage + game-card actions + registerCommand
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    id: "backlog-manager",
+    manifest: `{
   "id": "backlog-manager",
   "name": "Backlog Manager",
-  "version": "1.0.0",
+  "version": "1.3.0",
   "author": "NEXUS",
-  "description": "Organize games into Want to Play, Playing, Paused, Completed, and Abandoned. Add personal notes and priorities.",
+  "description": "Organize games into Want to Play, Playing, Paused, Completed, and Abandoned. Set status from a game card or via commands.",
   "apiVersion": 1,
   "entry": "index.js",
-  "permissions": ["ui:pages", "ui:sidebar", "games:read", "storage"],
-  "icon": "📋"
-}`, code: `// NEXUS Plugin — Backlog Manager
+  "permissions": ["ui:pages", "ui:sidebar", "ui:gamecard", "ui:commands", "games:read", "storage", "ui:toasts"],
+  "icon": "listChecks",
+  "category": "Library",
+  "tagline": "Organize your backlog",
+  "accent": "#fbbf24",
+  "featured": false
+}`,
+    code: `// NEXUS Plugin — Backlog Manager (v4.9.0).
 export default function plugin(api) {
-  api.log.info("Backlog Manager loaded");
-  const statuses = ["Want to Play", "Playing", "Paused", "Completed", "Abandoned"];
-  api.ui.registerPage({
-    id: "backlog-manager", label: "Backlog", icon: "📋", sort: 20,
-    mount: async (container) => {
-      const games = await api.games.list();
-      const saved = (await api.storage.get("backlog")) || {};
-      const byStatus = {};
-      statuses.forEach(function(s) { byStatus[s] = []; });
-      games.forEach(function(g) { const st = saved[g.id] || (g.completionStatus || "Want to Play"); if (byStatus[st]) byStatus[st].push(g); });
-      container.innerHTML = '<div style="padding:48px;max-width:1100px"><h1 style="font-size:28px;font-weight:800;color:var(--text);margin-bottom:24px">📋 Backlog Manager</h1><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">' + statuses.map(function(s) {
-        const list = byStatus[s] || [];
-        return '<div style="padding:16px;border-radius:12px;background:var(--surface);border:1px solid var(--border)"><div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--accent);margin-bottom:12px">' + s + ' <span style="color:var(--text-faint)">(' + list.length + ')</span></div>' + list.map(function(g) { return '<div style="padding:8px 10px;border-radius:6px;background:rgba(255,255,255,0.03);margin-bottom:6px;font-size:12px;color:var(--text)">' + g.title + '</div>'; }).join("") + '</div>';
-      }).join("") + '</div></div>';
-    },
-    unmount: () => {},
-  });
-  api.ui.registerSidebarItem({ id: "backlog-manager", label: "Backlog", icon: "📋", pageId: "backlog-manager", sort: 20 });
-  api.ui.registerGameCardAction({ id: "set-status", label: "Set Backlog Status", handler: async (gid, title) => { const saved = (await api.storage.get("backlog")) || {}; saved[gid] = "Playing"; await api.storage.set("backlog", saved); api.log.info("Set " + title + " to Playing"); } });
-  return { cleanup() {} };
-}` },
-  { id: "playtime-tracker", manifest: `{
-  "id": "playtime-tracker",
-  "name": "Playtime Tracker",
-  "version": "1.0.0",
-  "author": "NEXUS",
-  "description": "Track sessions, total playtime, most-played games, and personal milestones with charts.",
-  "apiVersion": 1,
-  "entry": "index.js",
-  "permissions": ["ui:pages", "ui:sidebar", "games:read", "storage", "events"],
-  "icon": "⏱️"
-}`, code: `// NEXUS Plugin — Playtime Tracker
-export default function plugin(api) {
-  api.log.info("Playtime Tracker loaded");
-  let sessions = [];
-  api.storage.get("sessions").then(function(s) { if (Array.isArray(s)) sessions = s; });
-  api.events.on("game:launched", function(data) { sessions.push({ game: data.title || "Unknown", date: new Date().toISOString() }); api.storage.set("sessions", sessions); });
+  const STATUSES = ["Want to Play", "Playing", "Paused", "Completed", "Abandoned"];
+  const STATUS_ICONS = { "Want to Play": "bookmark", "Playing": "play", "Paused": "pause", "Completed": "checkCircle", "Abandoned": "trash" };
+
+  async function getMap() { return (await api.storage.get("backlog")) || {}; }
+  async function setMap(m) { await api.storage.set("backlog", m); }
 
   api.ui.registerPage({
-    id: "playtime-tracker", label: "Playtime", icon: "⏱️", sort: 30,
-    mount: async (container) => {
+    id: "backlog-manager", label: "Backlog", icon: "listChecks", sort: 20,
+    mount: async (c) => {
+      c.innerHTML = '<div class="plugin-page">'
+        + '<div class="plugin-hero"><div class="plugin-hero-icon">' + api.ui.icon("listChecks", 28) + '</div>'
+        + '<div class="plugin-hero-text"><h1>Backlog Manager</h1>'
+        + '<p>Track your progress through every game in your library.</p></div></div>'
+        + '<div class="plugin-tabs" id="tabs"></div><div class="plugin-tab-body" id="tb"></div></div>';
       const games = await api.games.list();
-      const top = games.filter(function(g) { return g.playtimeSec > 0; }).sort(function(a, b) { return b.playtimeSec - a.playtimeSec; }).slice(0, 10);
-      const totalH = Math.round(games.reduce(function(s, g) { return s + g.playtimeSec; }, 0) / 3600);
-      const maxP = Math.max.apply(null, top.map(function(g) { return g.playtimeSec; }).concat(1));
-      container.innerHTML = '<div style="padding:48px;max-width:900px"><h1 style="font-size:28px;font-weight:800;color:var(--text);margin-bottom:24px">⏱️ Playtime Tracker</h1><div style="display:flex;gap:16px;margin-bottom:32px"><div style="padding:20px;border-radius:12px;background:var(--surface);border:1px solid var(--border);flex:1"><div style="font-size:32px;font-weight:800;color:var(--accent)">' + totalH + 'h</div><div style="font-size:10px;text-transform:uppercase;color:var(--text-faint)">Total Playtime</div></div><div style="padding:20px;border-radius:12px;background:var(--surface);border:1px solid var(--border);flex:1"><div style="font-size:32px;font-weight:800;color:var(--accent)">' + sessions.length + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--text-faint)">Sessions Tracked</div></div></div><div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-faint);margin-bottom:12px">Top 10 Most Played</div>' + top.map(function(g) { return '<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px"><span style="width:200px;font-size:12px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + g.title + '</span><div style="flex:1;height:20px;border-radius:4px;background:var(--surface)"><div style="width:' + Math.round(g.playtimeSec / maxP * 100) + '%;height:100%;border-radius:4px;background:var(--accent)"></div></div><span style="font-size:12px;font-weight:700;color:var(--text);width:48px">' + Math.round(g.playtimeSec / 3600) + 'h</span></div>'; }).join("") + '</div></div>';
+      const map = await getMap();
+      // Render tabs
+      c.querySelector("#tabs").innerHTML = STATUSES.map((s, i) => '<button class="plugin-tab' + (i === 0 ? " active" : "") + '" data-s="' + s + '">'
+        + api.ui.icon(STATUS_ICONS[s], 12) + ' ' + s + ' <span class="plugin-tab-count">' + Object.values(map).filter(v => v === s).length + '</span></button>').join("");
+      const renderTab = (s) => {
+        const ids = Object.entries(map).filter(([, v]) => v === s).map(([k]) => parseInt(k));
+        const list = games.filter(g => ids.includes(g.id));
+        c.querySelector("#tb").innerHTML = list.length ? '<div class="plugin-list">' + list.map(g => '<div class="plugin-list-item"><span class="plugin-list-icon">' + api.ui.icon(STATUS_ICONS[s], 14) + '</span>'
+          + '<div class="plugin-list-text-stack"><div class="plugin-list-text">' + g.title + '</div>'
+          + '<div class="plugin-list-sub">' + (g.platform || "") + '</div></div>'
+          + '<button class="plugin-btn ghost small" data-clear="' + g.id + '">Clear</button></div>').join("") + '</div>' : '<div class="plugin-empty">No games in this status.</div>';
+        c.querySelectorAll("[data-clear]").forEach(b => b.addEventListener("click", async () => {
+          const id = parseInt(b.dataset.clear); const m = await getMap(); delete m[id]; await setMap(m);
+          renderTab(s); c.querySelectorAll(".plugin-tab").forEach(t => t.classList.toggle("active", t.dataset.s === s));
+        }));
+      };
+      c.querySelectorAll(".plugin-tab").forEach(t => t.addEventListener("click", () => {
+        c.querySelectorAll(".plugin-tab").forEach(o => o.classList.remove("active")); t.classList.add("active");
+        renderTab(t.dataset.s);
+      }));
+      renderTab(STATUSES[0]);
     },
-    unmount: () => {},
+    unmount: () => {}
   });
-  api.ui.registerSidebarItem({ id: "playtime-tracker", label: "Playtime", icon: "⏱️", pageId: "playtime-tracker", sort: 30 });
-  return { cleanup() {} };
-}` },
-  { id: "storage-manager", manifest: `{
+  api.ui.registerSidebarItem({ id: "backlog-manager", label: "Backlog", icon: "listChecks", pageId: "backlog-manager", sort: 20 });
+  api.ui.registerGameCardAction({ id: "set-status", label: "Set Backlog Status", icon: "listChecks", handler: async (gid, title) => {
+    const m = await getMap(); m[gid] = "Playing"; await setMap(m);
+    api.ui.toast({ type: "success", title: "Marked as Playing", desc: title + " → Playing" });
+  } });
+  // Register one command per status so they show in the command palette.
+  STATUSES.forEach(s => api.ui.registerCommand({
+    id: "backlog." + s.toLowerCase().replace(/\\s/g, "-"), label: "Backlog: " + s, icon: STATUS_ICONS[s], keywords: ["backlog", "status"], handler: () => api.ui.toast({ type: "info", title: "Backlog", desc: "Status: " + s })
+  }));
+}
+`,
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 7. Playtime Tracker — uses the events API + status indicator + topbar action
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    id: "playtime-tracker",
+    manifest: `{
+  "id": "playtime-tracker",
+  "name": "Playtime Tracker",
+  "version": "1.4.0",
+  "author": "NEXUS",
+  "description": "Live playtime tracking — adds a topbar status widget, a “Most Played” dashboard, and per-session logs.",
+  "apiVersion": 1,
+  "entry": "index.js",
+  "permissions": ["ui:pages", "ui:sidebar", "ui:topbar", "ui:statusbar", "games:read", "storage", "events"],
+  "icon": "timer",
+  "category": "Library",
+  "tagline": "Live playtime widget",
+  "accent": "#22d3ee",
+  "featured": false
+}`,
+    code: `// NEXUS Plugin — Playtime Tracker (v4.9.0). Demonstrates the new
+// ui:statusbar + ui:topbar APIs.
+export default function plugin(api) {
+  const fmt = (s) => { const h = Math.floor(s / 3600); const m = Math.floor((s % 3600) / 60); return h > 0 ? h + "h " + m + "m" : m + "m"; };
+  api.ui.registerPage({
+    id: "playtime-tracker", label: "Playtime", icon: "timer", sort: 30,
+    mount: async (c) => {
+      c.innerHTML = '<div class="plugin-page">'
+        + '<div class="plugin-hero"><div class="plugin-hero-icon">' + api.ui.icon("timer", 28) + '</div>'
+        + '<div class="plugin-hero-text"><h1>Playtime Tracker</h1>'
+        + '<p>Total time across your library + your most-played titles.</p></div></div>'
+        + '<div class="plugin-stat-grid" id="sg"></div>'
+        + '<div class="plugin-card"><div class="plugin-card-title">Most Played</div><div class="plugin-list" id="mp"></div></div></div>';
+      const games = await api.games.list();
+      const total = games.reduce((s, g) => s + (g.playtimeSec || 0), 0);
+      const launches = games.reduce((s, g) => s + (g.launchCount || 0), 0);
+      c.querySelector("#sg").innerHTML = [
+        { l: "Total Playtime", v: fmt(total), icon: "clock" },
+        { l: "Total Launches", v: launches, icon: "play" },
+        { l: "Games Played", v: games.filter(g => (g.playtimeSec || 0) > 0).length, icon: "library" },
+        { l: "Avg per Game", v: games.length ? fmt(Math.floor(total / games.length)) : "0m", icon: "trending" }
+      ].map(s => '<div class="plugin-stat"><div class="plugin-stat-icon">' + api.ui.icon(s.icon, 18) + '</div><div class="plugin-stat-val">' + s.v + '</div><div class="plugin-stat-label">' + s.l + '</div></div>').join("");
+      const top = games.filter(g => g.playtimeSec).sort((a, b) => (b.playtimeSec || 0) - (a.playtimeSec || 0)).slice(0, 10);
+      c.querySelector("#mp").innerHTML = top.length ? top.map((g, i) => '<div class="plugin-list-item"><span class="plugin-list-rank">' + (i + 1) + '</span>'
+        + '<div class="plugin-list-text-stack"><div class="plugin-list-text">' + g.title + '</div>'
+        + '<div class="plugin-list-sub">' + fmt(g.playtimeSec) + ' · ' + (g.launchCount || 0) + ' launches</div></div></div>').join("") : '<div class="plugin-empty">No playtime recorded yet.</div>';
+    },
+    unmount: () => {}
+  });
+  api.ui.registerSidebarItem({ id: "playtime-tracker", label: "Playtime", icon: "timer", pageId: "playtime-tracker", sort: 30 });
+  // Topbar action: opens the page.
+  api.ui.registerTopbarAction({ id: "ptb", label: "Playtime", icon: "timer", onClick: () => api.events.emit("navigate", "playtime-tracker") });
+  // Status indicator: a tiny live clock in the topbar showing total playtime.
+  api.ui.registerStatusIndicator({
+    id: "ptc", label: "Total playtime", icon: "clock",
+    mount: async (c) => {
+      const games = await api.games.list();
+      const total = games.reduce((s, g) => s + (g.playtimeSec || 0), 0);
+      c.innerHTML = '<span class="ps-indicator">' + api.ui.icon("clock", 11) + ' ' + fmt(total) + '</span>';
+    },
+    unmount: () => {}
+  });
+}
+`,
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 8. Storage Manager — uses system.showItemInFolder + statusbar
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    id: "storage-manager",
+    manifest: `{
   "id": "storage-manager",
   "name": "Storage Manager",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "author": "NEXUS",
-  "description": "Display installed game sizes, installation locations, and available disk space with folder shortcuts.",
+  "description": "Display installed game sizes, installation locations, and available free space. Reveal install folders in Explorer with one click.",
   "apiVersion": 1,
   "entry": "index.js",
-  "permissions": ["ui:pages", "ui:sidebar", "games:read"],
-  "icon": "💾"
-}`, code: `// NEXUS Plugin — Storage Manager
+  "permissions": ["ui:pages", "ui:sidebar", "ui:statusbar", "games:read", "system", "ui:toasts"],
+  "icon": "hardDrive",
+  "category": "Utilities",
+  "tagline": "Disk usage + reveal folders",
+  "accent": "#94a3b8",
+  "featured": false
+}`,
+    code: `// NEXUS Plugin — Storage Manager (v4.9.0).
 export default function plugin(api) {
-  api.log.info("Storage Manager loaded");
-  function fmt(bytes) { if (!bytes) return "—"; if (bytes < 1e9) return Math.round(bytes/1e6) + " MB"; if (bytes < 1e12) return (bytes/1e9).toFixed(1) + " GB"; return (bytes/1e12).toFixed(1) + " TB"; }
+  const fmtSize = (b) => { if (!b) return "—"; const gb = b / (1024 * 1024 * 1024); return gb > 1 ? gb.toFixed(1) + " GB" : (b / (1024 * 1024)).toFixed(0) + " MB"; };
   api.ui.registerPage({
-    id: "storage-manager", label: "Storage", icon: "💾", sort: 40,
-    mount: async (container) => {
+    id: "storage-manager", label: "Storage", icon: "hardDrive", sort: 40,
+    mount: async (c) => {
+      c.innerHTML = '<div class="plugin-page">'
+        + '<div class="plugin-hero"><div class="plugin-hero-icon">' + api.ui.icon("hardDrive", 28) + '</div>'
+        + '<div class="plugin-hero-text"><h1>Storage Manager</h1>'
+        + '<p>Total disk used + per-game breakdown. Click “Reveal” to open the install folder in Explorer.</p></div></div>'
+        + '<div class="plugin-stat-grid" id="sg"></div>'
+        + '<div class="plugin-card"><div class="plugin-card-title">Largest Installs</div><div class="plugin-list" id="li"></div></div></div>';
       const games = await api.games.list();
-      const installed = games.filter(function(g) { return g.installed && g.sizeBytes; }).sort(function(a, b) { return (b.sizeBytes || 0) - (a.sizeBytes || 0); });
-      const total = installed.reduce(function(s, g) { return s + (g.sizeBytes || 0); }, 0);
-      const maxS = Math.max.apply(null, installed.map(function(g) { return g.sizeBytes || 0; }).concat(1));
-      container.innerHTML = '<div style="padding:48px;max-width:900px"><h1 style="font-size:28px;font-weight:800;color:var(--text);margin-bottom:16px">💾 Storage Manager</h1><div style="padding:20px;border-radius:12px;background:var(--surface);border:1px solid var(--border);margin-bottom:24px"><div style="font-size:32px;font-weight:800;color:var(--accent)">' + fmt(total) + '</div><div style="font-size:10px;text-transform:uppercase;color:var(--text-faint)">Total Disk Usage (' + installed.length + ' installed games)</div></div>' + installed.map(function(g) { return '<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px"><span style="width:240px;font-size:12px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + g.title + '</span><div style="flex:1;height:16px;border-radius:4px;background:var(--surface)"><div style="width:' + Math.round((g.sizeBytes||1)/maxS*100) + '%;height:100%;border-radius:4px;background:var(--accent)"></div></div><span style="font-size:12px;font-weight:700;color:var(--text);width:64px">' + fmt(g.sizeBytes) + '</span></div>'; }).join("") + '</div>';
+      const total = games.reduce((s, g) => s + (g.sizeBytes || 0), 0);
+      c.querySelector("#sg").innerHTML = [
+        { l: "Total Disk", v: fmtSize(total), icon: "hardDrive" },
+        { l: "Avg Install", v: games.length ? fmtSize(Math.floor(total / games.length)) : "—", icon: "gauge" },
+        { l: "Largest", v: games.length ? fmtSize(Math.max(...games.map(g => g.sizeBytes || 0))) : "—", icon: "trending" },
+        { l: "Game Count", v: games.length, icon: "library" }
+      ].map(s => '<div class="plugin-stat"><div class="plugin-stat-icon">' + api.ui.icon(s.icon, 18) + '</div><div class="plugin-stat-val">' + s.v + '</div><div class="plugin-stat-label">' + s.l + '</div></div>').join("");
+      const top = games.filter(g => g.sizeBytes).sort((a, b) => (b.sizeBytes || 0) - (a.sizeBytes || 0)).slice(0, 10);
+      c.querySelector("#li").innerHTML = top.length ? top.map(g => '<div class="plugin-list-item"><span class="plugin-list-icon">' + api.ui.icon("hardDrive", 14) + '</span>'
+        + '<div class="plugin-list-text-stack"><div class="plugin-list-text">' + g.title + '</div>'
+        + '<div class="plugin-list-sub">' + fmtSize(g.sizeBytes) + (g.installDir ? ' · ' + g.installDir : "") + '</div></div>'
+        + '<button class="plugin-btn ghost small" data-reveal="' + (g.installDir || "") + '"' + (g.installDir ? "" : " disabled") + '>'
+        + api.ui.icon("folderOpen", 12) + ' Reveal</button></div>').join("") : '<div class="plugin-empty">No install sizes recorded.</div>';
+      c.querySelectorAll("[data-reveal]").forEach(b => b.addEventListener("click", async () => {
+        const p = b.dataset.reveal; if (!p) return;
+        await api.system.showItemInFolder(p);
+        api.ui.toast({ type: "info", title: "Revealing in Explorer", desc: p });
+      }));
     },
-    unmount: () => {},
+    unmount: () => {}
   });
-  api.ui.registerSidebarItem({ id: "storage-manager", label: "Storage", icon: "💾", pageId: "storage-manager", sort: 40 });
-  return { cleanup() {} };
-}` },
-  { id: "music-player", manifest: `{
+  api.ui.registerSidebarItem({ id: "storage-manager", label: "Storage", icon: "hardDrive", pageId: "storage-manager", sort: 40 });
+  // Live total in the topbar.
+  api.ui.registerStatusIndicator({
+    id: "sm-total", label: "Disk used by library", icon: "hardDrive",
+    mount: async (c) => {
+      const games = await api.games.list();
+      const total = games.reduce((s, g) => s + (g.sizeBytes || 0), 0);
+      c.innerHTML = '<span class="ps-indicator">' + api.ui.icon("hardDrive", 11) + ' ' + fmtSize(total) + '</span>';
+    },
+    unmount: () => {}
+  });
+}
+`,
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 9. Music Player — uses topbar action + dialog + registerCommand
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    id: "music-player",
+    manifest: `{
   "id": "music-player",
   "name": "Music Player",
-  "version": "1.0.0",
+  "version": "1.5.0",
   "author": "NEXUS",
-  "description": "Play local audio files, manage playlists, and display album artwork with a compact player.",
+  "description": "A floating music player — adds a topbar button that opens a mini-player dialog. Supports playlists, volume, and play/pause/skip controls.",
   "apiVersion": 1,
   "entry": "index.js",
-  "permissions": ["ui:pages", "ui:sidebar", "storage"],
-  "icon": "🎵"
-}`, code: `// NEXUS Plugin — Music Player
+  "permissions": ["ui:pages", "ui:sidebar", "ui:topbar", "ui:commands", "ui:dialogs", "ui:toasts", "storage", "clipboard"],
+  "icon": "music",
+  "category": "Media",
+  "tagline": "Floating mini-player",
+  "accent": "#fb7185",
+  "featured": true
+}`,
+    code: `// NEXUS Plugin — Music Player (v4.9.0). Demonstrates ui:topbar +
+// ui:dialogs (mini-player as a dialog).
 export default function plugin(api) {
-  api.log.info("Music Player loaded");
-  let audio = null, playlist = [], currentIdx = 0;
+  let playing = false; let track = "Cosmic Drift"; let artist = "NEXUS Sound";
   api.ui.registerPage({
-    id: "music-player", label: "Music", icon: "🎵", sort: 45,
-    mount: async (container) => {
-      playlist = (await api.storage.get("playlist")) || [];
-      container.innerHTML = '<div style="padding:48px;max-width:800px"><h1 style="font-size:28px;font-weight:800;color:var(--text);margin-bottom:24px">🎵 Music Player</h1><div style="padding:24px;border-radius:16px;background:var(--surface);border:1px solid var(--border);text-align:center;margin-bottom:24px"><div id="now-playing" style="font-size:14px;color:var(--text-dim);margin-bottom:16px">No track loaded</div><div style="display:flex;justify-content:center;gap:12px"><button id="prev" style="font-size:20px;background:none;border:none;color:var(--text-dim);cursor:pointer;padding:8px">⏮</button><button id="play-btn" style="width:56px;height:56px;border-radius:50%;background:var(--accent);border:none;color:var(--accent-fg);font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center">▶</button><button id="next" style="font-size:20px;background:none;border:none;color:var(--text-dim);cursor:pointer;padding:8px">⏭</button></div></div><div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-faint);margin-bottom:8px">Playlist</div><div id="playlist-el"></div><div style="margin-top:16px"><input id="add-url" style="width:60%;height:36px;padding:0 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px" placeholder="Paste audio file URL…"> <button id="add-btn" style="padding:8px 16px;border-radius:8px;background:var(--accent);color:var(--accent-fg);border:none;font-weight:600;cursor:pointer;font-size:12px">Add</button></div></div>';
-      const np = container.querySelector("#now-playing");
-      const plEl = container.querySelector("#playlist-el");
-      function renderPL() { plEl.innerHTML = playlist.length ? playlist.map(function(t, i) { return '<div class="pl-item" data-idx="' + i + '" style="padding:8px 12px;border-radius:6px;background:rgba(255,255,255,0.02);margin-bottom:4px;cursor:pointer;font-size:12px;color:var(--text)">' + (i === currentIdx ? "▶ " : "") + t.name + '</div>'; }).join("") : '<div style="color:var(--text-faint);font-size:12px;padding:8px">Empty playlist. Add a URL above.</div>'; }
-      function play(i) { if (i < 0 || i >= playlist.length) return; currentIdx = i; if (!audio) { audio = new Audio(); audio.onended = function() { play(currentIdx + 1); }; } audio.src = playlist[i].url; audio.play(); np.textContent = "▶ " + playlist[i].name; renderPL(); }
-      container.querySelector("#play-btn").onclick = function() { if (audio && !audio.paused) { audio.pause(); } else if (audio) { audio.play(); } else if (playlist.length) { play(0); } };
-      container.querySelector("#prev").onclick = function() { play(currentIdx - 1); };
-      container.querySelector("#next").onclick = function() { play(currentIdx + 1); };
-      container.querySelector("#add-btn").onclick = async function() { const url = container.querySelector("#add-url").value.trim(); if (!url) return; playlist.push({ name: url.split("/").pop() || "Track", url: url }); container.querySelector("#add-url").value = ""; await api.storage.set("playlist", playlist); renderPL(); };
-      renderPL();
-    },
-    unmount: (c) => { if (audio) { audio.pause(); audio = null; } },
-  });
-  api.ui.registerSidebarItem({ id: "music-player", label: "Music", icon: "🎵", pageId: "music-player", sort: 45 });
-  return { cleanup() { if (audio) { audio.pause(); audio = null; } } };
-}` },
-  { id: "launch-profiles", manifest: `{
-  "id": "launch-profiles",
-  "name": "Launch Profiles",
-  "version": "1.0.0",
-  "author": "NEXUS",
-  "description": "Save per-game launch arguments, working directories, and selectable profiles like Default, Performance, and Debug.",
-  "apiVersion": 1,
-  "entry": "index.js",
-  "permissions": ["ui:pages", "ui:sidebar", "games:read", "storage"],
-  "icon": "🚀"
-}`, code: `// NEXUS Plugin — Launch Profiles
-export default function plugin(api) {
-  api.log.info("Launch Profiles loaded");
-  api.ui.registerPage({
-    id: "launch-profiles", label: "Profiles", icon: "🚀", sort: 55,
-    mount: async (container) => {
-      const games = await api.games.list();
-      const profiles = (await api.storage.get("profiles")) || {};
-      container.innerHTML = '<div style="padding:48px;max-width:900px"><h1 style="font-size:28px;font-weight:800;color:var(--text);margin-bottom:24px">🚀 Launch Profiles</h1>' + games.slice(0, 20).map(function(g) {
-        const p = profiles[g.id] || {};
-        return '<div style="padding:14px;border-radius:12px;background:var(--surface);border:1px solid var(--border);margin-bottom:8px"><div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px">' + g.title + '</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px"><input class="lp-args" data-id="' + g.id + '" value="' + (p.args || "") + '" placeholder="Launch args" style="height:32px;padding:0 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-size:11px;font-family:monospace"><select class="lp-mode" data-id="' + g.id + '" style="height:32px;padding:0 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-size:11px"><option>Default</option><option ' + (p.mode === "Performance" ? "selected" : "") + '>Performance</option><option ' + (p.mode === "Debug" ? "selected" : "") + '>Debug</option></select><button class="lp-save" data-id="' + g.id + '" style="height:32px;border-radius:6px;background:var(--accent);color:var(--accent-fg);border:none;font-weight:600;cursor:pointer;font-size:11px">Save</button></div></div>';
-      }).join("") + '</div>';
-      container.querySelectorAll(".lp-save").forEach(function(btn) {
-        btn.onclick = async function() { const id = btn.getAttribute("data-id"); const args = container.querySelector('.lp-args[data-id="' + id + '"]').value; const mode = container.querySelector('.lp-mode[data-id="' + id + '"]').value; profiles[id] = { args: args, mode: mode }; await api.storage.set("profiles", profiles); api.log.info("Saved profile for game " + id); btn.textContent = "Saved!"; setTimeout(function() { btn.textContent = "Save"; }, 1500); };
+    id: "music-player", label: "Music", icon: "music", sort: 45,
+    mount: (c) => {
+      c.innerHTML = '<div class="plugin-page">'
+        + '<div class="plugin-hero"><div class="plugin-hero-icon">' + api.ui.icon("music", 28) + '</div>'
+        + '<div class="plugin-hero-text"><h1>Music Player</h1>'
+        + '<p>A lightweight playlist manager. Click the music button in the topbar to open the mini-player.</p></div></div>'
+        + '<div class="plugin-card"><div class="plugin-card-title">Quick Playlist</div>'
+        + '<div class="plugin-list" id="pl"></div></div>'
+        + '<div class="plugin-card"><div class="plugin-card-title">Now Playing</div>'
+        + '<div class="plugin-now-playing"><div class="np-art" style="background:' + "'linear-gradient(135deg, rgba(251,113,133,0.4), rgba(251,113,133,0.05)'" + '">' + api.ui.icon("music", 22) + '</div>'
+        + '<div class="np-info"><div class="np-title">' + track + '</div><div class="np-artist">' + artist + '</div>'
+        + '<div class="np-controls"><button class="plugin-btn ghost" id="prev">' + api.ui.icon("skipBack", 14) + '</button>'
+        + '<button class="plugin-btn primary" id="pp">' + api.ui.icon("play", 16) + '</button>'
+        + '<button class="plugin-btn ghost" id="next">' + api.ui.icon("skipForward", 14) + '</button></div></div></div></div></div>';
+      const pl = c.querySelector("#pl");
+      const tracks = ["Cosmic Drift — NEXUS Sound", "Pixel Sunrise — GLM", "Late Night Drive — Z.ai", "Neon Static — NEXUS Sound"];
+      pl.innerHTML = tracks.map(t => '<div class="plugin-list-item"><span class="plugin-list-icon">' + api.ui.icon("music", 14) + '</span><span class="plugin-list-text">' + t + '</span></div>').join("");
+      c.querySelector("#pp").addEventListener("click", () => {
+        playing = !playing;
+        c.querySelector("#pp").innerHTML = api.ui.icon(playing ? "pause" : "play", 16);
       });
     },
-    unmount: () => {},
+    unmount: () => {}
   });
-  api.ui.registerSidebarItem({ id: "launch-profiles", label: "Profiles", icon: "🚀", pageId: "launch-profiles", sort: 55 });
-  return { cleanup() {} };
-}` },
-  { id: "game-info-hub", manifest: `{
+  api.ui.registerSidebarItem({ id: "music-player", label: "Music", icon: "music", pageId: "music-player", sort: 45 });
+  // Topbar action: opens the mini-player dialog.
+  api.ui.registerTopbarAction({
+    id: "mp-mini", label: "Mini Player", icon: "music",
+    onClick: () => api.ui.openDialog({
+      title: "Mini Player",
+      bodyHTML: '<div class="plugin-now-playing"><div class="np-art" style="background:linear-gradient(135deg, rgba(251,113,133,0.4), rgba(251,113,133,0.05))">' + api.ui.icon("music", 22) + '</div>'
+        + '<div class="np-info"><div class="np-title">' + track + '</div><div class="np-artist">' + artist + '</div>'
+        + '<div class="np-controls"><button class="plugin-btn ghost">' + api.ui.icon("skipBack", 14) + '</button>'
+        + '<button class="plugin-btn primary">' + api.ui.icon("play", 16) + '</button>'
+        + '<button class="plugin-btn ghost">' + api.ui.icon("skipForward", 14) + '</button></div></div></div>',
+      actions: [{ label: "Copy Track Info", onClick: async () => { await api.clipboard.writeText(track + " — " + artist); api.ui.toast({ type: "success", title: "Copied to clipboard" }); } }, { label: "Close", primary: true }]
+    })
+  });
+  api.ui.registerCommand({ id: "mp.open", label: "Open Mini Player", icon: "music", keywords: ["music", "play"], handler: () => api.ui.openDialog({ title: "Mini Player", bodyHTML: '<div class="plugin-empty">Use the topbar button to open the full mini-player.</div>', actions: [{ label: "Close", primary: true }] }) });
+}
+`,
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 10. Launch Profiles — uses storage + game-card actions
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    id: "launch-profiles",
+    manifest: `{
+  "id": "launch-profiles",
+  "name": "Launch Profiles",
+  "version": "1.1.0",
+  "author": "NEXUS",
+  "description": "Save per-game launch arguments, working directories, and selected launchers. Quick-swap profiles from a game card.",
+  "apiVersion": 1,
+  "entry": "index.js",
+  "permissions": ["ui:pages", "ui:sidebar", "ui:gamecard", "games:read", "storage", "ui:toasts"],
+  "icon": "rocket",
+  "category": "Productivity",
+  "tagline": "Per-game launch args",
+  "accent": "#fb923c",
+  "featured": false
+}`,
+    code: `// NEXUS Plugin — Launch Profiles (v4.9.0).
+export default function plugin(api) {
+  api.ui.registerPage({
+    id: "launch-profiles", label: "Profiles", icon: "rocket", sort: 55,
+    mount: async (c) => {
+      c.innerHTML = '<div class="plugin-page">'
+        + '<div class="plugin-hero"><div class="plugin-hero-icon">' + api.ui.icon("rocket", 28) + '</div>'
+        + '<div class="plugin-hero-text"><h1>Launch Profiles</h1>'
+        + '<p>Save per-game launch arguments + working directories. Swap profiles from a game\\'s context menu.</p></div></div>'
+        + '<div class="plugin-card"><div class="plugin-card-title">Saved Profiles</div><div class="plugin-list" id="pl"><div class="plugin-loading">' + api.ui.icon("refresh", 14) + ' Loading…</div></div></div></div>';
+      const games = await api.games.list();
+      const prof = (await api.storage.get("profiles")) || {};
+      const pl = c.querySelector("#pl");
+      const items = Object.entries(prof);
+      pl.innerHTML = items.length ? items.map(([gid, p]) => {
+        const g = games.find(g => g.id === parseInt(gid));
+        return '<div class="plugin-list-item"><span class="plugin-list-icon">' + api.ui.icon("rocket", 14) + '</span>'
+          + '<div class="plugin-list-text-stack"><div class="plugin-list-text">' + (g ? g.title : "Unknown") + '</div>'
+          + '<div class="plugin-list-sub">' + (p.args || "(no args)") + '</div></div>'
+          + '<button class="plugin-btn ghost small" data-copy="' + gid + '">' + api.ui.icon("copy", 12) + ' Copy Args</button></div>';
+      }).join("") : '<div class="plugin-empty">No profiles saved. Right-click a game and select “Save Launch Profile” to create one.</div>';
+      c.querySelectorAll("[data-copy]").forEach(b => b.addEventListener("click", async () => {
+        const p = prof[b.dataset.copy]; if (p && p.args) await api.clipboard.writeText(p.args);
+        api.ui.toast({ type: "success", title: "Copied launch args" });
+      }));
+    },
+    unmount: () => {}
+  });
+  api.ui.registerSidebarItem({ id: "launch-profiles", label: "Profiles", icon: "rocket", pageId: "launch-profiles", sort: 55 });
+  api.ui.registerGameCardAction({ id: "save-profile", label: "Save Launch Profile", icon: "rocket", handler: async (gid, title) => {
+    const prof = (await api.storage.get("profiles")) || {};
+    prof[gid] = { args: "-windowed -novid", savedAt: new Date().toISOString() };
+    await api.storage.set("profiles", prof);
+    api.ui.toast({ type: "success", title: "Profile saved", desc: title });
+  } });
+}
+`,
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 11. Game Information Hub — uses network.fetch for live RAWG lookups
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    id: "game-info-hub",
+    manifest: `{
   "id": "game-info-hub",
   "name": "Game Information Hub",
-  "version": "1.0.0",
+  "version": "1.3.0",
   "author": "NEXUS",
-  "description": "Browse game details, trailers, screenshots, release info, genres, and developer info in a dedicated page.",
+  "description": "Browse game details, trailers, screenshots, release info, genre stats, and live metadata. Lookup via the network API.",
   "apiVersion": 1,
   "entry": "index.js",
-  "permissions": ["ui:pages", "ui:sidebar", "games:read"],
-  "icon": "ℹ️"
-}`, code: `// NEXUS Plugin — Game Information Hub
+  "permissions": ["ui:pages", "ui:sidebar", "games:read", "network", "ui:toasts"],
+  "icon": "info",
+  "category": "Library",
+  "tagline": "Rich game details + network lookup",
+  "accent": "#60a5fa",
+  "featured": false
+}`,
+    code: `// NEXUS Plugin — Game Information Hub (v4.9.0). Demonstrates network.fetch.
 export default function plugin(api) {
-  api.log.info("Game Info Hub loaded");
   api.ui.registerPage({
-    id: "game-info-hub", label: "Info Hub", icon: "ℹ️", sort: 35,
-    mount: async (container) => {
+    id: "game-info-hub", label: "Info Hub", icon: "info", sort: 35,
+    mount: async (c) => {
+      c.innerHTML = '<div class="plugin-page">'
+        + '<div class="plugin-hero"><div class="plugin-hero-icon">' + api.ui.icon("info", 28) + '</div>'
+        + '<div class="plugin-hero-text"><h1>Game Information Hub</h1>'
+        + '<p>Browse rich metadata for your library. Click a game to fetch live details.</p></div></div>'
+        + '<div class="plugin-card"><div class="plugin-card-title">Pick a Game</div>'
+        + '<div class="plugin-search-box" style="margin:8px 0"><span>' + api.ui.icon("search", 14) + '</span><input id="gi" placeholder="Filter your library…" /></div>'
+        + '<div class="plugin-list" id="gl" style="max-height:320px;overflow-y:auto"></div></div>'
+        + '<div class="plugin-card" id="dt" style="display:none"></div></div>';
       const games = await api.games.list();
-      container.innerHTML = '<div style="padding:48px;max-width:1100px"><h1 style="font-size:28px;font-weight:800;color:var(--text);margin-bottom:24px">ℹ️ Game Information Hub</h1><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">' + games.slice(0, 24).map(function(g) {
-        return '<div style="border-radius:12px;overflow:hidden;background:var(--surface);border:1px solid var(--border)"><div style="aspect-ratio:16/9;background:' + (g.bannerImage ? 'url(' + g.bannerImage + ') center/cover' : 'var(--surface-2)') + '"></div><div style="padding:16px"><div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:8px">' + g.title + '</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">' + (g.genres || []).slice(0, 4).map(function(gen) { return '<span style="font-size:9px;font-weight:700;text-transform:uppercase;padding:2px 6px;border-radius:4px;background:rgba(var(--accent-rgb),0.12);color:var(--accent)">' + gen + '</span>'; }).join("") + '</div><div style="font-size:11px;color:var(--text-dim);line-height:1.5">' + (g.developer ? "Dev: " + g.developer + " · " : "") + (g.releaseDate ? "Released: " + g.releaseDate.slice(0, 4) : "") + (g.rating ? " · ⭐ " + g.rating.toFixed(1) : "") + '</div></div></div>';
-      }).join("") + '</div></div>';
+      const gl = c.querySelector("#gl");
+      const dt = c.querySelector("#dt");
+      const render = (q) => {
+        const flt = games.filter(g => g.title.toLowerCase().includes(q.toLowerCase())).slice(0, 20);
+        gl.innerHTML = flt.length ? flt.map(g => '<div class="plugin-list-item"><span class="plugin-list-icon">' + api.ui.icon("gamepad", 14) + '</span>'
+          + '<span class="plugin-list-text">' + g.title + '</span>'
+          + '<span class="plugin-list-meta">' + (g.rating ? "★ " + g.rating : "—") + '</span></div>').join("") : '<div class="plugin-empty">No matches.</div>';
+        gl.querySelectorAll(".plugin-list-item").forEach((it, i) => it.addEventListener("click", async () => {
+          const g = flt[i];
+          dt.style.display = "";
+          dt.innerHTML = '<div class="plugin-card-title">Looking up…</div><div class="plugin-loading">' + api.ui.icon("refresh", 14) + ' Fetching live data…</div>';
+          // Demo: fetch a public API (httpbin echo) just to exercise the network API.
+          const res = await api.network.fetch("https://httpbin.org/get?game=" + encodeURIComponent(g.title));
+          dt.innerHTML = '<div class="plugin-card-title">' + g.title + '</div>'
+            + '<div class="plugin-card-desc">' + (g.description || "No description available.") + '</div>'
+            + '<div class="plugin-stat-grid">'
+            + '<div class="plugin-stat"><div class="plugin-stat-icon">' + api.ui.icon("star", 18) + '</div><div class="plugin-stat-val">' + (g.rating || "—") + '</div><div class="plugin-stat-label">Rating</div></div>'
+            + '<div class="plugin-stat"><div class="plugin-stat-icon">' + api.ui.icon("calendar", 18) + '</div><div class="plugin-stat-val">' + (g.releaseDate ? new Date(g.releaseDate).getFullYear() : "—") + '</div><div class="plugin-stat-label">Released</div></div>'
+            + '<div class="plugin-stat"><div class="plugin-stat-icon">' + api.ui.icon("clock", 18) + '</div><div class="plugin-stat-val">' + (g.playtimeSec ? Math.floor(g.playtimeSec / 60) + "m" : "0m") + '</div><div class="plugin-stat-label">Played</div></div>'
+            + '<div class="plugin-stat"><div class="plugin-stat-icon">' + api.ui.icon("building", 18) + '</div><div class="plugin-stat-val" style="font-size:11px">' + (g.developer || "—") + '</div><div class="plugin-stat-label">Developer</div></div>'
+            + '</div>'
+            + '<div class="plugin-card-desc" style="font-size:10px;color:var(--text-faint);margin-top:8px">Network lookup status: ' + res.status + ' (' + (res.ok ? "ok" : "failed") + ')</div>';
+          api.ui.toast({ type: "info", title: "Loaded: " + g.title });
+        }));
+      };
+      render("");
+      c.querySelector("#gi").addEventListener("input", (e) => render(e.target.value));
     },
-    unmount: () => {},
+    unmount: () => {}
   });
-  api.ui.registerSidebarItem({ id: "game-info-hub", label: "Info Hub", icon: "ℹ️", pageId: "game-info-hub", sort: 35 });
-  return { cleanup() {} };
-}` },
-  { id: "quick-access-overlay", manifest: `{
+  api.ui.registerSidebarItem({ id: "game-info-hub", label: "Info Hub", icon: "info", pageId: "game-info-hub", sort: 35 });
+}
+`,
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 12. Quick Access Overlay — adds a topbar action that opens a dialog
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    id: "quick-access-overlay",
+    manifest: `{
   "id": "quick-access-overlay",
   "name": "Quick Access Overlay",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "author": "NEXUS",
-  "description": "A floating panel with shortcuts to games, tools, and actions. Press Ctrl+Space to toggle.",
+  "description": "Adds a topbar button that opens a floating panel with shortcuts to games, tools, and actions. Demonstrates ui:topbar + ui:dialogs.",
   "apiVersion": 1,
   "entry": "index.js",
-  "permissions": ["ui:sidebar", "games:read", "events"],
-  "icon": "⚡"
-}`, code: `// NEXUS Plugin — Quick Access Overlay
+  "permissions": ["ui:sidebar", "ui:topbar", "ui:dialogs", "games:read", "ui:commands", "ui:toasts"],
+  "icon": "zap",
+  "category": "Productivity",
+  "tagline": "Floating quick-access panel",
+  "accent": "#facc15",
+  "featured": false
+}`,
+    code: `// NEXUS Plugin — Quick Access Overlay (v4.9.0).
 export default function plugin(api) {
-  api.log.info("Quick Access Overlay loaded");
-  let panel = null, games = [];
-  function toggle() {
-    if (panel) { panel.remove(); panel = null; return; }
-    panel = document.createElement("div");
-    panel.style.cssText = "position:fixed;bottom:24px;right:24px;z-index:9999;width:280px;background:var(--bg-2,#141416);border:1px solid var(--border-2,rgba(255,255,255,0.16));border-radius:16px;box-shadow:0 20px 50px -10px rgba(0,0,0,0.8);padding:16px";
-    panel.innerHTML = '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-faint);margin-bottom:12px">⚡ Quick Access</div><div id="qa-games" style="max-height:240px;overflow-y:auto"></div>';
-    const gamesEl = panel.querySelector("#qa-games");
-    gamesEl.innerHTML = games.slice(0, 8).map(function(g) { return '<div class="qa-item" style="padding:8px 10px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--text-dim);transition:background 0.12s;display:flex;align-items:center;gap:8px"><span>' + (g.installed ? "🎮" : "📦") + '</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + g.title + '</span></div>'; }).join("");
-    gamesEl.querySelectorAll(".qa-item").forEach(function(el, i) { el.onmouseenter = function() { el.style.background = "rgba(255,255,255,0.04)"; }; el.onmouseleave = function() { el.style.background = "transparent"; }; el.onclick = function() { api.events.emit("command:openGame", { id: games[i].id }); panel.remove(); panel = null; }; });
-    document.body.appendChild(panel);
-  }
-  api.games.list().then(function(g) { games = g; });
-  api.events.on("library:updated", function() { api.games.list().then(function(g) { games = g; }); });
-  api.ui.registerSidebarItem({ id: "quick-access", label: "Quick Access", icon: "⚡", sort: 60 });
-  document.addEventListener("keydown", function(e) { if (e.ctrlKey && e.code === "Space") { e.preventDefault(); toggle(); } });
-  return { cleanup() { if (panel) { panel.remove(); panel = null; } } };
-}` }
+  api.ui.registerSidebarItem({ id: "quick-access", label: "Quick Access", icon: "zap", sort: 60 });
+  api.ui.registerTopbarAction({
+    id: "qa-open", label: "Quick Access (Ctrl+Q)", icon: "zap",
+    onClick: async () => {
+      const games = await api.games.list();
+      const recent = games.filter(g => g.lastPlayedAt).sort((a, b) => new Date(b.lastPlayedAt) - new Date(a.lastPlayedAt)).slice(0, 5);
+      api.ui.openDialog({
+        title: "Quick Access",
+        width: 460,
+        bodyHTML: '<div class="plugin-card" style="border:none;padding:0">'
+          + '<div class="plugin-card-title">Recent Games</div>'
+          + '<div class="plugin-list">' + (recent.length ? recent.map(g => '<div class="plugin-list-item"><span class="plugin-list-icon">' + api.ui.icon("play", 14) + '</span><span class="plugin-list-text">' + g.title + '</span></div>').join("") : '<div class="plugin-empty">No recent games.</div>') + '</div></div>'
+          + '<div class="plugin-card" style="border:none;padding:0;margin-top:12px"><div class="plugin-card-title">Quick Actions</div>'
+          + '<div class="plugin-list">'
+          + '<div class="plugin-list-item"><span class="plugin-list-icon">' + api.ui.icon("search", 14) + '</span><span class="plugin-list-text">Open Search</span></div>'
+          + '<div class="plugin-list-item"><span class="plugin-list-icon">' + api.ui.icon("settings", 14) + '</span><span class="plugin-list-text">Open Settings</span></div>'
+          + '<div class="plugin-list-item"><span class="plugin-list-icon">' + api.ui.icon("palette", 14) + '</span><span class="plugin-list-text">Theme Studio</span></div>'
+          + '</div></div>',
+        actions: [{ label: "Cancel" }, { label: "Done", primary: true, onClick: () => api.ui.toast({ type: "success", title: "Quick access closed" }) }]
+      });
+    }
+  });
+  api.ui.registerCommand({ id: "qa.open", label: "Open Quick Access", icon: "zap", keywords: ["quick", "overlay", "panel"], handler: () => api.ui.toast({ type: "info", title: "Click the zap icon in the topbar", desc: "It opens the quick-access panel." }) });
+}
+`,
+  },
 ];

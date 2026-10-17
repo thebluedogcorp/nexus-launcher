@@ -1,4 +1,4 @@
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, useEffect, useMemo, useRef, type ReactNode } from "react";
 import type { LauncherSettings, SortKey, Collection } from "@shared/types";
 import { SORT_LABELS, PLATFORM_LIST } from "@shared/types";
 import { Icon } from "./Icons";
@@ -9,6 +9,8 @@ import { IconGlyph } from "./IconGlyph";
 import { FIRST_PARTY_PLUGINS } from "../lib/first-party-plugins";
 import type { InstalledPlugin } from "@shared/plugin-types";
 import { reloadPlugins } from "../lib/plugin-runtime";
+import { usePluginExtensions } from "../lib/plugin-store";
+import { PluginIcon } from "./PluginIcon";
 
 interface Props {
   initial: LauncherSettings;
@@ -727,6 +729,11 @@ function PluginsTab({ flash }: { flash: (type: "info" | "success" | "error", msg
   const [plugins, setPlugins] = useState<InstalledPlugin[]>([]);
   const [loading, setLoading] = useState(true);
   const [installing, setInstalling] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [cat, setCat] = useState<string>("all");
+  // v4.9.0 — per-plugin settings panel expansion (from registered settingsPanels)
+  const [openSettings, setOpenSettings] = useState<string | null>(null);
+  const { settingsPanels } = usePluginExtensions();
 
   const refresh = async () => {
     try { setPlugins(await window.nexus.pluginsList()); } catch {}
@@ -769,76 +776,273 @@ function PluginsTab({ flash }: { flash: (type: "info" | "success" | "error", msg
     flash("success", `Removed: ${p.manifest.name}`);
   };
 
+  // Parse all first-party manifests once.
+  const fpParsed = useMemo(() => FIRST_PARTY_PLUGINS.map((fp) => ({ ...JSON.parse(fp.manifest), _fp: fp })), []);
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    fpParsed.forEach((m) => m.category && set.add(m.category));
+    return ["all", ...Array.from(set)];
+  }, [fpParsed]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return fpParsed.filter((m) => {
+      if (cat !== "all" && m.category !== cat) return false;
+      if (!q) return true;
+      return (m.name + " " + (m.description ?? "") + " " + (m.tagline ?? "") + " " + (m.author ?? "")).toLowerCase().includes(q)
+        || (m.permissions ?? []).some((p: string) => p.toLowerCase().includes(q));
+    });
+  }, [fpParsed, query, cat]);
+
+  const featured = filtered.filter((m) => m.featured);
+  const standard = filtered.filter((m) => !m.featured);
+
   if (loading) return <div style={{ padding: 40, textAlign: "center", color: "var(--text-faint)" }}>Loading…</div>;
 
   const installedIds = new Set(plugins.map((p) => p.manifest.id));
+  // Map of pluginId → enabled state (so gallery can show "enabled" badge)
+  const enabledIds = new Set(plugins.filter((p) => p.status === "enabled").map((p) => p.manifest.id));
 
   return (
     <>
-      {/* First-Party Plugins Gallery */}
-      <div className="settings-section">
-        <div className="settings-section-title"><span className="bar" />First-Party Plugins</div>
-        <div className="d" style={{ fontSize: 12, marginBottom: 16, lineHeight: 1.5 }}>Click Install to add any of these plugins directly — no directory browsing needed. They install + enable in one click.</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
-          {FIRST_PARTY_PLUGINS.map((fp) => {
-            const m = JSON.parse(fp.manifest);
-            const installed = installedIds.has(m.id);
-            return (
-              <div key={m.id} style={{ padding: 16, borderRadius: "var(--r-md)", background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                  <span style={{ fontSize: 20 }}>{m.icon || "📦"}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{m.name}</div>
-                    <div style={{ fontSize: 10, color: "var(--text-faint)" }}>v{m.version} · {m.author}</div>
-                  </div>
-                </div>
-                <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.4, marginBottom: 10, minHeight: 32 }}>{m.description}</div>
-                <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 10 }}>
-                  {m.permissions.map((perm: string) => (
-                    <span key={perm} style={{ fontSize: 8, fontWeight: 700, textTransform: "uppercase", padding: "2px 5px", borderRadius: 3, background: "var(--surface-2)", color: "var(--text-faint)" }}>{perm}</span>
-                  ))}
-                </div>
-                {installed ? (
-                  <button className="settings-choice" style={{ minWidth: 0, opacity: 0.6, cursor: "default" }} disabled>
-                    <Icon.Check size={13} /> Installed
-                  </button>
-                ) : (
-                  <button className="settings-choice" style={{ minWidth: 0, background: "var(--accent)", color: "var(--accent-fg)", borderColor: "var(--accent)" }} onClick={() => void installFirstParty(fp)} disabled={installing === m.id}>
-                    {installing === m.id ? <Icon.Spinner size={13} /> : <Icon.Plus size={13} />} Install
-                  </button>
-                )}
-              </div>
-            );
-          })}
+      {/* ===== Gallery Header (search + filter) ===== */}
+      <div className="settings-section plugin-gallery-head">
+        <div className="settings-section-title"><span className="bar" />Plugin Marketplace</div>
+        <div className="plugin-gallery-head-row">
+          <div className="plugin-search-box">
+            <Icon.Search size={14} />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search plugins, capabilities, or authors…" />
+            {query && <button className="plugin-search-clear" onClick={() => setQuery("")} aria-label="Clear search"><Icon.Close size={12} /></button>}
+          </div>
+          <div className="plugin-cat-chips">
+            {categories.map((c) => (
+              <button key={c} className={cat === c ? "plugin-cat-chip active" : "plugin-cat-chip"} onClick={() => setCat(c)}>
+                {c === "all" ? "All" : c}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Installed Plugins */}
+      {/* ===== Featured Plugins ===== */}
+      {featured.length > 0 && (
+        <div className="settings-section">
+          <div className="settings-section-title"><span className="bar" />Featured</div>
+          <div className="plugin-featured-grid">
+            {featured.map((m) => (
+              <FeaturedPluginCard
+                key={m.id}
+                manifest={m}
+                installed={installedIds.has(m.id)}
+                enabled={enabledIds.has(m.id)}
+                installing={installing === m.id}
+                onInstall={() => void installFirstParty(m._fp)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ===== Browse All ===== */}
       <div className="settings-section">
-        <div className="settings-section-title"><span className="bar" />Installed Plugins</div>
-        {plugins.length === 0 ? (
-          <div style={{ padding: "20px 4px", fontSize: 13, color: "var(--text-faint)" }}>No plugins installed yet. Install a first-party plugin above, or click "Install from Directory" below for a custom plugin.</div>
+        <div className="settings-section-title"><span className="bar" />Browse All</div>
+        {standard.length === 0 ? (
+          <div className="plugin-empty">No plugins match your search. Try a different keyword or category.</div>
         ) : (
-          plugins.map((p) => (
-            <div key={p.manifest.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: "var(--r-md)", background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", marginBottom: 8 }}>
-              <span style={{ fontSize: 20 }}>{p.manifest.icon || "📦"}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{p.manifest.name} <span style={{ fontSize: 10, color: "var(--text-faint)", fontWeight: 400 }}>v{p.manifest.version}</span></div>
-                <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>{p.manifest.description}</div>
-                <div style={{ fontSize: 10, color: "var(--text-faint)", marginTop: 3 }}>
-                  by {p.manifest.author} · {p.manifest.permissions.join(", ") || "no permissions"} · <span style={{ color: p.status === "enabled" ? "var(--accent)" : p.status === "error" ? "var(--danger)" : "var(--text-faint)" }}>{p.status}</span>
-                </div>
-                {p.error && <div style={{ fontSize: 10, color: "var(--danger)", marginTop: 4 }}>{p.error}</div>}
-              </div>
-              <button className="settings-toggle" style={p.status === "enabled" ? {} : {}} onClick={() => void toggle(p)}><span className="knob" style={p.status === "enabled" ? { left: 22 } : {}} /></button>
-              <button className="ctx-item danger" style={{ padding: "4px 8px", fontSize: 11 }} onClick={() => void remove(p)} title="Remove"><Icon.Trash size={12} /></button>
-            </div>
-          ))
+          <div className="plugin-gallery-grid">
+            {standard.map((m) => (
+              <PluginGalleryCard
+                key={m.id}
+                manifest={m}
+                installed={installedIds.has(m.id)}
+                enabled={enabledIds.has(m.id)}
+                installing={installing === m.id}
+                onInstall={() => void installFirstParty(m._fp)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ===== Installed Plugins (redesigned — no word-wrap bug) ===== */}
+      <div className="settings-section">
+        <div className="settings-section-title"><span className="bar" />Installed Plugins <span className="plugin-count-pill">{plugins.length}</span></div>
+        {plugins.length === 0 ? (
+          <div className="plugin-empty">No plugins installed yet. Install a first-party plugin above, or click “Install from Directory” below to add a custom plugin.</div>
+        ) : (
+          <div className="plugin-installed-list">
+            {plugins.map((p) => (
+              <InstalledPluginRow
+                key={p.manifest.id}
+                plugin={p}
+                hasSettings={settingsPanels.some((sp) => sp.pluginId === p.manifest.id)}
+                onToggle={() => void toggle(p)}
+                onRemove={() => void remove(p)}
+                onOpenSettings={() => setOpenSettings(openSettings === p.manifest.id ? null : p.manifest.id)}
+                settingsOpen={openSettings === p.manifest.id}
+                settingsExt={settingsPanels.find((sp) => sp.pluginId === p.manifest.id)}
+              />
+            ))}
+          </div>
         )}
         <div className="settings-choice-row" style={{ marginTop: 12 }}>
-          <button className="settings-choice" style={{ minWidth: 0 }} onClick={installFromDir}><span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Icon.Plus size={14} /> Install from Directory</span></button>
+          <button className="settings-choice" style={{ minWidth: 0 }} onClick={installFromDir}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Icon.Plus size={14} /> Install from Directory</span>
+          </button>
         </div>
       </div>
     </>
   );
+}
+
+// ─── v4.9.0 — Gallery card for a standard first-party plugin. ──────────────
+function PluginGalleryCard({ manifest, installed, enabled, installing, onInstall }: {
+  manifest: { id: string; name: string; version: string; author: string; description: string; icon?: string; category?: string; tagline?: string; accent?: string; permissions?: string[] };
+  installed: boolean;
+  enabled: boolean;
+  installing: boolean;
+  onInstall: () => void;
+}) {
+  const accent = manifest.accent || "var(--accent)";
+  return (
+    <div className={`plugin-card ${installed ? "installed" : ""}`}>
+      <div className="plugin-card-head" style={{ background: `linear-gradient(135deg, ${accent}26 0%, transparent 100%)` }}>
+        <div className="plugin-card-icon" style={{ background: `${accent}1f`, color: accent }}>
+          <PluginIcon name={manifest.icon} size={22} />
+        </div>
+        <div className="plugin-card-meta">
+          <div className="plugin-card-name">{manifest.name}</div>
+          <div className="plugin-card-tag">{manifest.tagline || manifest.category || "Plugin"} · v{manifest.version}</div>
+        </div>
+        {installed && (
+          <span className={`plugin-installed-badge ${enabled ? "on" : ""}`}>
+            <Icon.Check size={10} /> {enabled ? "Enabled" : "Installed"}
+          </span>
+        )}
+      </div>
+      <div className="plugin-card-body">
+        <p className="plugin-card-desc">{manifest.description}</p>
+        <div className="plugin-perm-row">
+          {(manifest.permissions ?? []).map((perm) => (
+            <span key={perm} className="plugin-perm-chip" title={perm}>{perm}</span>
+          ))}
+        </div>
+      </div>
+      <div className="plugin-card-foot">
+        <span className="plugin-author">by {manifest.author}</span>
+        {installed ? (
+          <button className="plugin-btn-installed" disabled><Icon.Check size={12} /> Added</button>
+        ) : (
+          <button className="plugin-btn-install" onClick={onInstall} disabled={installing} style={{ background: accent }}>
+            {installing ? <Icon.Spinner size={12} /> : <Icon.Plus size={12} />} Install
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── v4.9.0 — Larger card for featured plugins. ─────────────────────────────
+function FeaturedPluginCard(props: Parameters<typeof PluginGalleryCard>[0]) {
+  const manifest = props.manifest;
+  const accent = manifest.accent || "var(--accent)";
+  return (
+    <div className={`plugin-card featured ${props.installed ? "installed" : ""}`}>
+      <div className="plugin-card-featured-strip" style={{ background: `linear-gradient(135deg, ${accent}38 0%, ${accent}10 100%)` }}>
+        <div className="plugin-featured-mark" style={{ background: accent, color: "#000" }}><Icon.Sparkles size={11} /></div>
+        <span className="plugin-featured-label">Featured</span>
+      </div>
+      <div className="plugin-card-head" style={{ background: `linear-gradient(135deg, ${accent}26 0%, transparent 100%)` }}>
+        <div className="plugin-card-icon featured" style={{ background: `${accent}24`, color: accent }}>
+          <PluginIcon name={manifest.icon} size={28} />
+        </div>
+        <div className="plugin-card-meta">
+          <div className="plugin-card-name featured">{manifest.name}</div>
+          <div className="plugin-card-tag">{manifest.tagline || manifest.category}</div>
+        </div>
+      </div>
+      <div className="plugin-card-body">
+        <p className="plugin-card-desc">{manifest.description}</p>
+        <div className="plugin-perm-row">
+          {(manifest.permissions ?? []).map((perm) => (
+            <span key={perm} className="plugin-perm-chip" title={perm}>{perm}</span>
+          ))}
+        </div>
+      </div>
+      <div className="plugin-card-foot">
+        <span className="plugin-author">by {manifest.author} · v{manifest.version}</span>
+        {props.installed ? (
+          <button className="plugin-btn-installed" disabled><Icon.Check size={12} /> {props.enabled ? "Enabled" : "Installed"}</button>
+        ) : (
+          <button className="plugin-btn-install" onClick={props.onInstall} disabled={props.installing} style={{ background: accent }}>
+            {props.installing ? <Icon.Spinner size={12} /> : <Icon.Plus size={12} />} Install
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── v4.9.0 — Row for an installed plugin (fixes the broken word-wrap layout). ─
+function InstalledPluginRow({ plugin, hasSettings, onToggle, onRemove, onOpenSettings, settingsOpen, settingsExt }: {
+  plugin: InstalledPlugin;
+  hasSettings: boolean;
+  onToggle: () => void;
+  onRemove: () => void;
+  onOpenSettings: () => void;
+  settingsOpen: boolean;
+  settingsExt?: import("@shared/plugin-types").SettingsPanelExtension;
+}) {
+  const m = plugin.manifest;
+  const accent = m.accent || "var(--accent)";
+  return (
+    <div className={`plugin-row ${plugin.status === "enabled" ? "on" : ""} ${plugin.status === "error" ? "err" : ""}`}>
+      <div className="plugin-row-icon" style={{ background: `${accent}1a`, color: accent }}>
+        <PluginIcon name={m.icon} size={18} />
+      </div>
+      <div className="plugin-row-body">
+        <div className="plugin-row-title">
+          <span className="plugin-row-name">{m.name}</span>
+          <span className="plugin-row-ver">v{m.version}</span>
+          <span className={`plugin-row-status status-${plugin.status}`}>{plugin.status}</span>
+        </div>
+        <div className="plugin-row-desc">{m.description}</div>
+        <div className="plugin-row-meta">
+          <span className="plugin-row-author">by {m.author}</span>
+          {(m.permissions ?? []).length > 0 && (
+            <span className="plugin-row-perms">
+              {(m.permissions ?? []).map((p) => <span key={p} className="plugin-perm-chip tiny" title={p}>{p}</span>)}
+            </span>
+          )}
+        </div>
+        {plugin.error && <div className="plugin-row-error"><Icon.Info size={11} /> {plugin.error}</div>}
+      </div>
+      <div className="plugin-row-actions">
+        {hasSettings && (
+          <button className="plugin-action-btn" onClick={onOpenSettings} title="Plugin settings">
+            <Icon.Settings size={14} />
+          </button>
+        )}
+        <button className={`settings-toggle ${plugin.status === "enabled" ? "on" : ""}`} onClick={onToggle} title={plugin.status === "enabled" ? "Disable" : "Enable"}>
+          <span className="knob" />
+        </button>
+        <button className="plugin-action-btn danger" onClick={onRemove} title="Remove plugin">
+          <Icon.Trash size={13} />
+        </button>
+      </div>
+      {settingsOpen && settingsExt && <PluginSettingsPanel ext={settingsExt} />}
+    </div>
+  );
+}
+
+// v4.9.0 — Renders a plugin-registered settings panel inside the row (expand).
+function PluginSettingsPanel({ ext }: { ext: import("@shared/plugin-types").SettingsPanelExtension }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    try { ext.mount(el); } catch (e) { el.innerHTML = `<div style="padding:12px;color:var(--danger);font-size:12px">Failed to load settings panel: ${e instanceof Error ? e.message : String(e)}</div>`; }
+    return () => { try { ext.unmount?.(el); } catch { /* ignore */ } };
+  }, [ext]);
+  return <div className="plugin-settings-panel" ref={ref} />;
 }

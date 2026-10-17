@@ -1777,3 +1777,257 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{
   display:flex;flex-direction:column;align-items:center;gap:8px;
   color:var(--text-faint);font-size:13px;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   v4.9.0 — Plugin System Styles. Covers:
+   - .plugin-page, .plugin-hero, .plugin-stat-grid, .plugin-stat
+   - .plugin-card (gallery + installed), .plugin-list, .plugin-list-item
+   - .plugin-btn (primary / ghost / small / danger)
+   - .plugin-input, .plugin-swatch, .plugin-tabs, .plugin-tab
+   - .plugin-status-strip, .plugin-status-widget, .ps-indicator
+   - .plugin-topbar-actions
+   - .plugin-row (installed plugins — fixes word-wrap)
+   - .plugin-gallery-head, .plugin-search-box, .plugin-cat-chips
+   - .plugin-featured-grid, .plugin-gallery-grid, .plugin-installed-list
+   - .plugin-installed-badge, .plugin-perm-chip, .plugin-count-pill
+   - .plugin-now-playing, .np-* (mini-player)
+   - .plugin-settings-panel, .plugin-loading, .plugin-empty
+   - .plugin-dialog (modal)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Generic plugin page layout (used by every plugin's mount()) ────────── */
+.plugin-page{padding:24px 28px 48px;max-width:960px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.plugin-hero{display:flex;align-items:flex-start;gap:14px;padding:20px 22px;border-radius:14px;
+  background:linear-gradient(135deg,rgba(255,255,255,0.04) 0%,rgba(255,255,255,0.01) 100%);
+  border:1px solid var(--border)}
+.plugin-hero-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  background:rgba(var(--accent-rgb),0.14);color:var(--accent);flex-shrink:0}
+.plugin-hero-text h1{font-size:20px;font-weight:800;color:var(--text);margin:0 0 4px;letter-spacing:-0.01em}
+.plugin-hero-text p{font-size:12.5px;color:var(--text-dim);line-height:1.55;margin:0}
+
+/* ── Stat grid + cards ─────────────────────────────────────────────────── */
+.plugin-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.plugin-stat{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;
+  display:flex;flex-direction:column;gap:4px;transition:border-color var(--t-fast),background var(--t-fast)}
+.plugin-stat:hover{border-color:var(--border-2);background:var(--surface-2)}
+.plugin-stat-icon{width:26px;height:26px;border-radius:7px;background:rgba(var(--accent-rgb),0.12);
+  color:var(--accent);display:flex;align-items:center;justify-content:center;margin-bottom:4px}
+.plugin-stat-val{font-size:18px;font-weight:700;color:var(--text);line-height:1.1}
+.plugin-stat-label{font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.06em;font-weight:600}
+
+.plugin-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;
+  display:flex;flex-direction:column;gap:8px;transition:border-color var(--t-fast),background var(--t-fast)}
+.plugin-card-title{font-size:13px;font-weight:700;color:var(--text)}
+.plugin-card-desc{font-size:12px;color:var(--text-dim);line-height:1.5;margin:0}
+
+/* ── Plugin buttons ────────────────────────────────────────────────────── */
+.plugin-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 14px;
+  border-radius:8px;border:1px solid var(--border-2);background:var(--surface-2);color:var(--text);
+  font-size:12px;font-weight:600;cursor:pointer;transition:all var(--t-fast);line-height:1;white-space:nowrap}
+.plugin-btn:hover:not(:disabled){background:var(--surface);border-color:var(--border-strong)}
+.plugin-btn:disabled{opacity:0.45;cursor:not-allowed}
+.plugin-btn.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.plugin-btn.primary:hover:not(:disabled){background:var(--accent-hover);border-color:var(--accent-hover)}
+.plugin-btn.ghost{background:transparent;border-color:var(--border)}
+.plugin-btn.ghost:hover:not(:disabled){background:var(--surface-2);border-color:var(--border-2)}
+.plugin-btn.danger{background:rgba(248,113,113,0.12);color:var(--danger);border-color:rgba(248,113,113,0.3)}
+.plugin-btn.danger:hover:not(:disabled){background:rgba(248,113,113,0.18)}
+.plugin-btn.small{padding:5px 9px;font-size:11px;border-radius:6px}
+.plugin-btn svg{flex-shrink:0}
+
+/* ── Inputs ────────────────────────────────────────────────────────────── */
+.plugin-input{flex:1;min-width:0;padding:9px 12px;border-radius:8px;border:1px solid var(--border-2);
+  background:var(--bg-2);color:var(--text);font-size:12.5px;font-family:inherit;outline:none;
+  transition:border-color var(--t-fast)}
+.plugin-input:focus{border-color:var(--accent)}
+.plugin-input-row{display:flex;gap:8px;align-items:stretch;margin-top:6px}
+
+/* ── List + list items ─────────────────────────────────────────────────── */
+.plugin-list{display:flex;flex-direction:column;gap:4px}
+.plugin-list-item{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:8px;
+  background:rgba(255,255,255,0.018);border:1px solid var(--border);transition:all var(--t-fast);
+  cursor:default}
+.plugin-list-item:hover{background:var(--surface-2);border-color:var(--border-2)}
+.plugin-list-item.featured{background:rgba(var(--accent-rgb),0.06);border-color:rgba(var(--accent-rgb),0.22)}
+.plugin-list-icon{width:24px;height:24px;border-radius:6px;background:rgba(255,255,255,0.04);
+  color:var(--text-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.plugin-list-text{flex:1;min-width:0;font-size:12.5px;color:var(--text);font-weight:500;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plugin-list-text-stack{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.plugin-list-sub{font-size:10.5px;color:var(--text-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plugin-list-meta{font-size:10px;color:var(--text-faint);flex-shrink:0}
+.plugin-list-rank{width:22px;text-align:center;font-size:13px;font-weight:700;color:var(--accent);flex-shrink:0}
+.plugin-loading{padding:12px;font-size:12px;color:var(--text-dim);display:flex;align-items:center;gap:8px}
+.plugin-empty{padding:16px 8px;font-size:12px;color:var(--text-faint);text-align:center;line-height:1.5}
+
+/* ── Tabs ──────────────────────────────────────────────────────────────── */
+.plugin-tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);padding:0;overflow-x:auto;flex-wrap:wrap}
+.plugin-tab{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border:none;background:transparent;
+  color:var(--text-dim);font-size:12px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;
+  transition:all var(--t-fast);white-space:nowrap}
+.plugin-tab:hover{color:var(--text)}
+.plugin-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.plugin-tab-count{font-size:10px;padding:1px 6px;border-radius:8px;background:rgba(255,255,255,0.06);color:var(--text-faint)}
+.plugin-tab.active .plugin-tab-count{background:rgba(var(--accent-rgb),0.16);color:var(--accent)}
+.plugin-tab-body{padding-top:12px}
+
+/* ── Swatches ──────────────────────────────────────────────────────────── */
+.plugin-swatch-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(34px,1fr));gap:8px}
+.plugin-swatch-grid.small{grid-template-columns:repeat(auto-fill,minmax(28px,1fr))}
+.plugin-swatch{width:100%;aspect-ratio:1;border-radius:8px;border:2px solid transparent;cursor:pointer;
+  position:relative;transition:transform var(--t-fast),border-color var(--t-fast);padding:0}
+.plugin-swatch.small{border-radius:6px}
+.plugin-swatch:hover{transform:scale(1.06)}
+.plugin-swatch.selected{border-color:rgba(255,255,255,0.5);transform:scale(1.04)}
+.plugin-swatch-check{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  color:#000;font-weight:900;opacity:0;transition:opacity var(--t-fast)}
+.plugin-swatch.selected .plugin-swatch-check{opacity:1}
+
+/* ── Now playing (music player) ────────────────────────────────────────── */
+.plugin-now-playing{display:flex;align-items:center;gap:14px;padding:8px 4px}
+.np-art{width:64px;height:64px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+  color:var(--accent);flex-shrink:0}
+.np-info{flex:1;min-width:0}
+.np-title{font-size:14px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.np-artist{font-size:11.5px;color:var(--text-dim);margin-top:2px}
+.np-controls{display:flex;gap:6px;margin-top:10px}
+
+/* ── Topbar plugin actions + status indicators ────────────────────────── */
+.plugin-topbar-actions{display:flex;gap:4px;align-items:center;margin-right:4px}
+.plugin-status-strip{display:flex;gap:6px;align-items:center;margin-right:6px}
+.plugin-status-widget{display:inline-flex;align-items:center;height:24px;padding:0 8px;border-radius:6px;
+  background:rgba(255,255,255,0.04);border:1px solid var(--border);font-size:11px;color:var(--text-dim);
+  cursor:default;transition:background var(--t-fast)}
+.plugin-status-widget:hover{background:var(--surface-2)}
+.ps-indicator{display:inline-flex;align-items:center;gap:5px;font-weight:600}
+.ps-indicator svg{color:var(--accent)}
+
+/* ── dt-nav-icon for plugin sidebar items ───────────────────────────────── */
+.dt-nav-icon{width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;
+  color:var(--text-dim);flex-shrink:0}
+.dt-nav-item.active .dt-nav-icon{color:var(--accent)}
+
+/* ── Plugin gallery (Settings → Plugins) ─────────────────────────────── */
+.plugin-gallery-head{margin-bottom:12px}
+.plugin-gallery-head-row{display:flex;align-items:center;gap:12px;margin-top:10px;flex-wrap:wrap}
+.plugin-search-box{flex:1;min-width:200px;display:flex;align-items:center;gap:8px;padding:8px 12px;
+  border-radius:10px;background:var(--surface);border:1px solid var(--border-2);transition:border-color var(--t-fast)}
+.plugin-search-box:focus-within{border-color:var(--accent)}
+.plugin-search-box svg{color:var(--text-faint);flex-shrink:0}
+.plugin-search-box input{flex:1;min-width:0;background:transparent;border:none;outline:none;color:var(--text);
+  font-size:12.5px;font-family:inherit}
+.plugin-search-box input::placeholder{color:var(--text-faint)}
+.plugin-search-clear{background:none;border:none;color:var(--text-faint);cursor:pointer;padding:2px;border-radius:4px;
+  display:flex;align-items:center}
+.plugin-search-clear:hover{color:var(--text)}
+.plugin-cat-chips{display:flex;gap:4px;flex-wrap:wrap}
+.plugin-cat-chip{padding:6px 12px;border-radius:8px;border:1px solid var(--border-2);background:var(--surface);
+  color:var(--text-dim);font-size:11px;font-weight:600;cursor:pointer;transition:all var(--t-fast);text-transform:capitalize}
+.plugin-cat-chip:hover{background:var(--surface-2);color:var(--text)}
+.plugin-cat-chip.active{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+
+.plugin-count-pill{font-size:10px;padding:1px 7px;border-radius:8px;background:rgba(255,255,255,0.06);
+  color:var(--text-dim);margin-left:6px;font-weight:700}
+
+/* ── Gallery cards ────────────────────────────────────────────────────── */
+.plugin-featured-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.plugin-gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.plugin-card{position:relative;overflow:hidden;display:flex;flex-direction:column;min-height:170px;
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:0;
+  transition:transform var(--t-fast),border-color var(--t-fast),background var(--t-fast)}
+.plugin-card:hover{transform:translateY(-1px);border-color:var(--border-2);background:var(--surface-2)}
+.plugin-card.installed{border-color:rgba(var(--accent-rgb),0.32)}
+.plugin-card.featured{min-height:200px;border-color:rgba(var(--accent-rgb),0.22)}
+.plugin-card-featured-strip{position:absolute;top:0;left:0;right:0;height:24px;display:flex;align-items:center;
+  gap:6px;padding:0 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;
+  color:var(--accent)}
+.plugin-featured-mark{width:14px;height:14px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.plugin-featured-label{color:var(--accent)}
+.plugin-card-head{display:flex;align-items:center;gap:10px;padding:14px 14px 8px;position:relative}
+.plugin-card.featured .plugin-card-head{padding-top:32px}
+.plugin-card-icon{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0}
+.plugin-card-icon.featured{width:44px;height:44px;border-radius:11px}
+.plugin-card-meta{flex:1;min-width:0}
+.plugin-card-name{font-size:14px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plugin-card-name.featured{font-size:15px}
+.plugin-card-tag{font-size:10.5px;color:var(--text-faint);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plugin-installed-badge{display:inline-flex;align-items:center;gap:3px;padding:3px 7px;border-radius:6px;
+  font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;
+  background:rgba(var(--accent-rgb),0.12);color:var(--accent);border:1px solid rgba(var(--accent-rgb),0.26)}
+.plugin-installed-badge.on{background:rgba(var(--accent-rgb),0.22);color:var(--accent)}
+.plugin-card-body{padding:0 14px;flex:1;min-height:0}
+.plugin-card-desc{font-size:11.5px;color:var(--text-dim);line-height:1.5;margin:0 0 8px;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
+.plugin-perm-row{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px}
+.plugin-perm-chip{font-size:9px;font-weight:700;text-transform:uppercase;padding:2px 6px;border-radius:4px;
+  background:var(--surface-2);color:var(--text-faint);letter-spacing:0.04em;border:1px solid var(--border)}
+.plugin-perm-chip.tiny{font-size:8.5px;padding:1px 5px}
+.plugin-card-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;
+  border-top:1px solid var(--border);margin-top:auto}
+.plugin-author{font-size:10.5px;color:var(--text-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plugin-btn-install{display:inline-flex;align-items:center;gap:5px;padding:7px 12px;border-radius:7px;
+  border:none;color:#000;font-size:11.5px;font-weight:700;cursor:pointer;transition:filter var(--t-fast);
+  background:var(--accent)}
+.plugin-btn-install:hover:not(:disabled){filter:brightness(1.1)}
+.plugin-btn-install:disabled{opacity:0.7;cursor:not-allowed}
+.plugin-btn-installed{display:inline-flex;align-items:center;gap:5px;padding:7px 12px;border-radius:7px;
+  border:1px solid rgba(var(--accent-rgb),0.3);background:rgba(var(--accent-rgb),0.08);
+  color:var(--accent);font-size:11.5px;font-weight:600;cursor:default;opacity:0.7}
+
+/* ── Installed Plugins row (the previously-broken layout — now fixed) ─ */
+.plugin-installed-list{display:flex;flex-direction:column;gap:8px}
+.plugin-row{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-radius:10px;
+  background:var(--surface);border:1px solid var(--border);transition:all var(--t-fast);flex-wrap:wrap}
+.plugin-row:hover{border-color:var(--border-2);background:var(--surface-2)}
+.plugin-row.on{border-color:rgba(var(--accent-rgb),0.32);background:rgba(var(--accent-rgb),0.04)}
+.plugin-row.err{border-color:rgba(248,113,113,0.32);background:rgba(248,113,113,0.04)}
+.plugin-row-icon{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0}
+.plugin-row-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.plugin-row-title{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.plugin-row-name{font-size:14px;font-weight:700;color:var(--text)}
+.plugin-row-ver{font-size:10.5px;color:var(--text-faint);font-weight:400}
+.plugin-row-status{font-size:9.5px;font-weight:700;text-transform:uppercase;padding:2px 7px;border-radius:5px;
+  letter-spacing:0.04em}
+.plugin-row-status.status-enabled{background:rgba(var(--accent-rgb),0.16);color:var(--accent)}
+.plugin-row-status.status-installed{background:rgba(255,255,255,0.06);color:var(--text-dim)}
+.plugin-row-status.status-disabled{background:rgba(255,255,255,0.04);color:var(--text-faint)}
+.plugin-row-status.status-error{background:rgba(248,113,113,0.16);color:var(--danger)}
+.plugin-row-status.status-incompatible{background:rgba(251,191,36,0.16);color:#fbbf24}
+.plugin-row-desc{font-size:12px;color:var(--text-dim);line-height:1.5;
+  /* word-wrap fix: break very long words; allow wrapping on spaces */
+  overflow-wrap:break-word;word-break:break-word;hyphens:auto;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.plugin-row-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.plugin-row-author{font-size:11px;color:var(--text-faint)}
+.plugin-row-perms{display:flex;gap:3px;flex-wrap:wrap}
+.plugin-row-error{font-size:11px;color:var(--danger);display:flex;align-items:center;gap:5px;margin-top:4px;
+  padding:6px 9px;background:rgba(248,113,113,0.08);border-radius:6px;overflow-wrap:break-word;word-break:break-word}
+.plugin-row-actions{display:flex;align-items:center;gap:6px;flex-shrink:0;margin-left:auto}
+.plugin-action-btn{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;
+  border-radius:7px;border:1px solid var(--border-2);background:var(--surface-2);color:var(--text-dim);
+  cursor:pointer;transition:all var(--t-fast)}
+.plugin-action-btn:hover{background:var(--surface);color:var(--text);border-color:var(--border-strong)}
+.plugin-action-btn.danger:hover{background:rgba(248,113,113,0.1);color:var(--danger);border-color:rgba(248,113,113,0.32)}
+
+/* ── Per-plugin settings panel (expand inline under the row) ─────────────── */
+.plugin-settings-panel{margin-top:10px;padding:14px;border-radius:9px;
+  background:rgba(255,255,255,0.025);border:1px solid var(--border);width:100%;min-height:60px;flex-basis:100%}
+.plugin-settings-intro{font-size:12px;color:var(--text-dim);margin-bottom:10px;line-height:1.5}
+
+/* ── Plugin dialog (modal) — uses .modal-overlay/.modal chrome ───────── */
+.plugin-dialog .modal-body{min-height:80px;padding:16px 20px;font-size:13px;color:var(--text-dim);line-height:1.6}
+.plugin-dialog kbd{display:inline-block;padding:1px 6px;border-radius:4px;background:var(--surface-2);
+  border:1px solid var(--border-2);font-family:"Cascadia Code",Consolas,monospace;font-size:11px;
+  color:var(--text);box-shadow:0 1px 0 var(--border-strong)}
+
+/* ── Responsive ────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .plugin-page{padding:16px 14px 32px}
+  .plugin-hero{padding:14px;flex-direction:column;gap:10px}
+  .plugin-row{flex-wrap:wrap}
+  .plugin-row-actions{margin-left:0;width:100%;justify-content:flex-end}
+  .plugin-featured-grid,.plugin-gallery-grid{grid-template-columns:1fr}
+  .plugin-stat-grid{grid-template-columns:repeat(2,1fr)}
+}

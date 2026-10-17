@@ -150,6 +150,16 @@ const api = {
   pluginsStorageGet: (id: string, key: string) => ipcRenderer.invoke("plugins:storage:get", id, key) as Promise<unknown>,
   pluginsStorageSet: (id: string, key: string, value: unknown) => ipcRenderer.invoke("plugins:storage:set", id, key, value) as Promise<boolean>,
   pluginsSelectDir: () => ipcRenderer.invoke("plugins:selectDir") as Promise<string | null>,
+  // v4.9.0 — Host services exposed to plugins (routed via plugin-runtime.ts).
+  pluginsNetworkFetch: (url: string, opts?: {
+    method?: "GET" | "POST" | "PUT" | "DELETE";
+    headers?: Record<string, string>;
+    body?: string;
+    timeoutMs?: number;
+  }) => ipcRenderer.invoke("plugins:networkFetch", url, opts) as Promise<{ ok: boolean; status: number; body: string }>,
+  pluginsClipboardRead: () => ipcRenderer.invoke("plugins:clipboardRead") as Promise<string>,
+  pluginsClipboardWrite: (text: string) => ipcRenderer.invoke("plugins:clipboardWrite", text) as Promise<boolean>,
+  pluginsShowItemInFolder: (path: string) => ipcRenderer.invoke("plugins:showItemInFolder", path) as Promise<{ ok: boolean; message?: string }>,
   // Achievements
   getAchievements: () => ipcRenderer.invoke("achievements:list") as Promise<Array<{ id: string; name: string; description: string; icon: string; unlockedAt: string | null; progress: number; maxProgress: number }>>,
   checkAchievements: () => ipcRenderer.invoke("achievements:check") as Promise<{ newlyUnlocked: string[] }>,
