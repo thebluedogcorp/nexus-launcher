@@ -121,7 +121,7 @@ export default function plugin(api) {
         + '<p>Real-time totals, top-rated games, and a personal Game of the Day.</p></div></div>'
         + '<div class="plugin-stat-grid" id="sg"><div class="plugin-loading">' + api.ui.icon("refresh", 14) + ' Crunching numbers…</div></div>'
         + '<div class="plugin-card"><div class="plugin-card-title">Game of the Day</div>'
-        + '<div class="plugin-card-desc">A title you haven\\'t played recently — time to revisit it.</div>'
+        + '<div class="plugin-card-desc">A title you haven’t played recently — time to revisit it.</div>'
         + '<div class="plugin-list" id="gotd"></div></div></div>';
       try {
         const games = await api.games.list();
@@ -268,7 +268,7 @@ export default function plugin(api) {
       c.innerHTML = '<div class="plugin-page">'
         + '<div class="plugin-hero"><div class="plugin-hero-icon">' + api.ui.icon("house", 28) + '</div>'
         + '<div class="plugin-hero-text"><h1>Your Dashboard</h1>'
-        + '<p>Welcome back — here\\'s what you\\'ve been playing.</p></div></div>'
+        + '<p>Welcome back — here’s what you’ve been playing.</p></div></div>'
         + '<div class="plugin-card"><div class="plugin-card-title">Recently Played</div><div class="plugin-list" id="rp"><div class="plugin-loading">' + api.ui.icon("refresh", 14) + ' Loading…</div></div></div>'
         + '<div class="plugin-card"><div class="plugin-card-title">Favorites</div><div class="plugin-list" id="fv"></div></div></div>';
       try {
@@ -298,7 +298,7 @@ export default function plugin(api) {
   "name": "Command Palette",
   "version": "2.1.0",
   "author": "NEXUS",
-  "description": "Registers commands for the host\\'s command palette — search games, switch pages, and execute actions with Ctrl+K.",
+  "description": "Registers commands for the host’s command palette — search games, switch pages, and execute actions with Ctrl+K.",
   "apiVersion": 1,
   "entry": "index.js",
   "permissions": ["ui:pages", "ui:sidebar", "ui:commands", "games:read", "ui:toasts", "ui:dialogs"],
@@ -653,7 +653,7 @@ export default function plugin(api) {
       c.innerHTML = '<div class="plugin-page">'
         + '<div class="plugin-hero"><div class="plugin-hero-icon">' + api.ui.icon("rocket", 28) + '</div>'
         + '<div class="plugin-hero-text"><h1>Launch Profiles</h1>'
-        + '<p>Save per-game launch arguments + working directories. Swap profiles from a game\\'s context menu.</p></div></div>'
+        + '<p>Save per-game launch arguments + working directories. Swap profiles from a game’s context menu.</p></div></div>'
         + '<div class="plugin-card"><div class="plugin-card-title">Saved Profiles</div><div class="plugin-list" id="pl"><div class="plugin-loading">' + api.ui.icon("refresh", 14) + ' Loading…</div></div></div></div>';
       const games = await api.games.list();
       const prof = (await api.storage.get("profiles")) || {};

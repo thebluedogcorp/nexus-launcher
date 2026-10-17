@@ -50,41 +50,31 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v4.10.0"
-          $title = "NEXUS v4.10.0 — Plugin auto-update system + installer cache cleanup (answers 'where does the installer go?') + all 12 first-party plugins bumped"
+          $tag = "v4.10.1"
+          $title = "NEXUS v4.10.1 — CRITICAL FIX: Settings → Plugins tab crash (bad JSON escape in 4 plugin descriptions)"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
-          **v4.10.0 — Plugin auto-update + installer cache cleanup.**
+          **v4.10.1 — Critical fix for the Settings → Plugins tab crash.**
 
-          **1. Plugin auto-update system.** When NEXUS ships a newer first-party plugin catalog (via the embedded FIRST_PARTY_PLUGINS constant in the renderer), users running an OLDER installed version now get an upgrade path. The Plugins tab auto-checks for updates on mount, shows an amber 'N updates' pill in the header, a 'Check for updates' button in the toolbar, and a 'v1.X.0 available' badge + Update action button on each outdated installed row. Clicking Update overwrites the manifest + entry .js in place — the per-plugin data.json + meta status + enabledAt are PRESERVED, so an enabled plugin stays enabled after the update (no re-enable required).
+          **The bug:** Opening Settings and clicking the Plugins tab caused the app to go completely black. The root cause was 4 plugin descriptions in first-party-plugins.ts that contained the escape sequence backslash-backslash-apostrophe (literally 'host\\'s', 'haven\\'t', 'here\\'s', 'you\\'ve', 'game\\'s'). When TypeScript compiled the template literal to a JavaScript string, the double backslash became a single backslash — so the resulting JSON manifest string contained backslash-apostrophe, which is NOT a valid JSON escape sequence. JSON.parse threw 'Bad escaped character in JSON' inside the PluginsTab's useMemo, which crashed the React tree — SettingsPage unmounted, leaving only the dimming overlay (black screen).
 
-          **2. Installer cache cleanup (answers the question: 'where does the installer go?').** When NEXUS auto-updates, it downloads the NSIS installer to %TEMP%\NEXUS-Update-Setup.exe (~85 MB). After the install runs, the downloaded .exe was LEFT BEHIND in %TEMP% — taking up disk space on every update cycle. Over a few months this could pile up to several GB. v4.10.0 fixes this in three places:
+          The bug was present in v4.9.0 (when the 12 first-party plugins were first rewritten with the .plugin-* design system) and v4.10.0. Users on either version would see the Plugins tab crash.
 
-          - On startup: NEXUS silently sweeps %TEMP% for any NEXUS-Update-Setup.exe, nexus-update.part, NEXUS-Setup-*.exe, or NEXUS-Portable-*.exe files and deletes them. Best-effort, never blocks the launch.
-          - Before every new download: cleanup runs again so the new download doesn't fight an old leftover of the same name.
-          - Manual: Settings → General → Update Cache card shows the current cache size + file count + a one-click Clean button.
+          **The fix:** Replaced every backslash-backslash-apostrophe in the 4 affected plugin strings with a typographic right single quote (U+2019, the curly apostrophe). This is JSON-safe (it's a regular character), HTML-safe (renders as a typographic apostrophe), and visually nicer than a straight quote. The 4 fixed strings:
 
-          **3. All 12 first-party plugins bumped to new minor versions.** Users who installed the v4.9.0 versions will now see 'Update available' badges on every installed plugin. New versions:
+          - command-palette manifest description: 'Registers commands for the host's command palette...' (was 'host\\'s')
+          - library-insights page mount(): 'A title you haven't played recently...' (was 'haven\\'t')
+          - custom-dashboard page mount(): 'Welcome back — here's what you've been playing.' (was 'here\\'s' + 'you\\'ve')
+          - launch-profiles page mount(): 'Swap profiles from a game's context menu.' (was 'game\\'s')
 
-          - hello-world 1.2.0 → 1.3.0
-          - library-insights 1.4.0 → 1.5.0
-          - theme-studio 2.0.0 → 2.1.0
-          - custom-dashboard 1.1.0 → 1.2.0
-          - command-palette 2.0.0 → 2.1.0
-          - backlog-manager 1.3.0 → 1.4.0
-          - playtime-tracker 1.4.0 → 1.5.0
-          - storage-manager 1.2.0 → 1.3.0
-          - music-player 1.5.0 → 1.6.0
-          - launch-profiles 1.1.0 → 1.2.0
-          - game-info-hub 1.3.0 → 1.4.0
-          - quick-access-overlay 1.2.0 → 1.3.0
+          All v4.10.0 functionality is preserved: plugin auto-update system (catalog comparison, 'Update available' badges, 'Check for updates' button, per-row Update action button), installer cache cleanup (auto-sweep on startup + before every download + manual Clean button in Settings → General → Update Cache), all 12 first-party plugins bumped to new minor versions, Lucide icons everywhere (no emojis), broadened HostAPI (topbar/status/commands/settings/dialogs/toasts/network/clipboard/system), per-plugin custom UI panels.
 
-          All existing functionality preserved: Lucide icons (no emojis), fixed Installed Plugins word-wrap layout, broadened HostAPI (topbar / status / commands / settings / dialogs / toasts / network / clipboard / system), per-plugin custom UI panels, 12 first-party plugins using the .plugin-* CSS design system + api.ui.icon(), library, collections, platform detection, launching, playtime tracking, achievements, overlay, Theme Studio, console/desktop mode, real platform logos, intelligent Get button, install detection, game trailers, sidebar collapse, settings tabs.
+          Verification: TypeScript zero errors on both Electron tsconfigs. Vite production build succeeded. Reproduced the original crash in a mock-test harness (loaded the built JS in Chromium with a stubbed window.nexus — Settings overlay had 0 children, console.error showed 'SyntaxError: Bad escaped character in JSON at position 151 (line 6 column 51)'). After the fix, the same mock test renders the Plugins tab cleanly: 12 plugin cards + search box + 13 Install buttons + Installed Plugins section + no errors.
 
           **Downloads:**
-          - NEXUS-Setup-4.10.0.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-4.10.0.exe — single-file portable build.
+          - NEXUS-Setup-4.10.1.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-4.10.1.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@
