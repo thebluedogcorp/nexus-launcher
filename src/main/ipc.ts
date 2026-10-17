@@ -47,7 +47,7 @@ import {
 import { fetchSteamTrailer } from "./metadata/steam-trailers";
 import { resolveStoreLinks } from "./downloads/stores";
 import {
-  listPlugins, installPlugin, enablePlugin, disablePlugin, removePlugin,
+  listPlugins, installPlugin, installPluginFromCode, enablePlugin, disablePlugin, removePlugin,
   readPluginEntry, markPluginError, getPluginData, setPluginData,
 } from "./plugins/manager";
 import type {
@@ -401,6 +401,10 @@ export function registerIpc(): void {
   ipcMain.handle("plugins:list", () => listPlugins());
   ipcMain.handle("plugins:install", (_e, srcDir: string) => {
     try { return installPlugin(srcDir); } catch (e) { return { error: e instanceof Error ? e.message : String(e) }; }
+  });
+  // v4.8.1 — Install a first-party plugin from embedded source code (no directory needed).
+  ipcMain.handle("plugins:installFromCode", (_e, manifestJson: string, entryCode: string) => {
+    try { return installPluginFromCode(manifestJson, entryCode); } catch (e) { return { error: e instanceof Error ? e.message : String(e) }; }
   });
   ipcMain.handle("plugins:enable", (_e, id: string) => { enablePlugin(id); return true; });
   ipcMain.handle("plugins:disable", (_e, id: string) => { disablePlugin(id); return true; });

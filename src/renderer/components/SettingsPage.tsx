@@ -6,6 +6,9 @@ import { applyAccent } from "../lib/accent";
 import { NexusMark } from "./Logo";
 import { PlatformMark } from "./PlatformMark";
 import { IconGlyph } from "./IconGlyph";
+import { FIRST_PARTY_PLUGINS } from "../lib/first-party-plugins";
+import type { InstalledPlugin } from "@shared/plugin-types";
+import { reloadPlugins } from "../lib/plugin-runtime";
 
 interface Props {
   initial: LauncherSettings;
@@ -683,7 +686,7 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
                     <div className="logo"><NexusMark size={28} /></div>
                     <div>
                       <div className="name">NEXUS Launcher</div>
-                      <div className="ver">Version 4.8.0 — Universal Game Launcher for Windows</div>
+                      <div className="ver">Version 4.8.1 — Universal Game Launcher for Windows</div>
                       <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 6 }}>
                         Auto-detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox. Patches rich metadata via RAWG + Steam APIs. Launches natively.
                       </div>
@@ -720,13 +723,10 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
   );
 }
 
-// v4.7.0 — Plugins tab. Install/enable/disable/remove + details.
-import type { InstalledPlugin } from "@shared/plugin-types";
-import { reloadPlugins } from "../lib/plugin-runtime";
-
 function PluginsTab({ flash }: { flash: (type: "info" | "success" | "error", msg: string) => void }) {
   const [plugins, setPlugins] = useState<InstalledPlugin[]>([]);
   const [loading, setLoading] = useState(true);
+  const [installing, setInstalling] = useState<string | null>(null);
 
   const refresh = async () => {
     try { setPlugins(await window.nexus.pluginsList()); } catch {}
@@ -734,13 +734,29 @@ function PluginsTab({ flash }: { flash: (type: "info" | "success" | "error", msg
   };
   useEffect(() => { void refresh(); }, []);
 
-  const install = async () => {
+  const installFromDir = async () => {
     const dir = await window.nexus.pluginsSelectDir();
     if (!dir) return;
     const result = await window.nexus.pluginsInstall(dir);
     if ("error" in result) { flash("error", `Install failed: ${result.error}`); }
     else { flash("success", `Installed: ${result.manifest.name}`); void refresh(); }
   };
+
+  const installFirstParty = async (fp: typeof FIRST_PARTY_PLUGINS[0]) => {
+    setInstalling(fp.id);
+    try {
+      const result = await window.nexus.pluginsInstallFromCode(fp.manifest, fp.code);
+      if ("error" in result) { flash("error", `Install failed: ${result.error}`); }
+      else {
+        await window.nexus.pluginsEnable(result.manifest.id);
+        await reloadPlugins();
+        flash("success", `Installed + enabled: ${result.manifest.name}`);
+        void refresh();
+      }
+    } catch (e) { flash("error", `Install failed: ${e instanceof Error ? e.message : String(e)}`); }
+    setInstalling(null);
+  };
+
   const toggle = async (p: InstalledPlugin) => {
     if (p.status === "enabled") { await window.nexus.pluginsDisable(p.manifest.id); }
     else { await window.nexus.pluginsEnable(p.manifest.id); }
@@ -755,12 +771,53 @@ function PluginsTab({ flash }: { flash: (type: "info" | "success" | "error", msg
 
   if (loading) return <div style={{ padding: 40, textAlign: "center", color: "var(--text-faint)" }}>Loading…</div>;
 
+  const installedIds = new Set(plugins.map((p) => p.manifest.id));
+
   return (
     <>
+      {/* First-Party Plugins Gallery */}
+      <div className="settings-section">
+        <div className="settings-section-title"><span className="bar" />First-Party Plugins</div>
+        <div className="d" style={{ fontSize: 12, marginBottom: 16, lineHeight: 1.5 }}>Click Install to add any of these plugins directly — no directory browsing needed. They install + enable in one click.</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
+          {FIRST_PARTY_PLUGINS.map((fp) => {
+            const m = JSON.parse(fp.manifest);
+            const installed = installedIds.has(m.id);
+            return (
+              <div key={m.id} style={{ padding: 16, borderRadius: "var(--r-md)", background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                  <span style={{ fontSize: 20 }}>{m.icon || "📦"}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{m.name}</div>
+                    <div style={{ fontSize: 10, color: "var(--text-faint)" }}>v{m.version} · {m.author}</div>
+                  </div>
+                </div>
+                <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.4, marginBottom: 10, minHeight: 32 }}>{m.description}</div>
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 10 }}>
+                  {m.permissions.map((perm: string) => (
+                    <span key={perm} style={{ fontSize: 8, fontWeight: 700, textTransform: "uppercase", padding: "2px 5px", borderRadius: 3, background: "var(--surface-2)", color: "var(--text-faint)" }}>{perm}</span>
+                  ))}
+                </div>
+                {installed ? (
+                  <button className="settings-choice" style={{ minWidth: 0, opacity: 0.6, cursor: "default" }} disabled>
+                    <Icon.Check size={13} /> Installed
+                  </button>
+                ) : (
+                  <button className="settings-choice" style={{ minWidth: 0, background: "var(--accent)", color: "var(--accent-fg)", borderColor: "var(--accent)" }} onClick={() => void installFirstParty(fp)} disabled={installing === m.id}>
+                    {installing === m.id ? <Icon.Spinner size={13} /> : <Icon.Plus size={13} />} Install
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Installed Plugins */}
       <div className="settings-section">
         <div className="settings-section-title"><span className="bar" />Installed Plugins</div>
         {plugins.length === 0 ? (
-          <div style={{ padding: "20px 4px", fontSize: 13, color: "var(--text-faint)" }}>No plugins installed. Create a plugin directory with a manifest.json + index.js, then click Install.</div>
+          <div style={{ padding: "20px 4px", fontSize: 13, color: "var(--text-faint)" }}>No plugins installed yet. Install a first-party plugin above, or click "Install from Directory" below for a custom plugin.</div>
         ) : (
           plugins.map((p) => (
             <div key={p.manifest.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: "var(--r-md)", background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", marginBottom: 8 }}>
@@ -779,13 +836,7 @@ function PluginsTab({ flash }: { flash: (type: "info" | "success" | "error", msg
           ))
         )}
         <div className="settings-choice-row" style={{ marginTop: 12 }}>
-          <button className="settings-choice" style={{ minWidth: 0 }} onClick={install}><span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Icon.Plus size={14} /> Install from Directory</span></button>
-        </div>
-      </div>
-      <div className="settings-section">
-        <div className="settings-section-title"><span className="bar" />About Plugins</div>
-        <div className="settings-row" style={{ flexDirection: "column", padding: "14px 16px" }}>
-          <div className="d" style={{ lineHeight: 1.6 }}>Plugins are directories containing a manifest.json + an index.js (ES module). The entry exports a default function that receives a HostAPI. Plugins can register pages, sidebar items, game-card actions, read game data, use per-plugin storage, and subscribe to events. See the example-plugins/ directory in the source repo for working examples.</div>
+          <button className="settings-choice" style={{ minWidth: 0 }} onClick={installFromDir}><span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Icon.Plus size={14} /> Install from Directory</span></button>
         </div>
       </div>
     </>

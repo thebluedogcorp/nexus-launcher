@@ -141,6 +141,7 @@ const api = {
   // v4.7.0 — Plugins
   pluginsList: () => ipcRenderer.invoke("plugins:list") as Promise<InstalledPlugin[]>,
   pluginsInstall: (srcDir: string) => ipcRenderer.invoke("plugins:install", srcDir) as Promise<InstalledPlugin | { error: string }>,
+  pluginsInstallFromCode: (manifestJson: string, entryCode: string) => ipcRenderer.invoke("plugins:installFromCode", manifestJson, entryCode) as Promise<InstalledPlugin | { error: string }>,
   pluginsEnable: (id: string) => ipcRenderer.invoke("plugins:enable", id) as Promise<boolean>,
   pluginsDisable: (id: string) => ipcRenderer.invoke("plugins:disable", id) as Promise<boolean>,
   pluginsRemove: (id: string) => ipcRenderer.invoke("plugins:remove", id) as Promise<boolean>,

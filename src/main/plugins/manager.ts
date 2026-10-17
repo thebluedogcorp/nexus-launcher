@@ -70,6 +70,22 @@ export function installPlugin(srcDir: string): InstalledPlugin {
   return { manifest, status: "installed", dirPath: dest, installedAt: now, enabledAt: null };
 }
 
+/** v4.8.1 — Install a first-party plugin from embedded source code (no directory browsing needed). */
+export function installPluginFromCode(manifestJson: string, entryCode: string): InstalledPlugin {
+  const manifest = JSON.parse(manifestJson) as PluginManifest;
+  if (!manifest || !manifest.id) throw new Error("Invalid manifest.");
+  const v = validateManifest(manifest);
+  if (!v.ok) throw new Error(v.error);
+  const dest = pluginDir(manifest.id);
+  if (existsSync(dest)) throw new Error(`Plugin "${manifest.id}" already installed. Remove it first.`);
+  mkdirSync(dest, { recursive: true });
+  writeFileSync(join(dest, "manifest.json"), manifestJson);
+  writeFileSync(join(dest, manifest.entry), entryCode);
+  const now = new Date().toISOString();
+  writeMeta(manifest.id, { status: "installed", installedAt: now, enabledAt: null });
+  return { manifest, status: "installed", dirPath: dest, installedAt: now, enabledAt: null };
+}
+
 export function enablePlugin(id: string): void {
   const meta = readMeta(id) ?? { status: "installed", installedAt: new Date().toISOString(), enabledAt: null };
   writeMeta(id, { ...meta, status: "enabled", enabledAt: new Date().toISOString(), error: undefined });
