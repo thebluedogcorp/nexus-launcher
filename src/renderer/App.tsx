@@ -170,6 +170,9 @@ export function App() {
           const upd = await window.nexus.checkForUpdates();
           if (upd.ok && upd.updateAvailable) setUpdateAvailable({ version: upd.version, releaseUrl: upd.releaseUrl, downloadUrl: upd.downloadUrl, downloadSize: upd.downloadSize });
         } catch {}
+        // v4.6.1 — auto-detect trailers for games missing one (background, best-effort).
+        // Runs the enrich-all flow which now also patches games without trailerUrl.
+        try { await window.nexus.patchAllMetadata(); } catch {}
       } catch (e) {
         toast("error", "Couldn't load library", "The local database may be locked.");
       } finally { setLoading(false); }
@@ -1490,10 +1493,11 @@ function GameEditor({ game, onSave, onClose }: { game: Game; onSave: (patch: Rec
   const [launchCommand, setLaunchCommand] = useState(game.launchCommand ?? "");
   const [notes, setNotes] = useState(game.notes ?? "");
   const [coverImage, setCoverImage] = useState(game.coverImage ?? "");
+  const [trailerUrl, setTrailerUrl] = useState(game.trailerUrl ?? "");
   const [saving, setSaving] = useState(false);
   const save = async () => {
     setSaving(true);
-    onSave({ title, platform, executable: executable || null, installDir: installDir || null, launchCommand: launchCommand || null, notes: notes || null, coverImage: coverImage || null });
+    onSave({ title, platform, executable: executable || null, installDir: installDir || null, launchCommand: launchCommand || null, notes: notes || null, coverImage: coverImage || null, trailerUrl: trailerUrl || null });
   };
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -1515,6 +1519,7 @@ function GameEditor({ game, onSave, onClose }: { game: Game; onSave: (patch: Rec
           <div className="editor-field"><label>Executable Path</label><input value={executable} onChange={(e) => setExecutable(e.target.value)} placeholder="C:\Games\game.exe" /></div>
           <div className="editor-field"><label>Install Directory</label><input value={installDir} onChange={(e) => setInstallDir(e.target.value)} placeholder="C:\Games\MyGame" /></div>
           <div className="editor-field"><label>Launch Command</label><input value={launchCommand} onChange={(e) => setLaunchCommand(e.target.value)} placeholder="steam://run/123456" /></div>
+          <div className="editor-field"><label>Trailer URL (mp4)</label><input value={trailerUrl} onChange={(e) => setTrailerUrl(e.target.value)} placeholder="https://…/trailer.mp4 (leave empty to auto-detect via RAWG)" style={{ fontFamily: '"Cascadia Code",Consolas,monospace', fontSize: 12 }} /></div>
           <div className="editor-field"><label>Notes</label><textarea className="notes-area" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Your personal notes about this game…" /></div>
         </div>
         <div className="modal-footer">

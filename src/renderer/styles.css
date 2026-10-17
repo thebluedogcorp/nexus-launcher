@@ -547,9 +547,9 @@ textarea.field-input{height:auto;padding:11px 13px;resize:vertical;font-family:"
 .game-page{position:fixed;inset:0;z-index:var(--z-page);overflow-y:auto;background:var(--bg);animation:gpIn var(--t-slow)}
 @keyframes gpIn{from{opacity:0;transform:scale(1.02)}to{opacity:1;transform:scale(1)}}
 .gp-hero{position:relative;height:60vh;min-height:440px;overflow:hidden}
-.gp-hero-bg{position:absolute;inset:0;background-size:cover;background-position:center;transform:scale(1.05)}
-.gp-hero-overlay{position:absolute;inset:0;background:linear-gradient(0deg, var(--bg) 0%, rgba(0,0,0,0.25) 45%, transparent 75%), linear-gradient(90deg, rgba(0,0,0,0.9) 0%, transparent 60%)}
-.gp-hero-content{position:absolute;left:48px;right:48px;bottom:44px;max-width:680px}
+.gp-hero-bg{position:absolute;inset:0;z-index:0;background-size:cover;background-position:center;transform:scale(1.05)}
+.gp-hero-overlay{position:absolute;inset:0;z-index:2;background:linear-gradient(0deg, var(--bg) 0%, rgba(0,0,0,0.25) 45%, transparent 75%), linear-gradient(90deg, rgba(0,0,0,0.9) 0%, transparent 60%)}
+.gp-hero-content{position:absolute;left:48px;right:48px;bottom:44px;max-width:680px;z-index:3}
 .gp-back{position:absolute;top:24px;left:24px;z-index:var(--z-content);width:44px;height:44px;border-radius:var(--r-xl);background:rgba(0,0,0,0.5);backdrop-filter:blur(14px);border:1px solid var(--border-2);color:#fff;display:flex;align-items:center;justify-content:center;transition:background var(--t-fast), border-color var(--t-fast)}
 .gp-back:hover{background:rgba(255,255,255,0.15);border-color:var(--border-strong)}
 .gp-chips{display:flex;gap:var(--s-2);margin-bottom:var(--s-4);flex-wrap:wrap}
@@ -879,7 +879,7 @@ html:not([data-card-entrance="0"]) .gc{animation:gcIn var(--t-slow)}
   letter-spacing:-0.03em;text-shadow:0 2px 14px rgba(0,0,0,0.7);
 }
 .gc-overlay{
-  position:absolute;inset:0;
+  position:absolute;inset:0;z-index:1;
   background:linear-gradient(0deg, rgba(0,0,0,0.86) 0%, transparent 45%);
   pointer-events:none;
 }

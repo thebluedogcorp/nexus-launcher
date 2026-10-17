@@ -224,7 +224,8 @@ export function registerIpc(): void {
   // aggregator (RAWG -> Steam -> PCGamingWiki).
   ipcMain.handle("games:patchAll", async () => {
     const all = listGames({ showHidden: true });
-    const needPatch = all.filter((g) => !g.bannerImage);
+    // v4.6.0 — also patch games missing a trailer URL (so trailers auto-detect).
+    const needPatch = all.filter((g) => !g.bannerImage || !g.trailerUrl);
     const result = await patchGamesInBackground(needPatch.slice(0, 60));
     return { patched: result.patched, attempted: needPatch.length };
   });
