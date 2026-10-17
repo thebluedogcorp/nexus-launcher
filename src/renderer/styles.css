@@ -1711,3 +1711,69 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{
 .bg-trailer video,.bg-trailer img{width:100%;height:100%;object-fit:cover}
 @keyframes bgTrailerIn{from{opacity:0}to{opacity:0.85}}
 [data-reduced-motion] .bg-trailer{animation:none;opacity:0.85}
+
+/* ===================================================================
+   v4.6.6 — TrailerBlock (dedicated click-to-play in the details body)
+   =================================================================== */
+.trailer-block{
+  position:relative;
+  width:100%;
+  aspect-ratio:16/9;
+  border-radius:var(--r-xl);
+  overflow:hidden;
+  background:var(--surface-2);
+  border:1px solid var(--border);
+  margin-bottom:var(--s-6);
+}
+.trailer-empty{
+  display:flex;align-items:center;justify-content:center;
+  min-height:80px;
+}
+.trailer-poster{
+  position:absolute;inset:0;
+  background-size:cover;background-position:center;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:transform var(--t-slow);
+}
+.trailer-poster:hover{transform:scale(1.02)}
+.trailer-play-overlay{
+  display:flex;flex-direction:column;align-items:center;gap:12px;
+  background:rgba(0,0,0,0.4);
+  width:100%;height:100%;
+  justify-content:center;
+  transition:background var(--t-fast);
+}
+.trailer-poster:hover .trailer-play-overlay{background:rgba(0,0,0,0.3)}
+.trailer-play-btn{
+  width:64px;height:64px;border-radius:50%;
+  background:var(--accent);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--accent-fg);
+  box-shadow:0 8px 24px -4px rgba(var(--accent-rgb),0.5);
+  transition:transform var(--t-fast);
+}
+.trailer-poster:hover .trailer-play-btn{transform:scale(1.08)}
+.trailer-play-label{
+  font-size:13px;font-weight:600;color:#fff;
+  letter-spacing:0.05em;text-transform:uppercase;
+}
+.trailer-video{
+  width:100%;height:100%;object-fit:cover;
+  display:block;
+}
+.trailer-mute-btn{
+  position:absolute;bottom:12px;right:12px;
+  display:inline-flex;align-items:center;
+  padding:6px 12px;border-radius:var(--r-pill);
+  background:rgba(0,0,0,0.6);backdrop-filter:blur(10px);
+  border:1px solid var(--border-2);
+  color:#fff;font-size:11px;font-weight:600;
+  cursor:pointer;
+  transition:background var(--t-fast);
+}
+.trailer-mute-btn:hover{background:rgba(0,0,0,0.8)}
+.trailer-error-overlay{
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  color:var(--text-faint);font-size:13px;
+}

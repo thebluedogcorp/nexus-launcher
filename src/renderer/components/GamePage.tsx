@@ -3,7 +3,7 @@ import type { Game, PlatformId } from "@shared/types";
 import { PLATFORM_LIST } from "@shared/types";
 import { Icon } from "./Icons";
 import { PlatformMark } from "./PlatformMark";
-import { GameTrailer } from "./GameTrailer";
+import { TrailerBlock } from "./TrailerBlock";
 import {
   formatDate, formatPlaytime, formatSize, relativeTime, platformLabel, platformColor, gradientFor, initials,
 } from "../lib/helpers";
@@ -164,10 +164,6 @@ export function GamePage({ game, onClose, onLaunch, onPatch, onDelete, onToggleF
               backgroundImage: banner ? `url(${banner})` : `radial-gradient(circle at 30% 20%, ${grad.from}, #060608 70%)`,
               transform: heroTransform,
             }} />
-            {/* v4.6.0 — muted trailer overlay on the hero (autoplay setting +
-                reduced-motion respected by GameTrailer; falls back to the
-                hero-bg poster on error/unavailable). */}
-            <div className="gp-hero-trailer"><GameTrailer url={game.trailerUrl} posterUrl={banner} active /></div>
             <div className="gp-hero-overlay" />
             <div className="gp-hero-content">
               <div className="gp-chips">
@@ -458,6 +454,9 @@ export function GamePage({ game, onClose, onLaunch, onPatch, onDelete, onToggleF
         ) : (
           // ===== VIEW MODE =====
           <>
+            {/* v4.6.6 — Trailer block (dedicated, click-to-play, no autoplay issues) */}
+            <TrailerBlock game={game} banner={banner} onPatch={onPatch} />
+
             {/* Description */}
             <div className="gp-section-title"><span className="bar" /> About</div>
             {game.description ? (
