@@ -1,0 +1,11 @@
+{
+  "id": "hello-world",
+  "name": "Hello World",
+  "version": "1.0.0",
+  "author": "NEXUS",
+  "description": "A minimal plugin that adds a Hello World page to the sidebar.",
+  "apiVersion": 1,
+  "entry": "index.js",
+  "permissions": ["ui:pages", "ui:sidebar", "games:read"],
+  "icon": "👋"
+}

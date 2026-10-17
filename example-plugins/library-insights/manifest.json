@@ -1,0 +1,11 @@
+{
+  "id": "library-insights",
+  "name": "Library Insights",
+  "version": "1.0.0",
+  "author": "NEXUS",
+  "description": "Adds an insights dashboard page with library stats + a game-card action.",
+  "apiVersion": 1,
+  "entry": "index.js",
+  "permissions": ["ui:pages", "ui:sidebar", "ui:gamecard", "games:read", "storage", "events"],
+  "icon": "📊"
+}

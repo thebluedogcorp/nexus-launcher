@@ -9,6 +9,9 @@ import { IconGlyph } from "./components/IconGlyph";
 import { ThemeStudio } from "./components/theme/ThemeStudio";
 import { AcquisitionPicker } from "./components/AcquisitionPicker";
 import { GameTrailer } from "./components/GameTrailer";
+import { PluginPageContainer } from "./components/PluginPageContainer";
+import { loadPlugins } from "./lib/plugin-runtime";
+import { usePluginExtensions } from "./lib/plugin-store";
 import { CreateCollectionDialog } from "./components/CreateCollectionDialog";
 import { CollectionPicker } from "./components/CollectionPicker";
 import { GamePage } from "./components/GamePage";
@@ -83,6 +86,8 @@ export function App() {
     clearTimeout(trailerHoverTimer.current);
     setTrailerHoverId(null);
   }, []);
+  // v4.7.0 — Plugin extensions (sidebar items, pages, game-card actions).
+  const { sidebarItems: pluginSidebar, pages: pluginPages, gameCardActions: pluginActions, activePluginPage, setActivePluginPage } = usePluginExtensions();
   // Playtime tracking state — shows live playtime when a game is running.
   const [activePlaytime, setActivePlaytime] = useState<{ gameId: number; gameTitle: string; elapsedSec: number; startedAt: number } | null>(null);
   // v4.3.0 — Collections + collapsible sidebar + platform visibility.
@@ -189,6 +194,8 @@ export function App() {
             }
           })();
         }, 2000);
+        // v4.7.0 — Load enabled plugins (registers their UI extensions).
+        try { await loadPlugins(); } catch (e) { console.error("[plugins] load failed:", e); }
       } catch (e) {
         toast("error", "Couldn't load library", "The local database may be locked.");
       } finally { setLoading(false); }
@@ -771,10 +778,37 @@ export function App() {
               <div className="dt-stat-mini"><span>Launches</span><strong>{stats?.totalLaunches ?? "—"}</strong></div>
               <div className="dt-stat-mini"><span>Disk</span><strong>{stats ? formatSize(stats.totalSizeBytes) : "—"}</strong></div>
             </div>
+            {/* v4.7.0 — Plugin sidebar items */}
+            {pluginSidebar.length > 0 && (
+              <div className="dt-sidebar-section">
+                <div className="dt-sidebar-label">Plugins</div>
+                {pluginSidebar.map((item) => (
+                  <button key={item.id} className={activePluginPage === (item.pageId ?? item.id) ? "dt-nav-item active" : "dt-nav-item"}
+                    onClick={() => setActivePluginPage(activePluginPage === (item.pageId ?? item.id) ? null : (item.pageId ?? item.id))}>
+                    {item.icon && <span style={{ fontSize: 14 }}>{item.icon}</span>}
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </aside>
 
           {/* Main content area */}
           <main className="dt-main">
+            {/* v4.7.0 — Plugin page rendering (when a plugin page is active) */}
+            {activePluginPage && (() => {
+              const page = pluginPages.find((p) => p.id === activePluginPage);
+              if (!page) return null;
+              return (
+                <div className="dt-scroll" style={{ paddingTop: 24 }}>
+                  <PluginPageContainer extension={page} />
+                </div>
+              );
+            })()}
+
+            {/* Normal content (hidden when a plugin page is active) */}
+            {!activePluginPage && (
+              <>
             {/* Enrichment banner */}
             {patching && patchProgress && (
               <div className="enrich-banner">
@@ -936,6 +970,7 @@ export function App() {
                 )}
               </div>
             )}
+            </>  )}
           </main>
         </div>
 

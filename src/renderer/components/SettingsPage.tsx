@@ -14,7 +14,7 @@ interface Props {
   onCheckUpdates: () => void;
 }
 
-type TabId = "general" | "appearance" | "library" | "sidebar" | "downloads" | "startup" | "overlay" | "about";
+type TabId = "general" | "appearance" | "library" | "sidebar" | "plugins" | "startup" | "overlay" | "about";
 
 interface TabDef { id: TabId; label: string; icon: ReactNode }
 const TABS: TabDef[] = [
@@ -22,6 +22,7 @@ const TABS: TabDef[] = [
   { id: "appearance", label: "Appearance", icon: <Icon.Sparkles size={15} /> },
   { id: "library", label: "Library", icon: <Icon.Library size={15} /> },
   { id: "sidebar", label: "Sidebar", icon: <Icon.Folder size={15} /> },
+  { id: "plugins", label: "Plugins", icon: <Icon.FileCog size={15} /> },
   { id: "startup", label: "Startup & Close", icon: <Icon.Shield size={15} /> },
   { id: "overlay", label: "Overlay", icon: <Icon.Gamepad size={15} /> },
   { id: "about", label: "About", icon: <Icon.Info size={15} /> },
@@ -486,6 +487,9 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
               </>
             )}
 
+            {/* ===== PLUGINS TAB (v4.7.0) ===== */}
+            {tab === "plugins" && <PluginsTab flash={flash} />}
+
             {/* ===== STARTUP & CLOSE TAB ===== */}
             {tab === "startup" && (
               <>
@@ -595,7 +599,7 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
                     <div className="logo"><NexusMark size={28} /></div>
                     <div>
                       <div className="name">NEXUS Launcher</div>
-                      <div className="ver">Version 4.6.6 — Universal Game Launcher for Windows</div>
+                      <div className="ver">Version 4.7.0 — Universal Game Launcher for Windows</div>
                       <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 6 }}>
                         Auto-detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox. Patches rich metadata via RAWG + Steam APIs. Launches natively.
                       </div>
@@ -629,5 +633,77 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
         </div>
       </div>
     </div>
+  );
+}
+
+// v4.7.0 — Plugins tab. Install/enable/disable/remove + details.
+import type { InstalledPlugin } from "@shared/plugin-types";
+import { reloadPlugins } from "../lib/plugin-runtime";
+
+function PluginsTab({ flash }: { flash: (type: "info" | "success" | "error", msg: string) => void }) {
+  const [plugins, setPlugins] = useState<InstalledPlugin[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = async () => {
+    try { setPlugins(await window.nexus.pluginsList()); } catch {}
+    setLoading(false);
+  };
+  useEffect(() => { void refresh(); }, []);
+
+  const install = async () => {
+    const dir = await window.nexus.pluginsSelectDir();
+    if (!dir) return;
+    const result = await window.nexus.pluginsInstall(dir);
+    if ("error" in result) { flash("error", `Install failed: ${result.error}`); }
+    else { flash("success", `Installed: ${result.manifest.name}`); void refresh(); }
+  };
+  const toggle = async (p: InstalledPlugin) => {
+    if (p.status === "enabled") { await window.nexus.pluginsDisable(p.manifest.id); }
+    else { await window.nexus.pluginsEnable(p.manifest.id); }
+    await reloadPlugins(); void refresh();
+    flash("success", `${p.manifest.name} ${p.status === "enabled" ? "disabled" : "enabled"}`);
+  };
+  const remove = async (p: InstalledPlugin) => {
+    await window.nexus.pluginsRemove(p.manifest.id);
+    await reloadPlugins(); void refresh();
+    flash("success", `Removed: ${p.manifest.name}`);
+  };
+
+  if (loading) return <div style={{ padding: 40, textAlign: "center", color: "var(--text-faint)" }}>Loading…</div>;
+
+  return (
+    <>
+      <div className="settings-section">
+        <div className="settings-section-title"><span className="bar" />Installed Plugins</div>
+        {plugins.length === 0 ? (
+          <div style={{ padding: "20px 4px", fontSize: 13, color: "var(--text-faint)" }}>No plugins installed. Create a plugin directory with a manifest.json + index.js, then click Install.</div>
+        ) : (
+          plugins.map((p) => (
+            <div key={p.manifest.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: "var(--r-md)", background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", marginBottom: 8 }}>
+              <span style={{ fontSize: 20 }}>{p.manifest.icon || "📦"}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{p.manifest.name} <span style={{ fontSize: 10, color: "var(--text-faint)", fontWeight: 400 }}>v{p.manifest.version}</span></div>
+                <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>{p.manifest.description}</div>
+                <div style={{ fontSize: 10, color: "var(--text-faint)", marginTop: 3 }}>
+                  by {p.manifest.author} · {p.manifest.permissions.join(", ") || "no permissions"} · <span style={{ color: p.status === "enabled" ? "var(--accent)" : p.status === "error" ? "var(--danger)" : "var(--text-faint)" }}>{p.status}</span>
+                </div>
+                {p.error && <div style={{ fontSize: 10, color: "var(--danger)", marginTop: 4 }}>{p.error}</div>}
+              </div>
+              <button className="settings-toggle" style={p.status === "enabled" ? {} : {}} onClick={() => void toggle(p)}><span className="knob" style={p.status === "enabled" ? { left: 22 } : {}} /></button>
+              <button className="ctx-item danger" style={{ padding: "4px 8px", fontSize: 11 }} onClick={() => void remove(p)} title="Remove"><Icon.Trash size={12} /></button>
+            </div>
+          ))
+        )}
+        <div className="settings-choice-row" style={{ marginTop: 12 }}>
+          <button className="settings-choice" style={{ minWidth: 0 }} onClick={install}><span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Icon.Plus size={14} /> Install from Directory</span></button>
+        </div>
+      </div>
+      <div className="settings-section">
+        <div className="settings-section-title"><span className="bar" />About Plugins</div>
+        <div className="settings-row" style={{ flexDirection: "column", padding: "14px 16px" }}>
+          <div className="d" style={{ lineHeight: 1.6 }}>Plugins are directories containing a manifest.json + an index.js (ES module). The entry exports a default function that receives a HostAPI. Plugins can register pages, sidebar items, game-card actions, read game data, use per-plugin storage, and subscribe to events. See the example-plugins/ directory in the source repo for working examples.</div>
+        </div>
+      </div>
+    </>
   );
 }

@@ -46,6 +46,10 @@ import {
 } from "./db";
 import { fetchSteamTrailer } from "./metadata/steam-trailers";
 import { resolveStoreLinks } from "./downloads/stores";
+import {
+  listPlugins, installPlugin, enablePlugin, disablePlugin, removePlugin,
+  readPluginEntry, markPluginError, getPluginData, setPluginData,
+} from "./plugins/manager";
 import type {
   DetectedGame,
   Game,
@@ -390,6 +394,24 @@ export function registerIpc(): void {
     const game = await getGame(gameId);
     if (!game) return [];
     try { return await resolveStoreLinks(game); } catch { return []; }
+  });
+
+  // ===== v4.7.0 — Plugins =====
+  ipcMain.handle("plugins:list", () => listPlugins());
+  ipcMain.handle("plugins:install", (_e, srcDir: string) => {
+    try { return installPlugin(srcDir); } catch (e) { return { error: e instanceof Error ? e.message : String(e) }; }
+  });
+  ipcMain.handle("plugins:enable", (_e, id: string) => { enablePlugin(id); return true; });
+  ipcMain.handle("plugins:disable", (_e, id: string) => { disablePlugin(id); return true; });
+  ipcMain.handle("plugins:remove", (_e, id: string) => { removePlugin(id); return true; });
+  ipcMain.handle("plugins:readEntry", (_e, id: string) => readPluginEntry(id));
+  ipcMain.handle("plugins:markError", (_e, id: string, error: string) => { markPluginError(id, error); return true; });
+  ipcMain.handle("plugins:storage:get", (_e, id: string, key: string) => getPluginData(id, key));
+  ipcMain.handle("plugins:storage:set", (_e, id: string, key: string, value: unknown) => { setPluginData(id, key, value); return true; });
+  ipcMain.handle("plugins:selectDir", async () => {
+    const { dialog } = await import("electron");
+    const result = await dialog.showOpenDialog({ properties: ["openDirectory"], title: "Select a plugin directory" });
+    return result.canceled ? null : result.filePaths[0];
   });
 
   // ===== Achievements =====

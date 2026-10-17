@@ -15,6 +15,7 @@ import type {
   ScanSummary,
   Stats,
 } from "@shared/types";
+import type { InstalledPlugin } from "@shared/plugin-types";
 import type { ThemeConfig, SavedTheme } from "@shared/theme-types";
 
 const api = {
@@ -137,6 +138,17 @@ const api = {
   verifyAllInstalled: () => ipcRenderer.invoke("games:verifyAll") as Promise<Array<{ id: number; title: string; installed: boolean }>>,
   // Intelligent zero-config Get: returns the official store page(s) for a game.
   resolveStoreLinks: (gameId: number) => ipcRenderer.invoke("sources:resolveStoreLinks", gameId) as Promise<AcquisitionOption[]>,
+  // v4.7.0 — Plugins
+  pluginsList: () => ipcRenderer.invoke("plugins:list") as Promise<InstalledPlugin[]>,
+  pluginsInstall: (srcDir: string) => ipcRenderer.invoke("plugins:install", srcDir) as Promise<InstalledPlugin | { error: string }>,
+  pluginsEnable: (id: string) => ipcRenderer.invoke("plugins:enable", id) as Promise<boolean>,
+  pluginsDisable: (id: string) => ipcRenderer.invoke("plugins:disable", id) as Promise<boolean>,
+  pluginsRemove: (id: string) => ipcRenderer.invoke("plugins:remove", id) as Promise<boolean>,
+  pluginsReadEntry: (id: string) => ipcRenderer.invoke("plugins:readEntry", id) as Promise<string | null>,
+  pluginsMarkError: (id: string, error: string) => ipcRenderer.invoke("plugins:markError", id, error) as Promise<boolean>,
+  pluginsStorageGet: (id: string, key: string) => ipcRenderer.invoke("plugins:storage:get", id, key) as Promise<unknown>,
+  pluginsStorageSet: (id: string, key: string, value: unknown) => ipcRenderer.invoke("plugins:storage:set", id, key, value) as Promise<boolean>,
+  pluginsSelectDir: () => ipcRenderer.invoke("plugins:selectDir") as Promise<string | null>,
   // Achievements
   getAchievements: () => ipcRenderer.invoke("achievements:list") as Promise<Array<{ id: string; name: string; description: string; icon: string; unlockedAt: string | null; progress: number; maxProgress: number }>>,
   checkAchievements: () => ipcRenderer.invoke("achievements:check") as Promise<{ newlyUnlocked: string[] }>,
