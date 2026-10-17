@@ -50,12 +50,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v4.6.4"
-          $title = "NEXUS v4.6.4 — RAWG API key buttons hidden under trailer layer + per-game trailer URL field + auto-detect trailers on startup"
+          $tag = "v4.6.5"
+          $title = "NEXUS v4.6.5 — RAWG API key buttons hidden under trailer layer + per-game trailer URL field + auto-detect trailers on startup"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
-          **v4.6.4 — Immersive trailer previews + premium visual polish.**
+          **v4.6.5 — Immersive trailer previews + premium visual polish.**
 
           **1. Game trailer preview system.** Games with a RAWG trailer clip now show a muted, looping video preview in three places:
           - **Game cards (desktop grid):** hover a card for 400ms -> the trailer plays over the cover art. Only ONE card plays at a time (the last hovered). Quick mouse-overs don't trigger playback (debounced).

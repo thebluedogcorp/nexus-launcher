@@ -77,6 +77,29 @@ export function GamePage({ game, onClose, onLaunch, onPatch, onDelete, onToggleF
     }
   }, [game?.id]);
 
+  // v4.6.5 — When the game detail page opens, if this game has a Steam app ID
+  // but no trailer URL, fetch the trailer IMMEDIATELY (don't wait for the
+  // background batch to reach it). This ensures the trailer plays on the hero
+  // as soon as it's fetched. The onUpdate callback refreshes the game object
+  // so the GameTrailer component receives the URL.
+  useEffect(() => {
+    if (!game?.id || game.trailerUrl) return;
+    if (!game.steamAppId) return;
+    let cancelled = false;
+    (async () => {
+      console.log(`[trailers] GamePage: fetching trailer for ${game.title} (steam app ${game.steamAppId})`);
+      // Call the per-game patch (which fetches Steam trailer first, then RAWG).
+      // This updates the DB + the parent's game object via onUpdate.
+      try {
+        await onPatch(game);
+      } catch (e) {
+        console.error(`[trailers] GamePage: patch failed for ${game.title}:`, e);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game?.id, game?.steamAppId, game?.trailerUrl]);
+
   if (!game) return null;
 
   const banner = editMode ? (editBannerImage || editCoverImage) : (game.bannerImage || game.coverImage);
