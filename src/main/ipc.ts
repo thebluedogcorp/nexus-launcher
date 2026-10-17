@@ -145,11 +145,12 @@ export function registerIpc(): void {
       const game = getGame(id);
       if (!game) return null;
       const title = query?.trim() || game.title;
-      // v4.6.3 — Fetch Steam trailer FIRST (no API key needed!). This is the
-      // primary trailer source. Falls back to RAWG clips for non-Steam games.
+      // v4.6.7 — Fetch Steam trailer FIRST (no API key needed). Now also
+      // searches by TITLE when steamAppId is unknown — covers ALL games.
       let trailerUrl = game.trailerUrl;
-      if (game.steamAppId && !trailerUrl) {
-        const steamTrailer = await fetchSteamTrailer(game.steamAppId);
+      if (!trailerUrl) {
+        const steamKey = game.steamAppId || game.title;
+        const steamTrailer = await fetchSteamTrailer(steamKey);
         if (steamTrailer?.url) trailerUrl = steamTrailer.url;
       }
       const meta = await fetchAggregated(title, game.steamAppId, game.rawgId);
@@ -451,12 +452,12 @@ async function patchGamesInBackground(
       });
     }
     try {
-      // v4.6.3 — Fetch Steam trailer first (no API key needed). This covers
-      // ALL Steam games — the majority of most libraries — without requiring
-      // a RAWG key. Falls back to RAWG clips for non-Steam games.
+      // v4.6.7 — Fetch Steam trailer (no key needed). Searches by title when
+      // no steamAppId — covers ALL games, not just detected Steam games.
       let trailerUrl = g.trailerUrl;
-      if (g.steamAppId && !trailerUrl) {
-        const steamTrailer = await fetchSteamTrailer(g.steamAppId);
+      if (!trailerUrl) {
+        const steamKey = g.steamAppId || g.title;
+        const steamTrailer = await fetchSteamTrailer(steamKey);
         if (steamTrailer?.url) trailerUrl = steamTrailer.url;
       }
       const meta = await fetchAggregated(g.title, g.steamAppId, g.rawgId);

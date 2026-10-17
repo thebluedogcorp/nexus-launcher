@@ -2,13 +2,13 @@
 // public appdetails API (NO API KEY REQUIRED) and constructs a direct mp4
 // URL that plays in an HTML5 <video> element.
 //
-// The appdetails API returns a `movies` array. Each movie has an `id`. The
-// old-style direct mp4 URL pattern still works:
-//   https://cdn.akamai.steamstatic.com/steam/apps/<movieId>/movie_max.mp4
-// (verified: returns 200 video/mp4). This is more reliable than RAWG clips
-// (which need an API key + are on a separate CDN) and covers ALL Steam games.
+// v4.6.7 — Also supports searching the Steam store BY TITLE when the
+// steamAppId is unknown. Uses the public storesearch endpoint (no key)
+// to find the appId, then fetches the trailer. This covers ALL games,
+// not just detected Steam games.
 
 const APPDETAILS = "https://store.steampowered.com/api/appdetails";
+const STORE_SEARCH = "https://store.steampowered.com/api/storesearch";
 
 interface SteamMovie {
   id: number;
@@ -17,25 +17,57 @@ interface SteamMovie {
   highlight?: boolean;
 }
 
+/** Search the Steam store by title → find the best-matching appId. */
+async function findSteamAppId(title: string): Promise<string | null> {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 8_000);
+    const res = await fetch(
+      `${STORE_SEARCH}?term=${encodeURIComponent(title)}&l=english&cc=US`,
+      { signal: ctrl.signal, redirect: "follow" },
+    );
+    clearTimeout(t);
+    if (!res.ok) return null;
+    const data = await res.json() as { items?: Array<{ id: number; name: string }> };
+    const items = data.items ?? [];
+    if (items.length === 0) return null;
+    // Prefer exact title match; else first result.
+    const lower = title.trim().toLowerCase();
+    const exact = items.find((it) => it.name.toLowerCase() === lower);
+    const best = exact ?? items[0];
+    return String(best.id);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Fetch the best trailer mp4 URL for a Steam game. No API key needed.
- * Returns the direct mp4 URL + the thumbnail/poster, or null if no trailer.
+ * If steamAppId is provided, uses it directly. If not, searches the Steam
+ * store by title to find the appId first.
  */
 export async function fetchSteamTrailer(
-  steamAppId: string,
+  steamAppIdOrTitle: string,
 ): Promise<{ url: string; poster?: string; name?: string } | null> {
-  if (!steamAppId) return null;
+  let appId = steamAppIdOrTitle;
+  // If the input looks like a title (not a number), search for the appId.
+  if (appId && !/^\d+$/.test(appId)) {
+    const found = await findSteamAppId(appId);
+    if (!found) return null;
+    appId = found;
+  }
+  if (!appId || !/^\d+$/.test(appId)) return null;
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 10_000);
     const res = await fetch(
-      `${APPDETAILS}?appids=${encodeURIComponent(steamAppId)}&cc=us&l=en`,
+      `${APPDETAILS}?appids=${encodeURIComponent(appId)}&cc=us&l=en`,
       { signal: ctrl.signal, redirect: "follow" },
     );
     clearTimeout(t);
     if (!res.ok) return null;
     const data = await res.json() as Record<string, { success: boolean; data?: { movies?: SteamMovie[] } }>;
-    const entry = data[steamAppId];
+    const entry = data[appId];
     if (!entry?.success || !entry.data?.movies?.length) return null;
     // Prefer the highlighted trailer; else the first.
     const movies = entry.data.movies;
@@ -50,7 +82,7 @@ export async function fetchSteamTrailer(
     // the poster shows instead, which is correct graceful degradation).
     const head = await fetch(url, { method: "HEAD", signal: ctrl.signal });
     if (head.ok && (head.headers.get("content-type") ?? "").includes("video")) {
-      console.log(`[trailers] Steam app ${steamAppId}: found trailer ${url.slice(0, 80)}`);
+      console.log(`[trailers] Steam app ${appId}: found trailer ${url.slice(0, 80)}`);
       return { url, poster: movie.thumbnail, name: movie.name };
     }
     // Fallback: try the 480p version.

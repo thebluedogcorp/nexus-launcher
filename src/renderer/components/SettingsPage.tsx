@@ -14,7 +14,7 @@ interface Props {
   onCheckUpdates: () => void;
 }
 
-type TabId = "general" | "appearance" | "library" | "sidebar" | "plugins" | "startup" | "overlay" | "about";
+type TabId = "general" | "appearance" | "library" | "sidebar" | "plugins" | "developer" | "startup" | "overlay" | "about";
 
 interface TabDef { id: TabId; label: string; icon: ReactNode }
 const TABS: TabDef[] = [
@@ -23,6 +23,7 @@ const TABS: TabDef[] = [
   { id: "library", label: "Library", icon: <Icon.Library size={15} /> },
   { id: "sidebar", label: "Sidebar", icon: <Icon.Folder size={15} /> },
   { id: "plugins", label: "Plugins", icon: <Icon.FileCog size={15} /> },
+  { id: "developer", label: "Developer", icon: <Icon.Cpu size={15} /> },
   { id: "startup", label: "Startup & Close", icon: <Icon.Shield size={15} /> },
   { id: "overlay", label: "Overlay", icon: <Icon.Gamepad size={15} /> },
   { id: "about", label: "About", icon: <Icon.Info size={15} /> },
@@ -490,6 +491,89 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
             {/* ===== PLUGINS TAB (v4.7.0) ===== */}
             {tab === "plugins" && <PluginsTab flash={flash} />}
 
+            {/* ===== DEVELOPER TAB (v4.7.0) ===== */}
+            {tab === "developer" && (
+              <>
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />Developer Mode</div>
+                  <div className="settings-row">
+                    <div className="label-stack">
+                      <div className="t">Enable developer mode</div>
+                      <div className="d">Shows diagnostic info in the console, enables DevTools shortcuts, and exposes additional debugging tools for plugins + the app itself.</div>
+                    </div>
+                    <button onClick={() => { const v = localStorage.getItem("nx-devmode") !== "1"; localStorage.setItem("nx-devmode", v ? "1" : "0"); flash("info", v ? "Developer mode enabled" : "Developer mode disabled"); }} className={`settings-toggle ${localStorage.getItem("nx-devmode") === "1" ? "on" : ""}`}>
+                      <span className="knob" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />Plugin Development</div>
+                  <div className="settings-row" style={{ flexDirection: "column", alignItems: "stretch", padding: "14px 16px" }}>
+                    <div className="label-stack">
+                      <div className="t">Plugin Developer Guide</div>
+                      <div className="d">Complete documentation for creating NEXUS plugins — manifest format, HostAPI reference, permissions, lifecycle, example plugins, and debugging.</div>
+                    </div>
+                    <a href="https://github.com/thebluedogcorp/nexus-launcher/blob/main/PLUGIN_DEVELOPER_GUIDE.md" target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: "var(--r-md)", background: "var(--accent)", color: "var(--accent-fg)", fontWeight: 600, fontSize: 13, textDecoration: "none", marginTop: 8 }}>
+                      <Icon.ExternalLink size={14} /> Open Developer Guide
+                    </a>
+                  </div>
+                </div>
+
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />Example Plugins</div>
+                  <div className="settings-row" style={{ flexDirection: "column", alignItems: "stretch", padding: "14px 16px" }}>
+                    <div className="d" style={{ lineHeight: 1.6 }}>Two example plugins are included in the repository under <code>example-plugins/</code>:</div>
+                    <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+                      <div style={{ flex: 1, padding: 14, borderRadius: "var(--r-md)", background: "var(--surface)", border: "1px solid var(--border)" }}>
+                        <div style={{ fontSize: 16, marginBottom: 4 }}>👋 Hello World</div>
+                        <div style={{ fontSize: 11, color: "var(--text-dim)" }}>Minimal plugin: registers a page + calls the games API.</div>
+                      </div>
+                      <div style={{ flex: 1, padding: 14, borderRadius: "var(--r-md)", background: "var(--surface)", border: "1px solid var(--border)" }}>
+                        <div style={{ fontSize: 16, marginBottom: 4 }}>📊 Library Insights</div>
+                        <div style={{ fontSize: 11, color: "var(--text-dim)" }}>Dashboard with stats + game-card action + events + storage.</div>
+                      </div>
+                    </div>
+                    <a href="https://github.com/thebluedogcorp/nexus-launcher/tree/main/example-plugins" target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--accent)", fontSize: 12, marginTop: 8, textDecoration: "none" }}>
+                      <Icon.ExternalLink size={12} /> View on GitHub
+                    </a>
+                  </div>
+                </div>
+
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />Diagnostics</div>
+                  <div className="settings-row" style={{ flexDirection: "column", alignItems: "stretch", padding: "14px 16px" }}>
+                    <div className="label-stack">
+                      <div className="t">Open DevTools</div>
+                      <div className="d">Inspect the app's HTML/CSS/JS, view console logs (including plugin logs + trailer diagnostics), and debug issues.</div>
+                    </div>
+                    <div className="settings-choice-row" style={{ marginTop: 8 }}>
+                      <button className="settings-choice" style={{ minWidth: 0 }} onClick={() => { window.dispatchEvent(new KeyboardEvent("keydown", { key: "F12" })); }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Icon.Cpu size={14} /> Toggle DevTools</span>
+                      </button>
+                      <button className="settings-choice" style={{ minWidth: 0 }} onClick={() => { location.reload(); }}>
+                        <Icon.Refresh size={14} /> Reload App
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />App Info</div>
+                  <div className="settings-row" style={{ flexDirection: "column", padding: "14px 16px" }}>
+                    <div style={{ fontSize: 12, color: "var(--text-dim)", lineHeight: 1.8 }}>
+                      <strong style={{ color: "var(--text)" }}>Version:</strong> 4.7.0<br />
+                      <strong style={{ color: "var(--text)" }}>Electron:</strong> 32<br />
+                      <strong style={{ color: "var(--text)" }}>React:</strong> 19<br />
+                      <strong style={{ color: "var(--text)" }}>Plugin API:</strong> v1<br />
+                      <strong style={{ color: "var(--text)" }}>CSP:</strong> media-src + frame-src (YouTube) enabled<br />
+                      <strong style={{ color: "var(--text)" }}>GitHub:</strong> <a href="https://github.com/thebluedogcorp/nexus-launcher" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>thebluedogcorp/nexus-launcher</a>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
             {/* ===== STARTUP & CLOSE TAB ===== */}
             {tab === "startup" && (
               <>
@@ -599,7 +683,7 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
                     <div className="logo"><NexusMark size={28} /></div>
                     <div>
                       <div className="name">NEXUS Launcher</div>
-                      <div className="ver">Version 4.7.0 — Universal Game Launcher for Windows</div>
+                      <div className="ver">Version 4.7.1 — Universal Game Launcher for Windows</div>
                       <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 6 }}>
                         Auto-detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox. Patches rich metadata via RAWG + Steam APIs. Launches natively.
                       </div>

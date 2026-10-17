@@ -1,18 +1,14 @@
-// v4.6.6 — TrailerBlock. A dedicated, click-to-play trailer player that sits
-// in the game detail body (not overlaid on the hero). This avoids ALL the
-// autoplay/z-index/CSP-stacking issues that plagued the hero-overlay approach.
+// v4.6.7 — TrailerBlock. A dedicated, click-to-play trailer player in the
+// game detail body. Now searches Steam BY TITLE (not just appId) + falls back
+// to a YouTube embed for games without a Steam trailer.
 //
 // States:
-//   - No URL + has steamAppId → "Fetch Trailer" button (calls onPatch which
-//     fetches the Steam trailer immediately — no RAWG key needed).
-//   - No URL + no steamAppId → "No trailer available" message.
-//   - Has URL + not playing → poster image + large play button overlay.
-//   - Has URL + playing → muted, looping <video>. Mute/unmute toggle.
-//   - Error → "Trailer unavailable" + poster.
-//
-// The user explicitly clicks play (user-initiated playback — always allowed,
-// no autoplay restrictions). The video is in the normal document flow (no
-// z-index stacking issues).
+//   - No URL → "Fetch Trailer" button (always shown — searches Steam by
+//     title, then falls back to YouTube embed).
+//   - Has URL + not playing → poster + play button.
+//   - Playing → muted, looping video. Mute/unmute toggle.
+//   - Error → "Trailer unavailable" + retry button.
+//   - YouTube fallback → embedded YouTube iframe (muted, autoplay).
 
 import { useEffect, useRef, useState } from "react";
 import type { Game } from "@shared/types";
@@ -30,25 +26,26 @@ export function TrailerBlock({ game, banner, onPatch }: Props) {
   const [muted, setMuted] = useState(true);
   const [error, setError] = useState(false);
   const [fetching, setFetching] = useState(false);
+  // YouTube fallback: if the mp4 trailer fails or isn't found, embed YouTube.
+  const [ytFallback, setYtFallback] = useState(false);
 
   const url = game.trailerUrl;
   const poster = banner || game.coverImage;
 
-  // Reset when the game changes.
   useEffect(() => {
     setPlaying(false);
     setError(false);
+    setYtFallback(false);
   }, [game.id, url]);
 
   const play = () => {
-    if (!url) return;
     const v = videoRef.current;
     if (!v) return;
     setError(false);
     v.currentTime = 0;
     const p = v.play();
     if (p && typeof p.catch === "function") {
-      p.then(() => setPlaying(true)).catch(() => setError(true));
+      p.then(() => setPlaying(true)).catch(() => { setError(true); setYtFallback(true); });
     } else {
       setPlaying(true);
     }
@@ -69,19 +66,38 @@ export function TrailerBlock({ game, banner, onPatch }: Props) {
     setFetching(false);
   };
 
-  // No trailer URL.
+  // YouTube embed URL (muted, autoplay, no controls, no branding).
+  const ytQuery = encodeURIComponent(`${game.title} official trailer`);
+  const ytEmbed = `https://www.youtube-nocookie.com/embed?listType=search&list=${ytQuery}&autoplay=1&mute=1&loop=1&controls=0&modestbranding=1&rel=0`;
+
+  // No trailer URL → show fetch button or YouTube fallback.
   if (!url) {
+    if (ytFallback) {
+      return (
+        <div className="gp-section">
+          <div className="gp-section-title"><span className="bar" /> Trailer</div>
+          <div className="trailer-block">
+            <iframe
+              src={ytEmbed}
+              style={{ width: "100%", height: "100%", border: "none", borderRadius: "var(--r-xl)" }}
+              allow="autoplay; encrypted-media"
+              allowFullScreen
+              title={`${game.title} trailer`}
+            />
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="gp-section">
         <div className="gp-section-title"><span className="bar" /> Trailer</div>
         <div className="trailer-block trailer-empty">
-          {game.steamAppId ? (
-            <button className="btn btn-outline" onClick={fetchTrailer} disabled={fetching}>
-              {fetching ? <Icon.Spinner size={15} /> : <Icon.Download size={15} />} Fetch Trailer
-            </button>
-          ) : (
-            <span style={{ color: "var(--text-faint)", fontSize: 13 }}>No trailer available for this game.</span>
-          )}
+          <button className="btn btn-outline" onClick={fetchTrailer} disabled={fetching}>
+            {fetching ? <Icon.Spinner size={15} /> : <Icon.Download size={15} />} Fetch Trailer
+          </button>
+          <button className="btn btn-ghost btn-sm" style={{ marginLeft: 8 }} onClick={() => setYtFallback(true)}>
+            <Icon.Play size={13} /> Try YouTube
+          </button>
         </div>
       </div>
     );
@@ -92,15 +108,22 @@ export function TrailerBlock({ game, banner, onPatch }: Props) {
       <div className="gp-section-title"><span className="bar" /> Trailer</div>
       <div className="trailer-block">
         {error ? (
-          // Error state: poster + "unavailable" message
           <div className="trailer-poster" style={poster ? { backgroundImage: `url(${poster})` } : {}}>
             <div className="trailer-error-overlay">
               <Icon.Close size={24} />
               <span>Trailer unavailable</span>
+              <button className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} onClick={() => setYtFallback(true)}>Try YouTube</button>
             </div>
           </div>
+        ) : ytFallback ? (
+          <iframe
+            src={ytEmbed}
+            style={{ width: "100%", height: "100%", border: "none" }}
+            allow="autoplay; encrypted-media"
+            allowFullScreen
+            title={`${game.title} trailer`}
+          />
         ) : playing ? (
-          // Playing: video + mute toggle
           <>
             <video
               ref={videoRef}
@@ -111,7 +134,7 @@ export function TrailerBlock({ game, banner, onPatch }: Props) {
               playsInline
               preload="auto"
               className="trailer-video"
-              onError={() => setError(true)}
+              onError={() => { setError(true); setYtFallback(true); }}
               onPlaying={() => setPlaying(true)}
               onClick={toggleMute}
             />
@@ -121,12 +144,9 @@ export function TrailerBlock({ game, banner, onPatch }: Props) {
             </button>
           </>
         ) : (
-          // Initial: poster + play button
           <div className="trailer-poster" style={poster ? { backgroundImage: `url(${poster})` } : {}} onClick={play}>
             <div className="trailer-play-overlay">
-              <div className="trailer-play-btn">
-                <Icon.Play size={32} />
-              </div>
+              <div className="trailer-play-btn"><Icon.Play size={32} /></div>
               <span className="trailer-play-label">Play Trailer</span>
             </div>
           </div>
