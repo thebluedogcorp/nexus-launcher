@@ -50,31 +50,51 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v4.10.1"
-          $title = "NEXUS v4.10.1 — CRITICAL FIX: Settings → Plugins tab crash (bad JSON escape in 4 plugin descriptions)"
+          $tag = "v4.11.0"
+          $title = "NEXUS v4.11.0 — Removed 8 redundant first-party plugins that duplicated native features + polished UIs for the 4 remaining"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
-          **v4.10.1 — Critical fix for the Settings → Plugins tab crash.**
+          **v4.11.0 — Removed 8 redundant first-party plugins + polished the 4 remaining.**
 
-          **The bug:** Opening Settings and clicking the Plugins tab caused the app to go completely black. The root cause was 4 plugin descriptions in first-party-plugins.ts that contained the escape sequence backslash-backslash-apostrophe (literally 'host\\'s', 'haven\\'t', 'here\\'s', 'you\\'ve', 'game\\'s'). When TypeScript compiled the template literal to a JavaScript string, the double backslash became a single backslash — so the resulting JSON manifest string contained backslash-apostrophe, which is NOT a valid JSON escape sequence. JSON.parse threw 'Bad escaped character in JSON' inside the PluginsTab's useMemo, which crashed the React tree — SettingsPage unmounted, leaving only the dimming overlay (black screen).
+          **Why the removals:** v4.9.0/v4.10.0 shipped 12 first-party plugins, but 8 of them duplicated features already available natively in the app. Shipping redundant plugins is illogical — they bloat the install, confuse users about what the app already does, and waste maintainer effort. v4.11.0 keeps only the 4 plugins that genuinely extend the app with NEW capabilities.
 
-          The bug was present in v4.9.0 (when the 12 first-party plugins were first rewritten with the .plugin-* design system) and v4.10.0. Users on either version would see the Plugins tab crash.
+          **Removed (8 plugins — duplicates of native features):**
+          - theme-studio — duplicates the native ThemeStudio component (topbar Theme Studio button)
+          - custom-dashboard — duplicates the native Library home view (carousel + grid)
+          - game-info-hub — duplicates the native GamePage + GameEditor
+          - library-insights — duplicates the native StatsDashboard (topbar Stats button — shows top played, largest games, totals)
+          - playtime-tracker — duplicates native playtime tracking + StatsDashboard already shows top played
+          - storage-manager — duplicates StatsDashboard largest-games list + GamePage already has Reveal-in-Explorer
+          - launch-profiles — duplicates the native GameEditor which edits launchCommand/executable/installDir per-game
+          - quick-access-overlay — duplicates the native sidebar (All Games / Favorites / Recently Played / Top Rated / Platforms / Shortcuts)
 
-          **The fix:** Replaced every backslash-backslash-apostrophe in the 4 affected plugin strings with a typographic right single quote (U+2019, the curly apostrophe). This is JSON-safe (it's a regular character), HTML-safe (renders as a typographic apostrophe), and visually nicer than a straight quote. The 4 fixed strings:
+          **Kept (4 plugins — genuinely extend the app):**
+          - hello-world 2.0.0 — minimal starter plugin for plugin developers (educational; not a feature duplicate)
+          - command-palette 2.2.0 — Ctrl+K command palette (the app has no native command palette)
+          - backlog-manager 2.0.0 — game-status tracking (Want/Playing/Paused/Completed/Abandoned — the app has no native status tracking)
+          - music-player 2.0.0 — floating mini-player (the app has no native music player)
 
-          - command-palette manifest description: 'Registers commands for the host's command palette...' (was 'host\\'s')
-          - library-insights page mount(): 'A title you haven't played recently...' (was 'haven\\'t')
-          - custom-dashboard page mount(): 'Welcome back — here's what you've been playing.' (was 'here\\'s' + 'you\\'ve')
-          - launch-profiles page mount(): 'Swap profiles from a game's context menu.' (was 'game\\'s')
+          **UI polish on the 4 remaining plugins:**
+          - hello-world: redesigned hero with quick-reference card listing what the plugin demonstrates (registerPage / api.games.list() / api.ui.toast()), loading state with spinner, empty state with icon + call-to-action, per-game platform + developer tags.
+          - command-palette: in-plugin command search filter with clear button, keyboard shortcut chips next to each command (Ctrl+R / Ctrl+F), Recently Played dialog now opens with last-played timestamps, no-results empty state.
+          - backlog-manager: tabbed board with per-status game counts in each tab, clear empty state per status with call-to-action ('Right-click a game in your library and select Set Backlog Status'), per-game platform + developer sub-line, Clear button per game.
+          - music-player: rotating album art (CSS spin animation when playing), progress bar with seek handle + current/total times, queue list with active-track highlight + click-to-select, topbar action opens a 380px mini-player dialog with Copy Track Info action (uses the clipboard API).
 
-          All v4.10.0 functionality is preserved: plugin auto-update system (catalog comparison, 'Update available' badges, 'Check for updates' button, per-row Update action button), installer cache cleanup (auto-sweep on startup + before every download + manual Clean button in Settings → General → Update Cache), all 12 first-party plugins bumped to new minor versions, Lucide icons everywhere (no emojis), broadened HostAPI (topbar/status/commands/settings/dialogs/toasts/network/clipboard/system), per-plugin custom UI panels.
+          **New CSS classes** added to styles.css for the polished UIs:
+          - @keyframes spin (for the rotating album art)
+          - .plugin-empty-sub (secondary line in empty states)
+          - .np-progress-row / .np-progress / .np-progress-fill / .np-time (music player progress bar)
+          - .plugin-list-item.active (active queue item highlight)
+          - .plugin-page kbd / code / strong (keyboard hints + inline code + bold text inside plugin pages)
+          - .plugin-card .plugin-search-box (smaller variant for in-card search)
+          - .plugin-list-text-stack / .plugin-list-sub / .plugin-list-rank (for richer list items)
 
-          Verification: TypeScript zero errors on both Electron tsconfigs. Vite production build succeeded. Reproduced the original crash in a mock-test harness (loaded the built JS in Chromium with a stubbed window.nexus — Settings overlay had 0 children, console.error showed 'SyntaxError: Bad escaped character in JSON at position 151 (line 6 column 51)'). After the fix, the same mock test renders the Plugins tab cleanly: 12 plugin cards + search box + 13 Install buttons + Installed Plugins section + no errors.
+          All v4.10.0/v4.10.1 functionality preserved: plugin auto-update system, installer cache cleanup, Lucide icons (no emojis), broadened HostAPI (topbar/status/commands/settings/dialogs/toasts/network/clipboard/system), per-plugin custom UI panels, library, collections, platform detection, launching, playtime tracking, achievements, overlay, console/desktop mode, real platform logos, intelligent Get button, install detection, game trailers, sidebar collapse, settings tabs.
 
           **Downloads:**
-          - NEXUS-Setup-4.10.1.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-4.10.1.exe — single-file portable build.
+          - NEXUS-Setup-4.11.0.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-4.11.0.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@

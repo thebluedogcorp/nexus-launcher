@@ -2086,3 +2086,68 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{
 .plugin-cleanup-card-btn:hover:not(:disabled){background:var(--surface);border-color:var(--border-strong)}
 .plugin-cleanup-card-btn:disabled{opacity:0.5;cursor:not-allowed}
 .plugin-cleanup-card-btn.danger:hover:not(:disabled){background:rgba(248,113,113,0.1);color:var(--danger);border-color:rgba(248,113,113,0.3)}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   v4.11.0 — Additional plugin CSS for the polished UIs.
+   - @keyframes spin + .np-art rotation (rotating album art when playing)
+   - .plugin-empty-sub (secondary line in empty states)
+   - .np-progress-row / .np-progress / .np-progress-fill / .np-time (music player progress bar)
+   - .plugin-list-item.active (active queue item highlight)
+   - kbd styling inside plugin-page
+   - code styling inside plugin-page
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+
+/* Empty-state sub-line — small, dimmer than the main empty message */
+.plugin-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:32px 16px !important;text-align:center}
+.plugin-empty-sub{font-size:11px;color:var(--text-faint);line-height:1.5;max-width:340px;margin-top:2px}
+.plugin-empty svg,.plugin-empty .icon{color:var(--text-faint);margin-bottom:6px;opacity:0.5}
+
+/* Music player progress bar — used by the Now Playing card + mini-player dialog */
+.np-progress-row{display:flex;align-items:center;gap:8px;margin-top:8px}
+.np-progress{flex:1;min-width:0;height:4px;border-radius:2px;background:rgba(255,255,255,0.08);overflow:hidden}
+.np-progress-fill{height:100%;border-radius:2px;background:var(--accent);transition:width var(--t-fast)}
+.np-time{font-size:10px;color:var(--text-faint);font-variant-numeric:tabular-nums;flex-shrink:0;min-width:24px}
+.np-time:first-child{text-align:left}
+.np-time:last-child{text-align:right}
+
+/* Active queue item — highlighted when current track */
+.plugin-list-item.active{background:rgba(var(--accent-rgb),0.08);border-color:rgba(var(--accent-rgb),0.28)}
+.plugin-list-item.active:hover{background:rgba(var(--accent-rgb),0.12)}
+.plugin-list-item.active .plugin-list-text{color:var(--text)}
+
+/* Keyboard hints + inline code — used inside plugin-page descriptions */
+.plugin-page kbd{display:inline-block;padding:1px 6px;border-radius:4px;background:var(--surface-2);
+  border:1px solid var(--border-2);font-family:"Cascadia Code",Consolas,monospace;font-size:11px;
+  color:var(--text);box-shadow:0 1px 0 var(--border-strong);margin:0 2px}
+.plugin-page code{font-family:"Cascadia Code",Consolas,monospace;font-size:11px;color:var(--accent);
+  background:rgba(var(--accent-rgb),0.08);padding:1px 5px;border-radius:3px}
+.plugin-page strong{color:var(--text);font-weight:700}
+
+/* Plugin search box — make it work inside plugin-card (smaller variant) */
+.plugin-card .plugin-search-box{flex:1;min-width:0;padding:6px 10px;border-radius:8px;margin-top:8px}
+.plugin-card .plugin-search-box input{font-size:12px}
+
+/* Plugin-list-text-stack — already defined, just emphasize the active state */
+.plugin-list-text-stack{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.plugin-list-sub{font-size:10.5px;color:var(--text-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Plugin-list-rank — for numbered lists (used by hello-world) */
+.plugin-list-rank{width:22px;text-align:center;font-size:13px;font-weight:700;color:var(--accent);flex-shrink:0;
+  font-variant-numeric:tabular-nums}
+
+/* Plugin-btn primary hover (more pronounced) */
+.plugin-btn.primary:hover:not(:disabled){filter:brightness(1.1);box-shadow:0 4px 12px -4px rgba(var(--accent-rgb),0.4)}
+
+/* Plugin-list-item click affordance (when clickable) */
+.plugin-list-item.clickable{cursor:pointer}
+.plugin-list-item.clickable:hover{background:rgba(var(--accent-rgb),0.06);border-color:rgba(var(--accent-rgb),0.2)}
+
+/* Plugin-card-desc with line clamp (so long descriptions don't push other content) */
+.plugin-card-desc{font-size:12px;color:var(--text-dim);line-height:1.5;margin:0 0 8px;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+  word-break:break-word;overflow-wrap:break-word}
+
+/* Plugin-input-row inside a plugin-card — make buttons align nicely */
+.plugin-card .plugin-input-row{margin-top:8px;flex-wrap:wrap}
