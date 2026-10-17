@@ -1,0 +1,11 @@
+{
+  "id": "theme-studio",
+  "name": "Theme Studio",
+  "version": "1.0.0",
+  "author": "NEXUS",
+  "description": "Customize colors, backgrounds, gradients, glass effects, and typography. Apply presets or fine-tune every CSS variable.",
+  "apiVersion": 1,
+  "entry": "index.js",
+  "permissions": ["ui:pages", "ui:sidebar", "theme", "storage"],
+  "icon": "🎨"
+}

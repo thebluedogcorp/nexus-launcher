@@ -1,0 +1,11 @@
+{
+  "id": "quick-access-overlay",
+  "name": "Quick Access Overlay",
+  "version": "1.0.0",
+  "author": "NEXUS",
+  "description": "A floating panel with shortcuts to games, tools, and actions. Press Ctrl+Space to toggle.",
+  "apiVersion": 1,
+  "entry": "index.js",
+  "permissions": ["ui:sidebar", "games:read", "events"],
+  "icon": "⚡"
+}

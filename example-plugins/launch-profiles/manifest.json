@@ -1,0 +1,11 @@
+{
+  "id": "launch-profiles",
+  "name": "Launch Profiles",
+  "version": "1.0.0",
+  "author": "NEXUS",
+  "description": "Save per-game launch arguments, working directories, and selectable profiles like Default, Performance, and Debug.",
+  "apiVersion": 1,
+  "entry": "index.js",
+  "permissions": ["ui:pages", "ui:sidebar", "games:read", "storage"],
+  "icon": "🚀"
+}

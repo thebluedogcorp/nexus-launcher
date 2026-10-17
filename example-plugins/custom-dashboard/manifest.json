@@ -1,0 +1,11 @@
+{
+  "id": "custom-dashboard",
+  "name": "Custom Dashboard",
+  "version": "1.0.0",
+  "author": "NEXUS",
+  "description": "A personalized home page with recently played games, favorites, library stats, and quick actions.",
+  "apiVersion": 1,
+  "entry": "index.js",
+  "permissions": ["ui:pages", "ui:sidebar", "games:read"],
+  "icon": "🏠"
+}

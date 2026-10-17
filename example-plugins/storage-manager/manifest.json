@@ -1,0 +1,11 @@
+{
+  "id": "storage-manager",
+  "name": "Storage Manager",
+  "version": "1.0.0",
+  "author": "NEXUS",
+  "description": "Display installed game sizes, installation locations, and available disk space with folder shortcuts.",
+  "apiVersion": 1,
+  "entry": "index.js",
+  "permissions": ["ui:pages", "ui:sidebar", "games:read"],
+  "icon": "💾"
+}

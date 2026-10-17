@@ -1,0 +1,11 @@
+{
+  "id": "playtime-tracker",
+  "name": "Playtime Tracker",
+  "version": "1.0.0",
+  "author": "NEXUS",
+  "description": "Track sessions, total playtime, most-played games, and personal milestones with charts.",
+  "apiVersion": 1,
+  "entry": "index.js",
+  "permissions": ["ui:pages", "ui:sidebar", "games:read", "storage", "events"],
+  "icon": "⏱️"
+}

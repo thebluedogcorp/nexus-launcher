@@ -1,0 +1,11 @@
+{
+  "id": "backlog-manager",
+  "name": "Backlog Manager",
+  "version": "1.0.0",
+  "author": "NEXUS",
+  "description": "Organize games into Want to Play, Playing, Paused, Completed, and Abandoned. Add personal notes and priorities.",
+  "apiVersion": 1,
+  "entry": "index.js",
+  "permissions": ["ui:pages", "ui:sidebar", "games:read", "storage"],
+  "icon": "📋"
+}

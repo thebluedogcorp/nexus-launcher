@@ -1,0 +1,11 @@
+{
+  "id": "music-player",
+  "name": "Music Player",
+  "version": "1.0.0",
+  "author": "NEXUS",
+  "description": "Play local audio files, manage playlists, and display album artwork with a compact player.",
+  "apiVersion": 1,
+  "entry": "index.js",
+  "permissions": ["ui:pages", "ui:sidebar", "storage"],
+  "icon": "🎵"
+}

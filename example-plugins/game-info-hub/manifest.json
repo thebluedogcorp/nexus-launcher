@@ -1,0 +1,11 @@
+{
+  "id": "game-info-hub",
+  "name": "Game Information Hub",
+  "version": "1.0.0",
+  "author": "NEXUS",
+  "description": "Browse game details, trailers, screenshots, release info, genres, and developer info in a dedicated page.",
+  "apiVersion": 1,
+  "entry": "index.js",
+  "permissions": ["ui:pages", "ui:sidebar", "games:read"],
+  "icon": "ℹ️"
+}
