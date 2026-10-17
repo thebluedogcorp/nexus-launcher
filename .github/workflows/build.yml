@@ -50,57 +50,41 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v4.9.0"
-          $title = "NEXUS v4.9.0 — Plugin system UI overhaul: Lucide icons, fixed Installed Plugins word-wrap, broadened HostAPI (topbar/status/commands/settings/dialogs/toasts/network/clipboard/system), per-plugin custom UI"
+          $tag = "v4.10.0"
+          $title = "NEXUS v4.10.0 — Plugin auto-update system + installer cache cleanup (answers 'where does the installer go?') + all 12 first-party plugins bumped"
           $notes = @"
           NEXUS — Universal Game Launcher for Windows.
 
-          **v4.9.0 — Plugin system UI overhaul + broadened HostAPI.**
+          **v4.10.0 — Plugin auto-update + installer cache cleanup.**
 
-          **1. Emojis replaced with Lucide icons.** Every first-party plugin (12 total) now references a Lucide icon by NAME ('music', 'rocket', 'palette', ...) instead of embedding emojis. New PluginIcon.tsx registry whitelists ~130 Lucide names; plugins call api.ui.icon('name', size) to get inline SVG for innerHTML composition. Sidebar items, topbar actions, status indicators, gallery cards, installed rows, dialog chrome — all use real icons from the icon library. No emojis anywhere.
+          **1. Plugin auto-update system.** When NEXUS ships a newer first-party plugin catalog (via the embedded FIRST_PARTY_PLUGINS constant in the renderer), users running an OLDER installed version now get an upgrade path. The Plugins tab auto-checks for updates on mount, shows an amber 'N updates' pill in the header, a 'Check for updates' button in the toolbar, and a 'v1.X.0 available' badge + Update action button on each outdated installed row. Clicking Update overwrites the manifest + entry .js in place — the per-plugin data.json + meta status + enabledAt are PRESERVED, so an enabled plugin stays enabled after the update (no re-enable required).
 
-          **2. Fixed the broken Installed Plugins layout.** The previous Installed Plugins row used flex with no word-break on the description and joined all permissions into one long string that overflowed horizontally. Now uses flex items-start + min-w-0 + flex-col body; descriptions have overflow-wrap:break-word, word-break:break-word, hyphens:auto, line-clamp:2. Each permission renders as its own chip that wraps naturally. Status badge is a colored pill (.status-enabled=accent, .status-error=danger, etc.). Settings + toggle + remove actions are 30x30 square buttons with Lucide icons.
+          **2. Installer cache cleanup (answers the question: 'where does the installer go?').** When NEXUS auto-updates, it downloads the NSIS installer to %TEMP%\NEXUS-Update-Setup.exe (~85 MB). After the install runs, the downloaded .exe was LEFT BEHIND in %TEMP% — taking up disk space on every update cycle. Over a few months this could pile up to several GB. v4.10.0 fixes this in three places:
 
-          **3. Broadened HostAPI — 6 new UI surfaces + 3 new host services.** Plugins can now register their own custom UI in extraordinary ways:
+          - On startup: NEXUS silently sweeps %TEMP% for any NEXUS-Update-Setup.exe, nexus-update.part, NEXUS-Setup-*.exe, or NEXUS-Portable-*.exe files and deletes them. Best-effort, never blocks the launch.
+          - Before every new download: cleanup runs again so the new download doesn't fight an old leftover of the same name.
+          - Manual: Settings → General → Update Cache card shows the current cache size + file count + a one-click Clean button.
 
-          New UI surfaces:
-          - ui:topbar — add buttons to the topbar (registerTopbarAction)
-          - ui:statusbar — add live widgets to the topbar (registerStatusIndicator — renders into a small host-provided container)
-          - ui:commands — register command palette entries (registerCommand) invokable via Ctrl+K
-          - ui:settings — register a per-plugin settings panel (registerSettingsPanel) shown in Settings -> Plugins
-          - ui:dialogs — open modal dialogs with custom bodies (openDialog with bodyHTML or bodyRender callback)
-          - ui:toasts — show toast notifications via api.ui.toast({type,title,desc})
+          **3. All 12 first-party plugins bumped to new minor versions.** Users who installed the v4.9.0 versions will now see 'Update available' badges on every installed plugin. New versions:
 
-          New host services:
-          - network.fetch(url, opts) — host-proxied HTTP(S) requests with 15s timeout + scheme validation (refuses file://, data:)
-          - clipboard.readText / writeText — read + write the system clipboard
-          - system.openExternal(url) + system.showItemInFolder(path) — open URLs in browser, reveal files in Explorer
+          - hello-world 1.2.0 → 1.3.0
+          - library-insights 1.4.0 → 1.5.0
+          - theme-studio 2.0.0 → 2.1.0
+          - custom-dashboard 1.1.0 → 1.2.0
+          - command-palette 2.0.0 → 2.1.0
+          - backlog-manager 1.3.0 → 1.4.0
+          - playtime-tracker 1.4.0 → 1.5.0
+          - storage-manager 1.2.0 → 1.3.0
+          - music-player 1.5.0 → 1.6.0
+          - launch-profiles 1.1.0 → 1.2.0
+          - game-info-hub 1.3.0 → 1.4.0
+          - quick-access-overlay 1.2.0 → 1.3.0
 
-          The plugin-runtime creates the HostAPI per-plugin, gates every method by manifest.permissions, and dispatches toast/dialog requests as window CustomEvents that App.tsx listens for + renders in React (consistent styling).
-
-          **4. Per-plugin custom UI.** Plugins register pages with mount(container) + unmount(container). The host provides shared CSS classes (.plugin-page, .plugin-hero, .plugin-stat-grid, .plugin-stat, .plugin-card, .plugin-list, .plugin-list-item, .plugin-btn, .plugin-input, .plugin-tabs, .plugin-swatch, .plugin-now-playing) so plugins compose beautiful UI with classnames instead of inline styles. The SettingsPage PluginsTab now has a per-plugin settings button that expands the row to reveal the plugin's registered settings panel inline.
-
-          **5. Redesigned PluginsTab in Settings.** Search box (with clear button) + category chips (Productivity/Library/Customization/Media/Utilities). Featured section using FeaturedPluginCard (larger card with featured strip, 44x44 icon tile, accent gradient header, name + tagline, Installed badge). Browse All section using PluginGalleryCard (240px min cards with 36x36 accent-tinted icon, 3-line description with proper word-break, permission chips, accent Install button). Installed Plugins section using InstalledPluginRow — the previously-broken layout, now fixed with proper flex + break-word + line-clamp + discrete permission chips + status pill + per-plugin settings expand.
-
-          **6. 12 first-party plugins rewritten.** Every plugin's mount(c) function composes the new .plugin-* CSS design system + uses api.ui.icon('name', size) for inline SVG. Examples:
-          - library-insights: 6-stat grid + Game of the Day card
-          - theme-studio: 8-swatch palette + live --accent edit + registerSettingsPanel preset picker
-          - command-palette: registers 4 commands via api.ui.registerCommand + opens a sample dialog with api.ui.openDialog
-          - backlog-manager: tabbed status view + registerGameCardAction + 5 registerCommand calls
-          - playtime-tracker: page + registerTopbarAction + registerStatusIndicator (live total in topbar)
-          - storage-manager: largest installs + api.system.showItemInFolder to reveal in Explorer + status indicator
-          - music-player: page + registerTopbarAction that opens a mini-player dialog + clipboard.writeText on 'Copy Track Info'
-          - launch-profiles: storage-backed profiles + game-card action + clipboard.writeText
-          - game-info-hub: search filter + api.network.fetch('https://httpbin.org/get?game=...') as a live network demo
-          - quick-access-overlay: topbar action that opens a quick-access dialog with recent games + quick actions
-          - hello-world: load-games button + toast on success
-          - custom-dashboard: recently-played + favorites lists
-
-          All existing functionality preserved: library, collections, platform detection, launching, playtime tracking, achievements, overlay, Theme Studio, console/desktop mode, real platform logos, intelligent Get button, install detection, game trailers, sidebar collapse, settings tabs.
+          All existing functionality preserved: Lucide icons (no emojis), fixed Installed Plugins word-wrap layout, broadened HostAPI (topbar / status / commands / settings / dialogs / toasts / network / clipboard / system), per-plugin custom UI panels, 12 first-party plugins using the .plugin-* CSS design system + api.ui.icon(), library, collections, platform detection, launching, playtime tracking, achievements, overlay, Theme Studio, console/desktop mode, real platform logos, intelligent Get button, install detection, game trailers, sidebar collapse, settings tabs.
 
           **Downloads:**
-          - NEXUS-Setup-4.9.0.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-4.9.0.exe — single-file portable build.
+          - NEXUS-Setup-4.10.0.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-4.10.0.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@
