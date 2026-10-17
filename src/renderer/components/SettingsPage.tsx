@@ -47,6 +47,7 @@ const OVERLAY_FEATURES = [
 
 export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props) {
   // Local form state — synced to db + localStorage on Save
+  const [rawgApiKey, setRawgApiKey] = useState(initial.rawgApiKey ?? "");
   const [autoScan, setAutoScan] = useState(initial.autoScanOnStart);
   const [defaultSort, setDefaultSort] = useState<SortKey>(initial.defaultSort);
   const [scanPaths, setScanPaths] = useState(initial.scanPaths);
@@ -165,7 +166,7 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
       localStorage.setItem("nx-uimode", uiMode);
       applyAccent(accentColor);
       await onSave({
-        autoScanOnStart: autoScan, defaultSort, scanPaths, launchOnStartup, closeBehavior, uiMode,
+        rawgApiKey, autoScanOnStart: autoScan, defaultSort, scanPaths, launchOnStartup, closeBehavior, uiMode,
         // v4.3.0 — persist platform visibility (pipe-separated) + sidebar collapse default
         hiddenPlatforms: Array.from(hiddenPlatforms).join("|"),
         sidebarCollapsed: localStorage.getItem("nx-plat-collapsed") === "1",
@@ -214,6 +215,24 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
             {/* ===== GENERAL TAB ===== */}
             {tab === "general" && (
               <>
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />RAWG API Key</div>
+                  <div className="settings-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 10 }}>
+                    <div className="label-stack">
+                      <div className="t">RAWG API Key</div>
+                      <div className="d">Required for cover art, descriptions, ratings, screenshots, AND game trailers. The built-in default key has expired — get your own free key at <a href="https://rawg.io/apilogin" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", textDecoration: "underline" }}>rawg.io/apilogin</a> (sign up, request a key, paste it below). Without a valid key, no metadata or trailers will be fetched.</div>
+                    </div>
+                    <input
+                      className="field-input"
+                      type="text"
+                      value={rawgApiKey}
+                      onChange={(e) => setRawgApiKey(e.target.value)}
+                      placeholder="Paste your RAWG API key here (e.g. b40b7e…)"
+                      style={{ fontFamily: '"Cascadia Code",Consolas,monospace', fontSize: 12 }}
+                    />
+                  </div>
+                </div>
+
                 <div className="settings-section">
                   <div className="settings-section-title"><span className="bar" />Scanning</div>
                   <div className="settings-row">
@@ -576,7 +595,7 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
                     <div className="logo"><NexusMark size={28} /></div>
                     <div>
                       <div className="name">NEXUS Launcher</div>
-                      <div className="ver">Version 4.6.1 — Universal Game Launcher for Windows</div>
+                      <div className="ver">Version 4.6.2 — Universal Game Launcher for Windows</div>
                       <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 6 }}>
                         Auto-detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox. Patches rich metadata via RAWG + Steam APIs. Launches natively.
                       </div>
