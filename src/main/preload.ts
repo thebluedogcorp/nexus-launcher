@@ -88,6 +88,14 @@ const api = {
     ipcRenderer.on("updater:progress", listener);
     return () => ipcRenderer.removeListener("updater:progress", listener);
   },
+  // v4.10.0 — Installer cache cleanup (Settings → General → Clean up update cache).
+  cleanupInstallers: () => ipcRenderer.invoke("updater:cleanupInstallers") as Promise<{
+    ok: boolean;
+    bytesFreed: number;
+    filesRemoved: string[];
+    message: string;
+  }>,
+  getInstallerCacheInfo: () => ipcRenderer.invoke("updater:getCacheInfo") as Promise<{ bytes: number; files: string[] }>,
   openExternal: (url: string) =>
     ipcRenderer.invoke("shell:openExternal", url) as Promise<{ ok: boolean; message?: string }>,
   openPath: (path: string) =>
@@ -150,6 +158,11 @@ const api = {
   pluginsStorageGet: (id: string, key: string) => ipcRenderer.invoke("plugins:storage:get", id, key) as Promise<unknown>,
   pluginsStorageSet: (id: string, key: string, value: unknown) => ipcRenderer.invoke("plugins:storage:set", id, key, value) as Promise<boolean>,
   pluginsSelectDir: () => ipcRenderer.invoke("plugins:selectDir") as Promise<string | null>,
+  // v4.10.0 — Plugin auto-update.
+  pluginsCheckUpdates: (catalog: Array<{ id: string; version: string; name?: string }>) =>
+    ipcRenderer.invoke("plugins:checkUpdates", catalog) as Promise<{ ok: boolean; updates: Array<{ id: string; name: string; installedVersion: string; latestVersion: string }>; message?: string }>,
+  pluginsUpdateFromCode: (manifestJson: string, entryCode: string) =>
+    ipcRenderer.invoke("plugins:updateFromCode", manifestJson, entryCode) as Promise<InstalledPlugin | { error: string }>,
   // v4.9.0 — Host services exposed to plugins (routed via plugin-runtime.ts).
   pluginsNetworkFetch: (url: string, opts?: {
     method?: "GET" | "POST" | "PUT" | "DELETE";

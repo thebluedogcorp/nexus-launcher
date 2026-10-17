@@ -2031,3 +2031,58 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{
   .plugin-featured-grid,.plugin-gallery-grid{grid-template-columns:1fr}
   .plugin-stat-grid{grid-template-columns:repeat(2,1fr)}
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   v4.10.0 — Plugin Auto-Update + Installer Cleanup UI.
+   - .plugin-update-pill (count badge next to "Plugin Marketplace" header)
+   - .plugin-check-updates-btn (toolbar button)
+   - .plugin-row.upd (installed row with an update available)
+   - .plugin-row-update-badge (per-row "v1.6.0 available" pill)
+   - .plugin-action-btn.update (Update action button)
+   - .plugin-cleanup-card (Settings → General → installer cache card)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.plugin-update-pill{display:inline-flex;align-items:center;gap:4px;margin-left:8px;padding:2px 7px;border-radius:8px;
+  background:rgba(251,191,36,0.18);color:#fbbf24;border:1px solid rgba(251,191,36,0.34);
+  font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;vertical-align:middle}
+
+.plugin-check-updates-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:9px;
+  border:1px solid var(--border-2);background:var(--surface-2);color:var(--text-dim);
+  font-size:11px;font-weight:600;cursor:pointer;transition:all var(--t-fast)}
+.plugin-check-updates-btn:hover:not(:disabled){background:var(--surface);color:var(--text);border-color:var(--border-strong)}
+.plugin-check-updates-btn:disabled{opacity:0.6;cursor:wait}
+.plugin-check-updates-btn svg{flex-shrink:0}
+
+/* Installed row with an update available — subtle amber accent */
+.plugin-row.upd{border-color:rgba(251,191,36,0.36);background:rgba(251,191,36,0.04)}
+.plugin-row.upd:hover{background:rgba(251,191,36,0.06)}
+.plugin-row-update-badge{display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:5px;
+  background:rgba(251,191,36,0.16);color:#fbbf24;border:1px solid rgba(251,191,36,0.32);
+  font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em}
+.plugin-row-update-badge svg{flex-shrink:0}
+
+.plugin-action-btn.update{display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 12px;border-radius:7px;
+  border:1px solid rgba(251,191,36,0.42);background:rgba(251,191,36,0.16);color:#fbbf24;
+  font-size:11px;font-weight:700;cursor:pointer;transition:all var(--t-fast)}
+.plugin-action-btn.update:hover:not(:disabled){background:rgba(251,191,36,0.28);border-color:rgba(251,191,36,0.55)}
+.plugin-action-btn.update:disabled{opacity:0.65;cursor:wait}
+.plugin-action-btn.update span{font-size:11px;line-height:1}
+
+/* Installer cache cleanup card (Settings → General → Clean up update cache) */
+.plugin-cleanup-card{display:flex;align-items:center;gap:14px;padding:12px 14px;border-radius:10px;
+  background:rgba(255,255,255,0.02);border:1px solid var(--border);transition:all var(--t-fast)}
+.plugin-cleanup-card:hover{border-color:var(--border-2);background:var(--surface-2)}
+.plugin-cleanup-card-icon{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+  background:rgba(var(--accent-rgb),0.12);color:var(--accent);flex-shrink:0}
+.plugin-cleanup-card-body{flex:1;min-width:0}
+.plugin-cleanup-card-title{font-size:13px;font-weight:700;color:var(--text)}
+.plugin-cleanup-card-desc{font-size:11px;color:var(--text-dim);margin-top:2px;line-height:1.45;
+  overflow-wrap:break-word;word-break:break-word}
+.plugin-cleanup-card-actions{display:flex;gap:6px;align-items:center;flex-shrink:0}
+.plugin-cleanup-card-size{font-size:11px;font-weight:700;color:var(--accent);tabular-nums:true}
+.plugin-cleanup-card-btn{padding:7px 14px;border-radius:7px;border:1px solid var(--border-2);
+  background:var(--surface-2);color:var(--text);font-size:11px;font-weight:600;cursor:pointer;
+  transition:all var(--t-fast)}
+.plugin-cleanup-card-btn:hover:not(:disabled){background:var(--surface);border-color:var(--border-strong)}
+.plugin-cleanup-card-btn:disabled{opacity:0.5;cursor:not-allowed}
+.plugin-cleanup-card-btn.danger:hover:not(:disabled){background:rgba(248,113,113,0.1);color:var(--danger);border-color:rgba(248,113,113,0.3)}

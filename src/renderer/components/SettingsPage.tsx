@@ -277,6 +277,12 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
                     <div className="field-hint"><Icon.Info size={12} /><span>One path per line. NEXUS probes these during a deep filesystem scan in addition to detected platform libraries.</span></div>
                   </div>
                 </div>
+
+                {/* v4.10.0 — Installer cache cleanup */}
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />Update Cache</div>
+                  <InstallerCleanupCard flash={flash} />
+                </div>
               </>
             )}
 
@@ -729,17 +735,70 @@ function PluginsTab({ flash }: { flash: (type: "info" | "success" | "error", msg
   const [plugins, setPlugins] = useState<InstalledPlugin[]>([]);
   const [loading, setLoading] = useState(true);
   const [installing, setInstalling] = useState<string | null>(null);
+  const [updating, setUpdating] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [cat, setCat] = useState<string>("all");
   // v4.9.0 — per-plugin settings panel expansion (from registered settingsPanels)
   const [openSettings, setOpenSettings] = useState<string | null>(null);
+  // v4.10.0 — plugin update info: map of id → {installedVersion, latestVersion}
+  const [updates, setUpdates] = useState<Record<string, { installedVersion: string; latestVersion: string }>>({});
+  const [checking, setChecking] = useState(false);
   const { settingsPanels } = usePluginExtensions();
 
   const refresh = async () => {
     try { setPlugins(await window.nexus.pluginsList()); } catch {}
     setLoading(false);
   };
-  useEffect(() => { void refresh(); }, []);
+
+  // v4.10.0 — Build the first-party catalog (id + version + name) from the
+  // embedded FIRST_PARTY_PLUGINS constant, then ask the main process which
+  // installed plugins are outdated. Auto-check on mount + on user demand.
+  const checkForUpdates = async (silent = false) => {
+    setChecking(true);
+    try {
+      const catalog = FIRST_PARTY_PLUGINS.map((fp) => {
+        const m = JSON.parse(fp.manifest);
+        return { id: m.id, version: m.version, name: m.name };
+      });
+      const res = await window.nexus.pluginsCheckUpdates(catalog);
+      const map: Record<string, { installedVersion: string; latestVersion: string }> = {};
+      for (const u of res.updates) {
+        map[u.id] = { installedVersion: u.installedVersion, latestVersion: u.latestVersion };
+      }
+      setUpdates(map);
+      if (!silent) {
+        if (res.updates.length === 0) flash("success", "All plugins are up to date");
+        else flash("info", `${res.updates.length} plugin update${res.updates.length === 1 ? "" : "s"} available`);
+      }
+    } catch (e) {
+      if (!silent) flash("error", `Update check failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    setChecking(false);
+  };
+
+  useEffect(() => {
+    void refresh();
+    void checkForUpdates(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const updatePlugin = async (fp: typeof FIRST_PARTY_PLUGINS[0]) => {
+    setUpdating(fp.id);
+    try {
+      const result = await window.nexus.pluginsUpdateFromCode(fp.manifest, fp.code);
+      if ("error" in result) {
+        flash("error", `Update failed: ${result.error}`);
+      } else {
+        await reloadPlugins();
+        flash("success", `Updated ${result.manifest.name} to v${result.manifest.version}`);
+        void refresh();
+        void checkForUpdates(true);
+      }
+    } catch (e) {
+      flash("error", `Update failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    setUpdating(null);
+  };
 
   const installFromDir = async () => {
     const dir = await window.nexus.pluginsSelectDir();
@@ -796,18 +855,25 @@ function PluginsTab({ flash }: { flash: (type: "info" | "success" | "error", msg
 
   const featured = filtered.filter((m) => m.featured);
   const standard = filtered.filter((m) => !m.featured);
+  const updateCount = Object.keys(updates).length;
 
   if (loading) return <div style={{ padding: 40, textAlign: "center", color: "var(--text-faint)" }}>Loading…</div>;
 
   const installedIds = new Set(plugins.map((p) => p.manifest.id));
-  // Map of pluginId → enabled state (so gallery can show "enabled" badge)
   const enabledIds = new Set(plugins.filter((p) => p.status === "enabled").map((p) => p.manifest.id));
 
   return (
     <>
-      {/* ===== Gallery Header (search + filter) ===== */}
+      {/* ===== Gallery Header (search + filter + check-for-updates) ===== */}
       <div className="settings-section plugin-gallery-head">
-        <div className="settings-section-title"><span className="bar" />Plugin Marketplace</div>
+        <div className="settings-section-title">
+          <span className="bar" />Plugin Marketplace
+          {updateCount > 0 && (
+            <span className="plugin-update-pill" title={`${updateCount} plugin update${updateCount === 1 ? "" : "s"} available`}>
+              <Icon.Refresh size={10} /> {updateCount} update{updateCount === 1 ? "" : "s"}
+            </span>
+          )}
+        </div>
         <div className="plugin-gallery-head-row">
           <div className="plugin-search-box">
             <Icon.Search size={14} />
@@ -821,6 +887,10 @@ function PluginsTab({ flash }: { flash: (type: "info" | "success" | "error", msg
               </button>
             ))}
           </div>
+          <button className="plugin-check-updates-btn" onClick={() => checkForUpdates(false)} disabled={checking} title="Check for plugin updates">
+            {checking ? <Icon.Spinner size={12} /> : <Icon.Refresh size={12} />}
+            {checking ? "Checking…" : "Check for updates"}
+          </button>
         </div>
       </div>
 
@@ -876,8 +946,14 @@ function PluginsTab({ flash }: { flash: (type: "info" | "success" | "error", msg
                 key={p.manifest.id}
                 plugin={p}
                 hasSettings={settingsPanels.some((sp) => sp.pluginId === p.manifest.id)}
+                updateInfo={updates[p.manifest.id]}
+                updating={updating === p.manifest.id}
                 onToggle={() => void toggle(p)}
                 onRemove={() => void remove(p)}
+                onUpdate={async () => {
+                  const fp = FIRST_PARTY_PLUGINS.find((f) => f.id === p.manifest.id);
+                  if (fp) await updatePlugin(fp);
+                }}
                 onOpenSettings={() => setOpenSettings(openSettings === p.manifest.id ? null : p.manifest.id)}
                 settingsOpen={openSettings === p.manifest.id}
                 settingsExt={settingsPanels.find((sp) => sp.pluginId === p.manifest.id)}
@@ -984,11 +1060,14 @@ function FeaturedPluginCard(props: Parameters<typeof PluginGalleryCard>[0]) {
 }
 
 // ─── v4.9.0 — Row for an installed plugin (fixes the broken word-wrap layout). ─
-function InstalledPluginRow({ plugin, hasSettings, onToggle, onRemove, onOpenSettings, settingsOpen, settingsExt }: {
+function InstalledPluginRow({ plugin, hasSettings, updateInfo, updating, onToggle, onRemove, onUpdate, onOpenSettings, settingsOpen, settingsExt }: {
   plugin: InstalledPlugin;
   hasSettings: boolean;
+  updateInfo?: { installedVersion: string; latestVersion: string };
+  updating: boolean;
   onToggle: () => void;
   onRemove: () => void;
+  onUpdate: () => void;
   onOpenSettings: () => void;
   settingsOpen: boolean;
   settingsExt?: import("@shared/plugin-types").SettingsPanelExtension;
@@ -996,15 +1075,20 @@ function InstalledPluginRow({ plugin, hasSettings, onToggle, onRemove, onOpenSet
   const m = plugin.manifest;
   const accent = m.accent || "var(--accent)";
   return (
-    <div className={`plugin-row ${plugin.status === "enabled" ? "on" : ""} ${plugin.status === "error" ? "err" : ""}`}>
+    <div className={`plugin-row ${plugin.status === "enabled" ? "on" : ""} ${plugin.status === "error" ? "err" : ""} ${updateInfo ? "upd" : ""}`}>
       <div className="plugin-row-icon" style={{ background: `${accent}1a`, color: accent }}>
         <PluginIcon name={m.icon} size={18} />
       </div>
       <div className="plugin-row-body">
         <div className="plugin-row-title">
           <span className="plugin-row-name">{m.name}</span>
-          <span className="plugin-row-ver">v{m.version}</span>
+          <span className="plugin-row-ver">v{updateInfo ? updateInfo.installedVersion : m.version}</span>
           <span className={`plugin-row-status status-${plugin.status}`}>{plugin.status}</span>
+          {updateInfo && (
+            <span className="plugin-row-update-badge" title={`Update available — v${updateInfo.installedVersion} → v${updateInfo.latestVersion}`}>
+              <Icon.Refresh size={9} /> v{updateInfo.latestVersion} available
+            </span>
+          )}
         </div>
         <div className="plugin-row-desc">{m.description}</div>
         <div className="plugin-row-meta">
@@ -1018,6 +1102,12 @@ function InstalledPluginRow({ plugin, hasSettings, onToggle, onRemove, onOpenSet
         {plugin.error && <div className="plugin-row-error"><Icon.Info size={11} /> {plugin.error}</div>}
       </div>
       <div className="plugin-row-actions">
+        {updateInfo && (
+          <button className="plugin-action-btn update" onClick={onUpdate} disabled={updating} title={`Update to v${updateInfo.latestVersion}`}>
+            {updating ? <Icon.Spinner size={13} /> : <Icon.Refresh size={13} />}
+            <span>{updating ? "Updating…" : "Update"}</span>
+          </button>
+        )}
         {hasSettings && (
           <button className="plugin-action-btn" onClick={onOpenSettings} title="Plugin settings">
             <Icon.Settings size={14} />
@@ -1045,4 +1135,67 @@ function PluginSettingsPanel({ ext }: { ext: import("@shared/plugin-types").Sett
     return () => { try { ext.unmount?.(el); } catch { /* ignore */ } };
   }, [ext]);
   return <div className="plugin-settings-panel" ref={ref} />;
+}
+
+// v4.10.0 — Installer cache cleanup card. Shows how much disk space old update
+// installers are taking in %TEMP% (each NEXUS-Setup-*.exe is ~85 MB, left
+// behind after every auto-update), with a one-click Clean button + auto-cleanup
+// on startup (handled by src/main/index.ts).
+function InstallerCleanupCard({ flash }: { flash: (type: "info" | "success" | "error", msg: string) => void }) {
+  const [info, setInfo] = useState<{ bytes: number; files: string[] }>({ bytes: 0, files: [] });
+  const [cleaning, setCleaning] = useState(false);
+
+  const refresh = async () => {
+    try { setInfo(await window.nexus.getInstallerCacheInfo()); } catch { /* ignore */ }
+  };
+  useEffect(() => { void refresh(); }, []);
+
+  const formatSize = (b: number) => {
+    if (b === 0) return "0 MB";
+    const mb = b / (1024 * 1024);
+    if (mb < 1) return (b / 1024).toFixed(0) + " KB";
+    if (mb < 1024) return mb.toFixed(1) + " MB";
+    return (mb / 1024).toFixed(2) + " GB";
+  };
+
+  const clean = async () => {
+    setCleaning(true);
+    try {
+      const result = await window.nexus.cleanupInstallers();
+      if (result.ok) {
+        flash("success", result.message || "Cache cleared");
+      } else {
+        flash("error", `Cleanup failed: ${result.message}`);
+      }
+      await refresh();
+    } catch (e) {
+      flash("error", `Cleanup failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    setCleaning(false);
+  };
+
+  return (
+    <div className="plugin-cleanup-card">
+      <div className="plugin-cleanup-card-icon"><Icon.HardDrive size={18} /></div>
+      <div className="plugin-cleanup-card-body">
+        <div className="plugin-cleanup-card-title">Installer cache</div>
+        <div className="plugin-cleanup-card-desc">
+          NEXUS downloads installer .exe files to <code style={{ fontFamily: '"Cascadia Code",Consolas,monospace', fontSize: 11 }}>%TEMP%</code> when checking for app updates — each is ~85 MB and is normally left behind after install. NEXUS auto-sweeps them on startup; you can also clean manually.
+          {info.files.length > 0 && (
+            <div style={{ marginTop: 6 }}>
+              <span style={{ color: "var(--accent)", fontWeight: 700 }}>{formatSize(info.bytes)}</span> across {info.files.length} file{info.files.length === 1 ? "" : "s"}: {info.files.slice(0, 3).join(", ")}{info.files.length > 3 ? ` +${info.files.length - 3} more` : ""}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="plugin-cleanup-card-actions">
+        <button className="plugin-cleanup-card-btn" onClick={() => void refresh()} disabled={cleaning} title="Refresh">
+          <Icon.Refresh size={12} />
+        </button>
+        <button className="plugin-cleanup-card-btn danger" onClick={() => void clean()} disabled={cleaning || info.bytes === 0} title="Delete leftover installer files">
+          {cleaning ? <Icon.Spinner size={12} /> : <Icon.Trash size={12} />} Clean
+        </button>
+      </div>
+    </div>
+  );
 }

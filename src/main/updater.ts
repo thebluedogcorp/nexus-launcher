@@ -15,8 +15,108 @@
 import { app, BrowserWindow } from "electron";
 import type { App } from "electron";
 import { join } from "path";
-import { createWriteStream, existsSync, mkdirSync, unlinkSync, renameSync } from "fs";
+import { createWriteStream, existsSync, mkdirSync, unlinkSync, renameSync, readdirSync, statSync } from "fs";
 import { spawn } from "child_process";
+
+/** Names of files left behind in %TEMP% by previous update cycles. */
+const INSTALLER_CACHE_PATTERNS = [
+  "NEXUS-Update-Setup.exe",
+  "nexus-update.part",
+  "NEXUS-Setup-",      // any leftover NEXUS-Setup-*.exe from interrupted installs
+  "NEXUS-Portable-",   // any leftover NEXUS-Portable-*.exe
+];
+
+/**
+ * v4.10.0 — Installer cache cleanup.
+ *
+ * When NEXUS auto-updates, it downloads the latest NSIS installer to
+ * %TEMP%\NEXUS-Update-Setup.exe (~85 MB). After the install runs, the
+ * downloaded .exe is LEFT BEHIND in %TEMP% — taking up disk space on
+ * every update cycle. Over a few months this can pile up to several GB.
+ *
+ * This function scans %TEMP% for leftover NEXUS installer files and deletes
+ * them. It's called:
+ *   - On app startup (best-effort, silent — never blocks the launch).
+ *   - Just before downloading a new update (so the new download doesn't fight
+ *     an old leftover of the same name).
+ *   - On user demand via the Settings → General → "Clean up update cache"
+ *     button.
+ *
+ * Returns the bytes freed + the list of paths removed (for the Settings UI
+ * to display: "Freed 85.2 MB across 1 file").
+ */
+export interface CleanupResult {
+  ok: boolean;
+  bytesFreed: number;
+  filesRemoved: string[];
+  message: string;
+}
+
+export function cleanupInstallerCache(): CleanupResult {
+  const tempDir = app.getPath("temp");
+  const removed: string[] = [];
+  let bytesFreed = 0;
+  try {
+    const entries = readdirSync(tempDir);
+    for (const name of entries) {
+      const matches = INSTALLER_CACHE_PATTERNS.some((p) =>
+        p.endsWith("-") ? name.startsWith(p) : name === p
+      );
+      if (!matches) continue;
+      const full = join(tempDir, name);
+      try {
+        const stat = statSync(full);
+        if (stat.isFile()) {
+          unlinkSync(full);
+          removed.push(name);
+          bytesFreed += stat.size;
+        }
+      } catch {
+        // File might be in use (e.g. installer currently running) — skip.
+      }
+    }
+    const mb = (bytesFreed / (1024 * 1024)).toFixed(1);
+    return {
+      ok: true,
+      bytesFreed,
+      filesRemoved: removed,
+      message: removed.length
+        ? `Freed ${mb} MB across ${removed.length} file${removed.length === 1 ? "" : "s"}`
+        : "No leftover installer files found.",
+    };
+  } catch (e) {
+    return { ok: false, bytesFreed: 0, filesRemoved: [], message: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** Scan %TEMP% for leftover installer files WITHOUT deleting — for the
+ *  Settings UI to show the current cache size before the user clicks Clean. */
+export function getInstallerCacheInfo(): { bytes: number; files: string[] } {
+  const tempDir = app.getPath("temp");
+  let bytes = 0;
+  const files: string[] = [];
+  try {
+    for (const name of readdirSync(tempDir)) {
+      const matches = INSTALLER_CACHE_PATTERNS.some((p) =>
+        p.endsWith("-") ? name.startsWith(p) : name === p
+      );
+      if (!matches) continue;
+      const full = join(tempDir, name);
+      try {
+        const stat = statSync(full);
+        if (stat.isFile()) {
+          bytes += stat.size;
+          files.push(name);
+        }
+      } catch {
+        // ignore
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return { bytes, files };
+}
 
 export interface UpdateResult {
   ok: boolean;
@@ -189,6 +289,16 @@ export async function downloadAndInstallUpdate(
   const tempDir = app.getPath("temp");
   const tmpPath = join(tempDir, "nexus-update.part");
   const finalPath = join(tempDir, "NEXUS-Update-Setup.exe");
+
+  // v4.10.0 — Auto-cleanup of any leftover installer files BEFORE downloading,
+  // so the new download doesn't fight an old leftover of the same name. Also
+  // prevents the user's %TEMP% from accumulating multiple NEXUS-Setup-*.exe
+  // files (each ~85 MB) over repeated updates.
+  try {
+    cleanupInstallerCache();
+  } catch {
+    // Never block the download on cleanup failure.
+  }
 
   try {
     const res = await fetch(downloadUrl, { redirect: "follow" });

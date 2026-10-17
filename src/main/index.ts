@@ -7,6 +7,7 @@ import { app, BrowserWindow, shell, dialog } from "electron";
 import { join } from "path";
 import { existsSync } from "fs";
 import { registerIpc } from "./ipc";
+import { cleanupInstallerCache } from "./updater";
 import { createTray, registerStartupCloseIpc, handleCloseRequest, getIsQuitting, destroyTray } from "./startup-close";
 import { getAllSettings } from "./db";
 import { initOverlay, cleanupOverlay, setActiveGame } from "./overlay";
@@ -124,6 +125,18 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // v4.10.0 — Silent installer-cache cleanup on startup. Auto-update leaves
+  // the downloaded NSIS installer (~85 MB) in %TEMP%; over repeated updates
+  // this piles up to GBs. We sweep on launch so the user never has to think
+  // about it. Best-effort, never blocks the launch.
+  try {
+    const result = cleanupInstallerCache();
+    if (result.filesRemoved.length > 0) {
+      console.log(`[updater] cleaned up ${result.filesRemoved.length} leftover installer file(s) — ${(result.bytesFreed / 1024 / 1024).toFixed(1)} MB freed`);
+    }
+  } catch (e) {
+    console.warn("[updater] startup cleanup failed:", e instanceof Error ? e.message : String(e));
+  }
   try {
     registerIpc();
   } catch (err) {

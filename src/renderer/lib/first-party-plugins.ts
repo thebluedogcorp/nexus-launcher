@@ -28,7 +28,7 @@ export const FIRST_PARTY_PLUGINS: FirstPartyPlugin[] = [
     manifest: `{
   "id": "hello-world",
   "name": "Hello World",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "author": "NEXUS",
   "description": "A minimal starter plugin that adds a Hello World page. Demonstrates page registration, the games API, and toasts.",
   "apiVersion": 1,
@@ -87,7 +87,7 @@ export default function plugin(api) {
     manifest: `{
   "id": "library-insights",
   "name": "Library Insights",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "author": "NEXUS",
   "description": "An insights dashboard with library totals, top-rated games, largest installs, and a personal Game of the Day recommendation.",
   "apiVersion": 1,
@@ -171,7 +171,7 @@ export default function plugin(api) {
     manifest: `{
   "id": "theme-studio",
   "name": "Theme Studio",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "author": "NEXUS",
   "description": "Customize your accent color live, switch between preset themes, and apply accent tints to cards. Includes a settings panel for presets.",
   "apiVersion": 1,
@@ -248,7 +248,7 @@ export default function plugin(api) {
     manifest: `{
   "id": "custom-dashboard",
   "name": "Custom Dashboard",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": "NEXUS",
   "description": "A personalized home page showing recently played games, your favorites, and quick stats — replaces the default landing.",
   "apiVersion": 1,
@@ -296,7 +296,7 @@ export default function plugin(api) {
     manifest: `{
   "id": "command-palette",
   "name": "Command Palette",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "author": "NEXUS",
   "description": "Registers commands for the host\\'s command palette — search games, switch pages, and execute actions with Ctrl+K.",
   "apiVersion": 1,
@@ -356,7 +356,7 @@ export default function plugin(api) {
     manifest: `{
   "id": "backlog-manager",
   "name": "Backlog Manager",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "author": "NEXUS",
   "description": "Organize games into Want to Play, Playing, Paused, Completed, and Abandoned. Set status from a game card or via commands.",
   "apiVersion": 1,
@@ -430,7 +430,7 @@ export default function plugin(api) {
     manifest: `{
   "id": "playtime-tracker",
   "name": "Playtime Tracker",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "author": "NEXUS",
   "description": "Live playtime tracking — adds a topbar status widget, a “Most Played” dashboard, and per-session logs.",
   "apiVersion": 1,
@@ -496,7 +496,7 @@ export default function plugin(api) {
     manifest: `{
   "id": "storage-manager",
   "name": "Storage Manager",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "author": "NEXUS",
   "description": "Display installed game sizes, installation locations, and available free space. Reveal install folders in Explorer with one click.",
   "apiVersion": 1,
@@ -565,7 +565,7 @@ export default function plugin(api) {
     manifest: `{
   "id": "music-player",
   "name": "Music Player",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "author": "NEXUS",
   "description": "A floating music player — adds a topbar button that opens a mini-player dialog. Supports playlists, volume, and play/pause/skip controls.",
   "apiVersion": 1,
@@ -633,7 +633,7 @@ export default function plugin(api) {
     manifest: `{
   "id": "launch-profiles",
   "name": "Launch Profiles",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": "NEXUS",
   "description": "Save per-game launch arguments, working directories, and selected launchers. Quick-swap profiles from a game card.",
   "apiVersion": 1,
@@ -692,7 +692,7 @@ export default function plugin(api) {
     manifest: `{
   "id": "game-info-hub",
   "name": "Game Information Hub",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "author": "NEXUS",
   "description": "Browse game details, trailers, screenshots, release info, genre stats, and live metadata. Lookup via the network API.",
   "apiVersion": 1,
@@ -761,7 +761,7 @@ export default function plugin(api) {
     manifest: `{
   "id": "quick-access-overlay",
   "name": "Quick Access Overlay",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "author": "NEXUS",
   "description": "Adds a topbar button that opens a floating panel with shortcuts to games, tools, and actions. Demonstrates ui:topbar + ui:dialogs.",
   "apiVersion": 1,

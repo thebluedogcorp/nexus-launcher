@@ -49,6 +49,7 @@ import { resolveStoreLinks } from "./downloads/stores";
 import {
   listPlugins, installPlugin, installPluginFromCode, enablePlugin, disablePlugin, removePlugin,
   readPluginEntry, markPluginError, getPluginData, setPluginData,
+  checkPluginUpdates, updatePluginFromCode,
 } from "./plugins/manager";
 import type {
   DetectedGame,
@@ -279,6 +280,25 @@ export function registerIpc(): void {
     }
   });
 
+  // v4.10.0 — Installer cache cleanup (manual, from Settings → General).
+  ipcMain.handle("updater:cleanupInstallers", async () => {
+    try {
+      const { cleanupInstallerCache } = await import("./updater");
+      return cleanupInstallerCache();
+    } catch (e) {
+      return { ok: false, bytesFreed: 0, filesRemoved: [], message: e instanceof Error ? e.message : String(e) };
+    }
+  });
+
+  ipcMain.handle("updater:getCacheInfo", async () => {
+    try {
+      const { getInstallerCacheInfo } = await import("./updater");
+      return getInstallerCacheInfo();
+    } catch {
+      return { bytes: 0, files: [] };
+    }
+  });
+
   // ===== Utilities =====
   ipcMain.handle("platform:info", () => null);
 
@@ -417,6 +437,27 @@ export function registerIpc(): void {
     const { dialog } = await import("electron");
     const result = await dialog.showOpenDialog({ properties: ["openDirectory"], title: "Select a plugin directory" });
     return result.canceled ? null : result.filePaths[0];
+  });
+
+  // v4.10.0 — Plugin auto-update. The renderer passes the embedded
+  // FIRST_PARTY_PLUGINS catalog (id + version pairs); main compares against
+  // the installed versions and returns the outdated list. Update itself uses
+  // updatePluginFromCode() which preserves data.json + meta across the bump.
+  ipcMain.handle("plugins:checkUpdates", (_e, catalog: Array<{ id: string; version: string; name?: string }>) => {
+    try {
+      return { ok: true, updates: checkPluginUpdates(catalog ?? []) };
+    } catch (e) {
+      return { ok: false, updates: [], message: e instanceof Error ? e.message : String(e) };
+    }
+  });
+
+  ipcMain.handle("plugins:updateFromCode", (_e, manifestJson: string, entryCode: string) => {
+    try {
+      const result = updatePluginFromCode(manifestJson, entryCode);
+      return result;
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : String(e) };
+    }
   });
 
   // v4.9.0 — Host services for plugins.

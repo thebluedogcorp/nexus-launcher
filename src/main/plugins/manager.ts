@@ -134,3 +134,100 @@ export function setPluginData(id: string, key: string, value: unknown): void {
   d[key] = value;
   writeFileSync(f, JSON.stringify(d, null, 2));
 }
+
+// ─── v4.10.0 — Plugin auto-update system ─────────────────────────────────
+// When the app ships a NEWER first-party plugin catalog (via the
+// FIRST_PARTY_PLUGINS constant in the renderer), users running an OLDER
+// installed version need an upgrade path. We expose:
+//   - checkPluginUpdates(catalog): returns the list of installed plugins
+//     whose installed version < catalog version.
+//   - updatePluginFromCode(manifestJson, entryCode): removes the old version
+//     (if any) + writes the new manifest + entry code + re-enables. Preserves
+//     the per-plugin data.json (so user settings aren't lost).
+
+export interface PluginUpdateInfo {
+  id: string;
+  name: string;
+  installedVersion: string;
+  latestVersion: string;
+}
+
+/** Compare semver strings. Returns >0 if a > b, <0 if a < b, 0 if equal. */
+function compareSemver(a: string, b: string): number {
+  const pa = (a || "0").split(".").map((x) => parseInt(x, 10) || 0);
+  const pb = (b || "0").split(".").map((x) => parseInt(x, 10) || 0);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    const va = pa[i] || 0;
+    const vb = pb[i] || 0;
+    if (va !== vb) return va - vb;
+  }
+  return 0;
+}
+
+/**
+ * Given the renderer's first-party catalog (an array of {id, version}), return
+ * the list of installed first-party plugins whose catalog version is newer
+ * than the installed version. The renderer passes the catalog because the
+ * catalog is a renderer-side constant (FIRST_PARTY_PLUGINS in
+ * first-party-plugins.ts) — keeps the catalog in one place.
+ */
+export function checkPluginUpdates(
+  catalog: Array<{ id: string; version: string; name?: string }>,
+): PluginUpdateInfo[] {
+  const installed = listPlugins();
+  const out: PluginUpdateInfo[] = [];
+  for (const cat of catalog) {
+    const inst = installed.find((p) => p.manifest.id === cat.id);
+    if (!inst) continue;
+    if (compareSemver(cat.version, inst.manifest.version) > 0) {
+      out.push({
+        id: cat.id,
+        name: cat.name ?? inst.manifest.name,
+        installedVersion: inst.manifest.version,
+        latestVersion: cat.version,
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * Update an installed first-party plugin to a new version (from new manifest
+ * + entry code). Removes the old version's files (manifest + entry .js) but
+ * PRESERVES the per-plugin data.json + .meta.json's status (so an enabled
+ * plugin stays enabled after the update).
+ */
+export function updatePluginFromCode(manifestJson: string, entryCode: string): InstalledPlugin {
+  const manifest = JSON.parse(manifestJson) as PluginManifest;
+  if (!manifest || !manifest.id) throw new Error("Invalid manifest.");
+  const v = validateManifest(manifest);
+  if (!v.ok) throw new Error(v.error);
+  const dest = pluginDir(manifest.id);
+  if (!existsSync(dest)) {
+    // Not installed yet — fall back to install.
+    return installPluginFromCode(manifestJson, entryCode);
+  }
+  // Preserve the per-plugin meta (status + enabled-at) + data.json across the update.
+  const preservedMeta = readMeta(manifest.id) ?? { status: "enabled" as PluginStatus, installedAt: new Date().toISOString(), enabledAt: null };
+  const preservedStatus: PluginStatus = preservedMeta.status === "error" ? "enabled" : preservedMeta.status;
+  const preservedEnabledAt = preservedMeta.enabledAt;
+  const preservedInstalledAt = preservedMeta.installedAt;
+
+  // Overwrite manifest + entry file in place. The data.json is untouched.
+  writeFileSync(join(dest, "manifest.json"), manifestJson);
+  writeFileSync(join(dest, manifest.entry), entryCode);
+  writeMeta(manifest.id, {
+    status: preservedStatus,
+    installedAt: preservedInstalledAt,
+    enabledAt: preservedEnabledAt,
+    error: undefined,
+  });
+  return {
+    manifest,
+    status: preservedStatus,
+    dirPath: dest,
+    installedAt: preservedInstalledAt,
+    enabledAt: preservedEnabledAt,
+  };
+}
