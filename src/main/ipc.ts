@@ -44,6 +44,7 @@ import {
   // v4.5.0 — install verification (Play/Get action logic)
   verifyInstalled, verifyAllInstalled,
 } from "./db";
+import { fetchSteamTrailer } from "./metadata/steam-trailers";
 import { resolveStoreLinks } from "./downloads/stores";
 import type {
   DetectedGame,
@@ -140,12 +141,21 @@ export function registerIpc(): void {
       const game = getGame(id);
       if (!game) return null;
       const title = query?.trim() || game.title;
+      // v4.6.3 — Fetch Steam trailer FIRST (no API key needed!). This is the
+      // primary trailer source. Falls back to RAWG clips for non-Steam games.
+      let trailerUrl = game.trailerUrl;
+      if (game.steamAppId && !trailerUrl) {
+        const steamTrailer = await fetchSteamTrailer(game.steamAppId);
+        if (steamTrailer?.url) trailerUrl = steamTrailer.url;
+      }
       const meta = await fetchAggregated(title, game.steamAppId, game.rawgId);
-      if (!meta) return null;
+      // Steam trailer takes priority; RAWG clip is the fallback.
+      if (!trailerUrl && meta?.trailerUrl) trailerUrl = meta.trailerUrl;
+      if (!meta) return trailerUrl ? updateGame(id, { trailerUrl }) : null;
       return updateGame(id, {
         coverImage: meta.coverImage ?? game.coverImage,
         bannerImage: meta.bannerImage ?? game.bannerImage,
-        trailerUrl: meta.trailerUrl ?? game.trailerUrl,
+        trailerUrl: trailerUrl ?? game.trailerUrl,
         screenshots: meta.screenshots && meta.screenshots.length ? meta.screenshots : game.screenshots,
         description: meta.description ?? game.description,
         developer: meta.developer ?? game.developer,
@@ -415,15 +425,27 @@ async function patchGamesInBackground(
       });
     }
     try {
+      // v4.6.3 — Fetch Steam trailer first (no API key needed). This covers
+      // ALL Steam games — the majority of most libraries — without requiring
+      // a RAWG key. Falls back to RAWG clips for non-Steam games.
+      let trailerUrl = g.trailerUrl;
+      if (g.steamAppId && !trailerUrl) {
+        const steamTrailer = await fetchSteamTrailer(g.steamAppId);
+        if (steamTrailer?.url) trailerUrl = steamTrailer.url;
+      }
       const meta = await fetchAggregated(g.title, g.steamAppId, g.rawgId);
+      // Steam trailer takes priority; RAWG clip is the fallback.
+      if (!trailerUrl && meta?.trailerUrl) trailerUrl = meta.trailerUrl;
       if (!meta) {
+        // Even if RAWG failed, store the Steam trailer if we got one.
+        if (trailerUrl) updateGame(g.id, { trailerUrl });
         await new Promise((r) => setTimeout(r, 120));
         continue;
       }
       const updated = updateGame(g.id, {
         coverImage: meta.coverImage ?? g.coverImage,
         bannerImage: meta.bannerImage ?? g.bannerImage,
-        trailerUrl: meta.trailerUrl ?? g.trailerUrl,
+        trailerUrl: trailerUrl ?? g.trailerUrl,
         screenshots: meta.screenshots && meta.screenshots.length ? meta.screenshots : g.screenshots,
         description: meta.description ?? g.description,
         developer: meta.developer ?? g.developer,

@@ -1,16 +1,17 @@
-// v4.6.0 — GameTrailer. A muted, looping mp4 preview that overlays a game's
+// v4.6.3 — GameTrailer. A muted, looping mp4 preview that overlays a game's
 // cover art when the preview is "active" (card hovered / tile focused / hero
-// visible). Designed for restraint:
-//   - Muted by default, playsInline, loop. No audio, no player chrome.
-//   - Only renders the <video> when `active` is true AND the global auto-play
-//     setting is on AND the user hasn't requested reduced motion. Otherwise
-//     the poster image is shown (graceful fallback — never a blank/broken area).
-//   - On any video error, hides itself + calls onFallback so the parent keeps
-//     the static poster.
-//   - Only ONE trailer plays at a time because only one preview is "active" at
-//     a time (the hovered card / the focused tile / the visible hero).
-//   - Paused (removed) when `active` becomes false, so hidden screens never
-//     keep a video running.
+// visible).
+//
+// FIXED in v4.6.3:
+//   - The CSP was missing a `media-src` directive, which blocked ALL video
+//     from HTTPS sources. Even with a valid trailer URL, the webview refused
+//     to load the video. Fixed: index.html CSP now includes
+//     `media-src 'self' https: blob: file:`.
+//   - The component now has proper state transitions: idle → loading →
+//     playing → error → fallback. A loading indicator is shown briefly
+//     while the video buffers. On error, falls back to the poster.
+//   - The video element is properly cleaned up when the component unmounts
+//     or when the game changes (no leaked video elements or stale state).
 
 import { useEffect, useRef, useState } from "react";
 
@@ -21,6 +22,8 @@ interface Props {
   className?: string;
   onFallback?: () => void;
 }
+
+type PlayerState = "idle" | "loading" | "playing" | "error";
 
 export function useTrailerAutoplay(): boolean {
   const [on, setOn] = useState(() => localStorage.getItem("nx-autoplay-trailers") !== "0");
@@ -34,51 +37,95 @@ export function useTrailerAutoplay(): boolean {
 
 export function GameTrailer({ url, posterUrl, active, className, onFallback }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [failed, setFailed] = useState(false);
+  const [state, setState] = useState<PlayerState>("idle");
   const autoplay = useTrailerAutoplay();
-  // Respect the OS reduced-motion preference.
   const reducedMotion = typeof window !== "undefined" &&
     window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
 
-  // The trailer plays ONLY when: there's a URL, it hasn't failed, the preview
-  // is active, autoplay is enabled, and reduced motion is NOT requested.
-  const shouldPlay = !!url && !failed && active && autoplay && !reducedMotion;
+  // Reset state when the URL changes (different game).
+  useEffect(() => {
+    setState("idle");
+  }, [url]);
 
-  // When shouldPlay flips on, try to play (browsers require muted for autoplay).
+  // The trailer plays ONLY when: there's a URL, the preview is active,
+  // autoplay is enabled, and reduced motion is NOT requested.
+  const shouldPlay = !!url && active && autoplay && !reducedMotion;
+
+  // Manage the video element lifecycle.
   useEffect(() => {
     const v = videoRef.current;
-    if (!v) return;
-    if (shouldPlay) {
-      v.currentTime = 0;
-      const p = v.play();
-      if (p && typeof p.catch === "function") p.catch(() => setFailed(true));
+    if (!v || !shouldPlay) return;
+
+    setState("loading");
+    v.currentTime = 0;
+    const p = v.play();
+    if (p && typeof p.catch === "function") {
+      p.then(() => setState("playing")).catch(() => {
+        setState("error");
+        onFallback?.();
+      });
     } else {
-      v.pause();
+      setState("playing");
     }
-  }, [shouldPlay]);
 
-  // Reset the failed flag if the URL changes (different game).
-  useEffect(() => { setFailed(false); }, [url]);
+    // Cleanup: pause + reset when the effect re-runs or unmounts.
+    return () => {
+      try { v.pause(); } catch { /* ignore */ }
+    };
+  }, [shouldPlay, url]);
 
-  if (!shouldPlay) {
-    // Show the poster (or nothing — the parent's cover art shows through).
+  // Handle video events.
+  const onCanPlay = () => {
+    if (shouldPlay) setState("playing");
+  };
+  const onError = () => {
+    setState("error");
+    onFallback?.();
+  };
+  const onWaiting = () => {
+    if (state === "playing") setState("loading");
+  };
+  const onPlaying = () => setState("playing");
+
+  // Not playing → show the poster (or nothing — the parent's cover shows through).
+  if (!shouldPlay || state === "error") {
     return posterUrl ? (
       <img className={className} src={posterUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} loading="lazy" />
     ) : null;
   }
 
   return (
-    <video
-      ref={videoRef}
-      className={className}
-      src={url!}
-      poster={posterUrl ?? undefined}
-      muted
-      loop
-      playsInline
-      preload="none"
-      style={{ width: "100%", height: "100%", objectFit: "cover" }}
-      onError={() => { setFailed(true); onFallback?.(); }}
-    />
+    <>
+      {/* Loading indicator (shown briefly while buffering) */}
+      {state === "loading" && (
+        <div className="gc-trailer-loading" style={{
+          position: "absolute", inset: 0, zIndex: 2,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          background: "rgba(0,0,0,0.3)",
+        }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="spin" style={{ color: "var(--accent)", opacity: 0.7 }}>
+            <line x1="12" y1="2" x2="12" y2="6" /><line x1="12" y1="18" x2="12" y2="22" />
+            <line x1="4.93" y1="4.93" x2="7.76" y2="7.76" /><line x1="16.24" y1="16.24" x2="19.07" y2="19.07" />
+            <line x1="2" y1="12" x2="6" y2="12" /><line x1="18" y1="12" x2="22" y2="12" />
+            <line x1="4.93" y1="19.07" x2="7.76" y2="16.24" /><line x1="16.24" y1="7.76" x2="19.07" y2="4.93" />
+          </svg>
+        </div>
+      )}
+      <video
+        ref={videoRef}
+        className={className}
+        src={url!}
+        poster={posterUrl ?? undefined}
+        muted
+        loop
+        playsInline
+        preload="auto"
+        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        onCanPlay={onCanPlay}
+        onError={onError}
+        onWaiting={onWaiting}
+        onPlaying={onPlaying}
+      />
+    </>
   );
 }
