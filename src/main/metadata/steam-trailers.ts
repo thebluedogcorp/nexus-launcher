@@ -50,6 +50,7 @@ export async function fetchSteamTrailer(
     // the poster shows instead, which is correct graceful degradation).
     const head = await fetch(url, { method: "HEAD", signal: ctrl.signal });
     if (head.ok && (head.headers.get("content-type") ?? "").includes("video")) {
+      console.log(`[trailers] Steam app ${steamAppId}: found trailer ${url.slice(0, 80)}`);
       return { url, poster: movie.thumbnail, name: movie.name };
     }
     // Fallback: try the 480p version.

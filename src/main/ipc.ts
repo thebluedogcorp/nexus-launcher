@@ -236,7 +236,11 @@ export function registerIpc(): void {
     const all = listGames({ showHidden: true });
     // v4.6.0 — also patch games missing a trailer URL (so trailers auto-detect).
     const needPatch = all.filter((g) => !g.bannerImage || !g.trailerUrl);
+    console.log(`[trailers] patchAll: ${all.length} total games, ${needPatch.length} need patching (no banner or no trailer)`);
+    const steamGames = needPatch.filter((g) => g.steamAppId);
+    console.log(`[trailers] ${steamGames.length} of those have a Steam app ID (can fetch Steam trailers without a RAWG key)`);
     const result = await patchGamesInBackground(needPatch.slice(0, 60));
+    console.log(`[trailers] patchAll complete: ${result.patched} patched of ${result.attempted} attempted`);
     return { patched: result.patched, attempted: needPatch.length };
   });
 

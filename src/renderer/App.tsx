@@ -170,9 +170,25 @@ export function App() {
           const upd = await window.nexus.checkForUpdates();
           if (upd.ok && upd.updateAvailable) setUpdateAvailable({ version: upd.version, releaseUrl: upd.releaseUrl, downloadUrl: upd.downloadUrl, downloadSize: upd.downloadSize });
         } catch {}
-        // v4.6.1 — auto-detect trailers for games missing one (background, best-effort).
-        // Runs the enrich-all flow which now also patches games without trailerUrl.
-        try { await window.nexus.patchAllMetadata(); } catch {}
+        // v4.6.3 — auto-detect trailers in the BACKGROUND (not blocking). The
+        // patchAllMetadata call fetches Steam trailers (no key needed) for every
+        // game missing one. It runs AFTER loading so the user can interact
+        // immediately. A toast shows progress.
+        setTimeout(() => {
+          (async () => {
+            try {
+              toast("info", "Fetching game trailers…", "This runs in the background — Steam games get trailers automatically.");
+              const result = await window.nexus.patchAllMetadata();
+              console.log("[trailers] patch complete:", result);
+              if (result.patched > 0) {
+                toast("success", `Trailers fetched for ${result.patched} game${result.patched === 1 ? "" : "s"}`, "Hover a game card to preview.");
+                await refreshGames();
+              }
+            } catch (e) {
+              console.error("[trailers] patch failed:", e);
+            }
+          })();
+        }, 2000);
       } catch (e) {
         toast("error", "Couldn't load library", "The local database may be locked.");
       } finally { setLoading(false); }

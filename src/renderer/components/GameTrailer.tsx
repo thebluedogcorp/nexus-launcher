@@ -42,6 +42,13 @@ export function GameTrailer({ url, posterUrl, active, className, onFallback }: P
   const reducedMotion = typeof window !== "undefined" &&
     window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
 
+  // v4.6.3 — diagnostic logging (visible in DevTools console: View → Toggle Developer Tools).
+  useEffect(() => {
+    if (active) {
+      console.log(`[GameTrailer] active=${active} url=${url ? url.slice(0, 60) + "…" : "null"} autoplay=${autoplay} reducedMotion=${reducedMotion} shouldPlay=${!!url && active && autoplay && !reducedMotion}`);
+    }
+  }, [active, url, autoplay, reducedMotion]);
+
   // Reset state when the URL changes (different game).
   useEffect(() => {
     setState("idle");
