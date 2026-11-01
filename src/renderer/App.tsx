@@ -4,6 +4,8 @@ import { PLATFORM_LIST, PLATFORMS } from "@shared/types";
 import { Icon } from "./components/Icons";
 import { NexusMark } from "./components/Logo";
 import { ModeToggle } from "./components/ModeToggle";
+import { ModeSplash } from "./components/ModeSplash";
+import { EntertainmentView } from "./components/entertainment/EntertainmentView";
 import { PlatformMark } from "./components/PlatformMark";
 import { IconGlyph } from "./components/IconGlyph";
 import { ThemeStudio } from "./components/theme/ThemeStudio";
@@ -37,6 +39,14 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
 ];
 
 export function App() {
+  // v5.0.0 — Top-level app mode: the "Games & Entertainment" startup selector
+  // decides whether the user lands in the game launcher or NEXUS TV. Always
+  // starts on "splash" so the selector shows on every app open.
+  const [appMode, setAppMode] = useState<"splash" | "games" | "tv">("splash");
+  const goSplash = useCallback(() => setAppMode("splash"), []);
+  const goGames = useCallback(() => setAppMode("games"), []);
+  const goTv = useCallback(() => setAppMode("tv"), []);
+
   const [games, setGames] = useState<Game[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [settings, setSettings] = useState<LauncherSettings | null>(null);
@@ -664,6 +674,16 @@ export function App() {
 
   const focusedGame = games[focusedIdx] ?? null;
 
+  // v5.0.0 — Mode selector + Entertainment (NEXUS TV). When the user hasn't
+  // picked a mode yet (or switched back), show the splash; "tv" shows the
+  // OTT-style browse view. Otherwise fall through to the game launcher below.
+  if (appMode === "splash") {
+    return <ModeSplash onChoose={(m) => setAppMode(m)} />;
+  }
+  if (appMode === "tv") {
+    return <EntertainmentView onBackToSplash={goSplash} onSwitchToGames={goGames} />;
+  }
+
   // Game page
   if (pageGame) {
     return (
@@ -1084,8 +1104,11 @@ export function App() {
       {/* Top bar */}
       <header className="topbar">
         <div className="tb-brand">
-          <div className="tb-logo"><NexusMark size={18} /></div>
+          <button className="tb-logo" onClick={goSplash} title="Switch mode" aria-label="Switch mode">{<NexusMark size={18} />}</button>
           <div><div className="tb-name">NEXUS</div><div className="tb-sub">Launcher</div></div>
+          <button className="tb-mode-tv" onClick={goTv} title="Open NEXUS TV (Entertainment)">
+            <Icon.Film size={12} /> TV
+          </button>
         </div>
         <div className="tb-search">
           <span className="icon"><Icon.Search size={15} /></span>

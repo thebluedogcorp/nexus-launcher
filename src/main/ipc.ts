@@ -512,6 +512,66 @@ export function registerIpc(): void {
     }
   });
 
+  // ===== v5.0.0 — TMDB (Entertainment mode) =====
+  // All TMDB calls run in the main process; the renderer goes through IPC.
+  const tmdbWrap = async <T,>(fn: () => Promise<T>): Promise<T | { error: string }> => {
+    try { return await fn(); }
+    catch (e) { return { error: e instanceof Error ? e.message : String(e) }; }
+  };
+  ipcMain.handle("tmdb:trending", () => tmdbWrap(async () => {
+    const { tmdbTrending } = await import("./tmdb");
+    return await tmdbTrending();
+  }));
+  ipcMain.handle("tmdb:popular", (_e, page?: number) => tmdbWrap(async () => {
+    const { tmdbPopular } = await import("./tmdb");
+    return await tmdbPopular(page ?? 1);
+  }));
+  ipcMain.handle("tmdb:topRated", (_e, page?: number) => tmdbWrap(async () => {
+    const { tmdbTopRated } = await import("./tmdb");
+    return await tmdbTopRated(page ?? 1);
+  }));
+  ipcMain.handle("tmdb:nowPlaying", (_e, page?: number) => tmdbWrap(async () => {
+    const { tmdbNowPlaying } = await import("./tmdb");
+    return await tmdbNowPlaying(page ?? 1);
+  }));
+  ipcMain.handle("tmdb:byGenre", (_e, genreId: number, page?: number) => tmdbWrap(async () => {
+    const { tmdbByGenre } = await import("./tmdb");
+    return await tmdbByGenre(genreId, page ?? 1);
+  }));
+  ipcMain.handle("tmdb:search", (_e, query: string) => tmdbWrap(async () => {
+    const { tmdbSearch } = await import("./tmdb");
+    return await tmdbSearch(query);
+  }));
+  ipcMain.handle("tmdb:details", (_e, id: number) => tmdbWrap(async () => {
+    const { tmdbDetails } = await import("./tmdb");
+    return await tmdbDetails(id);
+  }));
+  // v5.0.0 — TV + multi-search + unified details (movie or tv).
+  ipcMain.handle("tmdb:trendingAll", () => tmdbWrap(async () => {
+    const { tmdbTrendingAll } = await import("./tmdb");
+    return await tmdbTrendingAll();
+  }));
+  ipcMain.handle("tmdb:popularTv", (_e, page?: number) => tmdbWrap(async () => {
+    const { tmdbPopularTv } = await import("./tmdb");
+    return await tmdbPopularTv(page ?? 1);
+  }));
+  ipcMain.handle("tmdb:topRatedTv", (_e, page?: number) => tmdbWrap(async () => {
+    const { tmdbTopRatedTv } = await import("./tmdb");
+    return await tmdbTopRatedTv(page ?? 1);
+  }));
+  ipcMain.handle("tmdb:searchMulti", (_e, query: string) => tmdbWrap(async () => {
+    const { tmdbSearchMulti } = await import("./tmdb");
+    return await tmdbSearchMulti(query);
+  }));
+  ipcMain.handle("tmdb:detailsTv", (_e, id: number) => tmdbWrap(async () => {
+    const { tmdbDetailsTv } = await import("./tmdb");
+    return await tmdbDetailsTv(id);
+  }));
+  ipcMain.handle("tmdb:detailsAny", (_e, mediaType: "movie" | "tv", id: number) => tmdbWrap(async () => {
+    const { tmdbDetailsAny } = await import("./tmdb");
+    return await tmdbDetailsAny(mediaType, id);
+  }));
+
   // ===== Achievements =====
   ipcMain.handle("achievements:list", () => getAchievements());
   ipcMain.handle("achievements:unlock", (_e, id: string) => {
