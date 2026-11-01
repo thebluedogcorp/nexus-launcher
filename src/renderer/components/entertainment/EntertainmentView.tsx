@@ -11,6 +11,7 @@ import { NexusMark } from "../Logo";
 import { EntHero } from "./EntHero";
 import { EntCarousel } from "./EntCarousel";
 import { EntDetailDialog } from "./EntDetailDialog";
+import { EntPlayer } from "./EntPlayer";
 import {
   asItems,
   asMovies,
@@ -28,6 +29,8 @@ export function EntertainmentView({ onBackToSplash, onSwitchToGames }: Props) {
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const [selected, setSelected] = useState<{ mediaType: TmdbMediaType; id: number } | null>(null);
+  // v5.1.0 — Full-screen CineSrc player state.
+  const [watching, setWatching] = useState<{ mediaType: TmdbMediaType; id: number; title: string; numberOfSeasons: number | null } | null>(null);
 
   // Browse data
   const [trending, setTrending] = useState<TmdbItem[]>([]);
@@ -95,6 +98,11 @@ export function EntertainmentView({ onBackToSplash, onSwitchToGames }: Props) {
     setSelected({ mediaType, id });
   const closeDetail = () => setSelected(null);
 
+  // v5.1.0 — Launch the full-screen CineSrc player.
+  const watch = (mediaType: TmdbMediaType, id: number, title: string, numberOfSeasons: number | null = null) =>
+    setWatching({ mediaType, id, title, numberOfSeasons });
+  const closePlayer = () => setWatching(null);
+
   const heroItems = useMemo(() => trending.slice(0, 8), [trending]);
 
   return (
@@ -147,6 +155,7 @@ export function EntertainmentView({ onBackToSplash, onSwitchToGames }: Props) {
               items={heroItems}
               loading={browseLoading}
               onOpen={openDetail}
+              onWatch={(mt, id, title) => watch(mt, id, title)}
               onBackToSplash={onBackToSplash}
             />
             <div className="ent-rails">
@@ -168,8 +177,8 @@ export function EntertainmentView({ onBackToSplash, onSwitchToGames }: Props) {
           <strong>NEXUS TV</strong> · <span className="ent-foot-dim">Metadata by TMDB</span>
         </div>
         <div className="ent-foot-meta">
+          <span><Icon.Play size={11} /> Full movie &amp; TV streaming</span>
           <span><Icon.Film size={11} /> Trailer playback</span>
-          <span><Icon.Play size={11} /> Movies &amp; TV</span>
           <span><Icon.Shield size={11} /> Read-only API</span>
         </div>
       </footer>
@@ -179,7 +188,17 @@ export function EntertainmentView({ onBackToSplash, onSwitchToGames }: Props) {
         mediaType={selected?.mediaType ?? null}
         id={selected?.id ?? null}
         onClose={closeDetail}
+        onWatch={(mt, id, title, numberOfSeasons) => watch(mt, id, title, numberOfSeasons)}
         isTvHint={selected?.mediaType === "tv"}
+      />
+
+      <EntPlayer
+        open={watching !== null}
+        mediaType={watching?.mediaType ?? "movie"}
+        tmdbId={watching?.id ?? 0}
+        title={watching?.title ?? ""}
+        numberOfSeasons={watching?.numberOfSeasons ?? null}
+        onClose={closePlayer}
       />
     </div>
   );

@@ -19,11 +19,13 @@ interface DetailDialogProps {
   mediaType: TmdbMediaType | null;
   id: number | null;
   onClose: () => void;
+  /** v5.1.0 — Launch the full-screen CineSrc player. */
+  onWatch: (mediaType: TmdbMediaType, id: number, title: string, numberOfSeasons: number | null) => void;
   /** Extra label hint when the details shape is TV (the IPC returns a movie-shape). */
   isTvHint?: boolean;
 }
 
-export function EntDetailDialog({ open, mediaType, id, onClose, isTvHint }: DetailDialogProps) {
+export function EntDetailDialog({ open, mediaType, id, onClose, onWatch, isTvHint }: DetailDialogProps) {
   const [detail, setDetail] = useState<TmdbMovieDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -129,9 +131,15 @@ export function EntDetailDialog({ open, mediaType, id, onClose, isTvHint }: Deta
             <>
               {/* Action row */}
               <div className="ent-modal-actions">
+                <button
+                  className="ent-btn ent-btn-primary"
+                  onClick={() => onWatch(mediaType ?? "movie", detail.id, detail.title, detail.numberOfSeasons ?? null)}
+                >
+                  <Icon.Play size={15} /> Watch Now
+                </button>
                 {trailerKey && !playing && (
-                  <button className="ent-btn ent-btn-primary" onClick={() => setPlaying(true)}>
-                    <Icon.Play size={15} /> Play Trailer
+                  <button className="ent-btn ent-btn-ghost" onClick={() => setPlaying(true)}>
+                    <Icon.Film size={15} /> Play Trailer
                   </button>
                 )}
                 {trailerKey && playing && (

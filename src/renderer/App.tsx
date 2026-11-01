@@ -718,8 +718,11 @@ export function App() {
         {/* Top bar */}
         <header className="topbar">
           <div className="tb-brand">
-            <div className="tb-logo"><NexusMark size={18} /></div>
+            <button className="tb-logo" onClick={goSplash} title="Switch mode" aria-label="Switch mode"><NexusMark size={18} /></button>
             <div><div className="tb-name">NEXUS</div><div className="tb-sub">Launcher</div></div>
+            <button className="tb-mode-tv" onClick={goTv} title="Open NEXUS TV (Entertainment)">
+              <Icon.Film size={12} /> TV
+            </button>
           </div>
           <div className="tb-search">
             <span className="icon"><Icon.Search size={15} /></span>

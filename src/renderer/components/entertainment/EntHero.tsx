@@ -10,12 +10,13 @@ interface HeroProps {
   items: TmdbItem[];
   loading: boolean;
   onOpen: (mediaType: "movie" | "tv", id: number) => void;
+  onWatch: (mediaType: "movie" | "tv", id: number, title: string) => void;
   onBackToSplash: () => void;
 }
 
 const HERO_COUNT = 5;
 
-export function EntHero({ items, loading, onOpen, onBackToSplash }: HeroProps) {
+export function EntHero({ items, loading, onOpen, onWatch, onBackToSplash }: HeroProps) {
   const heroes = items.filter(i => i.backdropPath && i.overview).slice(0, HERO_COUNT);
   const [idx, setIdx] = useState(0);
 
@@ -82,8 +83,8 @@ export function EntHero({ items, loading, onOpen, onBackToSplash }: HeroProps) {
         <p className="ent-hero-overview">{cur.overview}</p>
 
         <div className="ent-hero-actions">
-          <button className="ent-btn ent-btn-primary" onClick={() => onOpen(mediaType, cur.id)}>
-            <Icon.Play size={16} /> Play Trailer
+          <button className="ent-btn ent-btn-primary" onClick={() => onWatch(mediaType, cur.id, cur.title)}>
+            <Icon.Play size={16} /> Watch Now
           </button>
           <button className="ent-btn ent-btn-ghost" onClick={() => onOpen(mediaType, cur.id)}>
             <Icon.Info size={16} /> More Info

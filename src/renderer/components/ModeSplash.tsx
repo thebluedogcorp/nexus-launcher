@@ -87,14 +87,14 @@ export function ModeSplash({ onChoose }: Props) {
             <div className="splash-card-name">Entertainment</div>
             <div className="splash-card-desc">
               NEXUS TV — browse trending, popular, and top-rated movies &amp;
-              series. Watch trailers, explore cast + credits, and find where
-              to stream.
+              series. Watch full films &amp; episodes instantly, explore cast
+              + credits, and find where to stream.
             </div>
             <ul className="splash-card-feats">
+              <li><span className="dot tv" />Full streaming playback</li>
               <li><span className="dot tv" />Trending &amp; popular</li>
-              <li><span className="dot tv" />Top rated &amp; upcoming</li>
-              <li><span className="dot tv" />Multi-search</li>
-              <li><span className="dot tv" />Trailer playback</li>
+              <li><span className="dot tv" />Top rated &amp; search</li>
+              <li><span className="dot tv" />Trailers + cast</li>
             </ul>
             {collage.length > 0 && (
               <div className="splash-card-preview">

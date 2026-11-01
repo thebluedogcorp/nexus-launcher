@@ -2534,3 +2534,56 @@ button.tb-logo:active{transform:scale(0.97)}
 /* Ent buttons as anchors (homepage/imdb links) */
 a.ent-btn{text-decoration:none;display:inline-flex;align-items:center;gap:6px;height:40px;padding:0 16px;
   border-radius:var(--r-md);font-size:13px;font-weight:700}
+
+/* ===== v5.1.0 — Full-screen CineSrc player ===== */
+.ent-player-overlay{position:fixed;inset:0;z-index:300;display:flex;flex-direction:column;
+  background:#000;animation:ent-fade-in var(--t-base)}
+.ent-player-bar{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:10px 16px;background:rgba(0,0,0,0.92);border-bottom:1px solid var(--border);
+  backdrop-filter:blur(8px);flex-wrap:wrap}
+.ent-player-bar-left{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-width:0}
+.ent-player-badge{flex-shrink:0;padding:3px 8px;border-radius:var(--r-sm);
+  background:rgba(var(--ent-rgb),0.15);color:#fb7185;border:1px solid rgba(var(--ent-rgb),0.3);
+  font-size:10px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase}
+.ent-player-title{font-size:15px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;max-width:340px}
+.ent-player-se{display:flex;align-items:center;gap:6px;margin-left:4px}
+.ent-player-se-group{display:inline-flex;align-items:center;gap:4px;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--r-md);padding:2px 8px 2px 6px}
+.ent-player-se-group span{font-size:10px;font-weight:800;color:var(--text-faint);letter-spacing:0.04em}
+.ent-player-se-group select,.ent-player-se-group input{background:none;border:none;outline:none;
+  color:#fff;font-size:12px;font-weight:600;width:48px;cursor:pointer}
+.ent-player-se-group select option{background:#0c0c0e;color:#fff}
+.ent-player-se-group input::-webkit-inner-spin-button,.ent-player-se-group input::-webkit-outer-spin-button{
+  -webkit-appearance:none;margin:0}
+.ent-player-se-group input{-moz-appearance:textfield}
+.ent-player-prev,.ent-player-next{display:flex;align-items:center;justify-content:center;width:26px;height:26px;
+  border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface);color:var(--text-dim);
+  cursor:pointer;transition:background var(--t-fast),color var(--t-fast)}
+.ent-player-prev:hover:not(:disabled),.ent-player-next:hover:not(:disabled){background:var(--surface-2);color:#fff}
+.ent-player-prev:disabled{opacity:0.4;cursor:not-allowed}
+.ent-player-prev svg{transform:rotate(180deg)}
+.ent-player-bar-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.ent-player-link{display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 12px;
+  border-radius:var(--r-md);border:1px solid var(--border);background:var(--surface);color:var(--text-dim);
+  font-size:12px;font-weight:600;text-decoration:none;transition:background var(--t-fast),color var(--t-fast)}
+.ent-player-link:hover{background:var(--surface-2);color:#fff}
+.ent-player-close{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;
+  border:1px solid var(--border-2);background:rgba(244,63,94,0.12);color:#fb7185;cursor:pointer;
+  transition:background var(--t-fast),transform var(--t-fast)}
+.ent-player-close:hover{background:rgba(244,63,94,0.22);transform:scale(1.06)}
+
+.ent-player-stage{flex:1;position:relative;overflow:hidden;background:#000}
+.ent-player-stage iframe{width:100%;height:100%;border:none;display:block}
+
+.ent-player-foot{flex-shrink:0;display:flex;align-items:center;gap:8px;padding:8px 16px;
+  background:rgba(0,0,0,0.92);border-top:1px solid var(--border);font-size:11px;color:var(--text-faint)}
+.ent-player-foot-dot{width:6px;height:6px;border-radius:50%;background:var(--ent);flex-shrink:0;
+  box-shadow:0 0 8px rgba(var(--ent-rgb),0.6)}
+
+/* Detail dialog: add a runtime note + status row polish (v5.1.0) */
+.ent-modal-meta-grid .ent-meta-item .ent-meta-value{white-space:normal;overflow:visible}
+
+/* Hero Watch Now button gets a subtle glow */
+.ent-btn-primary{box-shadow:0 6px 20px -6px rgba(255,255,255,0.3)}
+.ent-btn-primary:hover{box-shadow:0 8px 26px -6px rgba(255,255,255,0.4)}

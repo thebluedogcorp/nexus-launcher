@@ -50,48 +50,47 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v5.0.0"
-          $title = "NEXUS v5.0.0 — Games & Entertainment: new startup mode selector + NEXUS TV (OTT-style movie/TV browse powered by TMDB)"
+          $tag = "v5.1.0"
+          $title = "NEXUS v5.1.0 — Full streaming playback (CineSrc) + fixed desktop-mode mode switching"
           $notes = @"
           NEXUS — Universal Game Launcher & Entertainment Hub for Windows.
 
-          **v5.0.0 — Games & Entertainment. A whole new mode.**
+          **v5.1.0 — Watch full movies & TV shows inside NEXUS TV, plus desktop-mode mode-switch fix.**
 
-          NEXUS now opens with a full-screen **Games & Entertainment** selector. Pick how you want to spend your time:
+          **New: full streaming playback via CineSrc.**
+          NEXUS TV can now play full movies and TV episodes — not just trailers. Click **Watch Now** on the hero or in any detail dialog and a full-screen player opens, embedding the CineSrc stream for that title.
 
-          - **Games** — the game launcher you know: library, collections, playtime, achievements, stats, store, plugins, themes.
-          - **Entertainment** — **NEXUS TV**: an OTT-style movie + TV browse experience powered by TMDB.
+          - **CineSrc** (cinesrc.st) is a free streaming API that indexes embeddable streams against TMDB IDs. Since NEXUS TV already uses TMDB IDs, playback is a direct embed — no scraping, no file hosting, no extra lookups.
+          - **Movie URL**: cinesrc.st/embed/movie/{tmdbId}
+          - **TV URL**: cinesrc.st/embed/tv/{tmdbId}?season={s}&episode={e}
+          - The embed pages return 200 with no X-Frame-Options, so they iframe cleanly inside the app.
+          - CSP frame-src extended to allow https://cinesrc.st (+ wildcard). connect-src stays locked — all TMDB API calls still go via main-process IPC.
 
-          **NEXUS TV (Entertainment mode):**
-          - Cinematic hero banner cycling the week's trending titles (auto-advancing, with Play Trailer / More Info).
-          - Six poster rails: Trending Now, Now Playing in Theaters, Popular Movies, Popular TV Series, Top Rated Movies, Top Rated TV Series.
-          - Multi-search across movies + TV (debounced, filters out people + poster-less results).
-          - Detail dialog: backdrop or click-to-play YouTube trailer, title + tagline, rating/year/runtime badges, overview, genres, top cast (profile photos), watch providers (stream/rent/buy via JustWatch), Homepage + IMDb deep links.
-          - Hover-reveal poster cards with rating + media-type chips, scroll-arrow rails, skeleton loaders.
+          **Full-screen player (EntPlayer):**
+          - Top bar: title, media-type badge, and for TV a **season + episode selector** (season dropdown populated from TMDB number_of_seasons; episode input; prev/next buttons). Changing the selector re-targets the iframe live without re-mounting the overlay.
+          - Open-in-browser link, close button, Esc-to-close.
+          - Footer disclaimer: NEXUS does not host or store any video — streams are indexed by CineSrc against TMDB IDs.
 
-          **TMDB integration (security):**
-          - All TMDB API calls run in the MAIN process (Node) via new IPC channels (tmdb:trendingAll / popular / topRated / nowPlaying / popularTv / topRatedTv / byGenre / search / searchMulti / details / detailsTv / detailsAny). The renderer never contacts api.themoviedb.org, so the CSP connect-src stays locked down.
-          - TMDB images load under the existing https: img-src; trailers embed under the existing YouTube frame-src (youtube-nocookie.com). No CSP changes needed.
-          - 12s upstream timeout, error-envelope wrapping, normalized movie + TV item shapes, unified details dispatcher.
+          **Detail dialog:**
+          - New primary **Watch Now** button (opens the player) alongside **Play Trailer** (YouTube) and Watchlist/Homepage/IMDb links.
+          - TMDB TV details now carry numberOfSeasons + numberOfEpisodes so the player's season dropdown is accurate.
 
-          **Mode switching:**
-          - The NEXUS logo in the games topbar is now clickable — returns to the selector.
-          - A new TV pill button in the games topbar jumps straight to NEXUS TV.
-          - NEXUS TV has a back arrow + a Games button + a Switch-mode link in the hero.
-          - The selector always shows on app open (mode is runtime state, not persisted) — no lock-in.
+          **Hero:**
+          - Netflix-style: **Watch Now** (primary, opens player) + **More Info** (opens detail dialog).
 
-          **Files added:**
-          - src/main/tmdb.ts — TMDB service (movie + TV endpoints, unified details, watch providers, trailer-key picker).
-          - src/renderer/components/ModeSplash.tsx — startup selector with cinematic trending collage.
-          - src/renderer/components/entertainment/EntertainmentView.tsx + EntHero.tsx + EntCarousel.tsx + EntDetailDialog.tsx.
-          - src/renderer/lib/tmdb-types.ts — renderer types + image/rating/runtime helpers.
-          - ~380 lines of CSS (splash + NEXUS TV design system, scoped rose accent for entertainment identity).
+          **Bug fix — desktop-mode mode switching:**
+          - The clickable NEXUS logo + TV pill button were missing from the **desktop** UI-mode topbar (only the console/PS5 topbar had them). Once you switched to Entertainment from desktop mode there was no way back to Games from the games topbar in desktop layout. v5.1.0 adds the clickable logo + TV pill to the desktop topbar too, so mode switching works identically in both layouts.
 
-          All v4.11.0 functionality preserved: 4 first-party plugins, plugin auto-update, installer cache cleanup, library, collections, platform detection, launching, playtime tracking, achievements, overlay, console/desktop mode, themes.
+          **Polish:**
+          - Splash Entertainment card copy updated to advertise full streaming.
+          - NEXUS TV footer reflects full streaming + trailer playback.
+          - Player, hero, and detail-dialog button styling refined (Watch Now glow, consistent badges).
+
+          All v5.0.0 functionality preserved: Games & Entertainment selector, NEXUS TV browse (hero + 6 carousels + multi-search + detail dialog), TMDB IPC in main process, mode switching, library, collections, platform detection, launching, playtime, achievements, overlay, console/desktop mode, themes, 4 first-party plugins.
 
           **Downloads:**
-          - NEXUS-Setup-5.0.0.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-5.0.0.exe — single-file portable build.
+          - NEXUS-Setup-5.1.0.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-5.1.0.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@

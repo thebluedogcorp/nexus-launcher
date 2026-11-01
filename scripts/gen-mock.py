@@ -69,6 +69,8 @@ STUB = r"""
         { providerId: 119, providerName: "Amazon Prime", logoPath: "/8ghg7yKh4xTMutVqUuT5v5i8.jpg" },
       ],
       providerLink: "https://www.justwatch.com",
+      numberOfSeasons: mediaType === "tv" ? 3 : null,
+      numberOfEpisodes: mediaType === "tv" ? 24 : null,
     };
   }
 

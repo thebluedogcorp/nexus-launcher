@@ -56,6 +56,9 @@ export interface TmdbMovieDetails {
   imdbId: string | null;
   providers: TmdbWatchProvider[] | null;
   providerLink: string | null;
+  /** TV only — null for movies. Used by the player's season/episode selector. */
+  numberOfSeasons: number | null;
+  numberOfEpisodes: number | null;
 }
 
 export interface TmdbError {
@@ -106,4 +109,25 @@ export function formatRuntime(minutes: number | null | undefined): string {
 export function formatRating(v: number | null | undefined): string {
   if (v === null || v === undefined) return "—";
   return v.toFixed(1);
+}
+
+/**
+ * CineSrc embed URL — cinesrc.st is a free streaming API that embeds movies &
+ * TV shows by TMDB ID (no scraping; it indexes streams against TMDB IDs).
+ *  - Movie: https://cinesrc.st/embed/movie/{tmdbId}
+ *  - TV:    https://cinesrc.st/embed/tv/{tmdbId}?season={s}&episode={e}
+ * The embed pages return 200 with no X-Frame-Options, so they iframe cleanly.
+ */
+export function cinesrcEmbedUrl(
+  mediaType: "movie" | "tv",
+  tmdbId: number,
+  season?: number,
+  episode?: number,
+): string {
+  if (mediaType === "tv") {
+    const s = Math.max(1, season ?? 1);
+    const e = Math.max(1, episode ?? 1);
+    return `https://cinesrc.st/embed/tv/${tmdbId}?season=${s}&episode=${e}`;
+  }
+  return `https://cinesrc.st/embed/movie/${tmdbId}`;
 }

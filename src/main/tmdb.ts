@@ -211,6 +211,9 @@ export interface TmdbMovieDetails extends TmdbMovie {
   imdbId: string | null;
   providers: TmdbWatchProvider[] | null;
   providerLink: string | null;
+  /** TV only — null for movies. Used by the player's season/episode selector. */
+  numberOfSeasons: number | null;
+  numberOfEpisodes: number | null;
 }
 
 /** Pick the best YouTube trailer key from a TMDB videos list. */
@@ -282,6 +285,8 @@ export async function tmdbDetails(id: number): Promise<TmdbMovieDetails> {
     trailerKey: trailer,
     providers,
     providerLink: usProviders?.link ?? null,
+    numberOfSeasons: null,
+    numberOfEpisodes: null,
   };
 }
 
@@ -357,6 +362,8 @@ export async function tmdbDetailsTv(id: number): Promise<TmdbMovieDetails> {
     trailerKey: trailer,
     providers,
     providerLink: usProviders?.link ?? null,
+    numberOfSeasons: m.number_of_seasons ?? null,
+    numberOfEpisodes: m.number_of_episodes ?? null,
   };
 }
 
