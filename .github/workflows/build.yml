@@ -50,35 +50,36 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v6.4.0"
-          $title = "NEXUS v6.4.0 — Toast notifications, Surprise Me, tactile polish"
+          $tag = "v6.5.0"
+          $title = "NEXUS v6.5.0 — Settings panel, My List badge, Surprise/Settings shortcuts"
           $notes = @"
           NEXUS — Universal Game Launcher & Entertainment Hub for Windows.
 
-          **v6.4.0 — Feedback + serendipity. Toast notifications for every action, a Surprise Me random-pick, and tactile micro-polish.**
+          **v6.5.0 — Preferences + discoverability. A native settings panel, a live My List count badge, and two new keyboard shortcuts.**
 
-          **New: Toast notification system.**
-          A lightweight pub/sub toast store (EntToaster) renders a bottom-left stack of glass toasts with kind-colored icons (success=green, info=rose, error=red). Auto-dismisses after 3.2s, manually dismissible. Wired into: add/remove from My List ("Added 'X' to My List" / "Removed 'X' from My List"), start watching ("Now playing: X"), clear history ("History cleared"), and Surprise Me ("Surprise! Playing X").
+          **New: NEXUS TV Settings panel (press `,` or click the gear icon).**
+          A proper native-app settings modal with three sections:
+          - **Playback**: toggle Hero auto-advance (8s rotation), Reduced motion (disable non-essential animations), NEW release badges.
+          - **Your Library**: live stats — My List count, In Progress count, Recently Viewed count.
+          - **Data**: a "Clear all NEXUS TV data" button that wipes My List + Continue Watching + History + preferences from this PC, with a confirmation toast.
+          Each toggle fires a toast and persists instantly via a new `ent-prefs` store (localStorage).
 
-          **New: Surprise Me.**
-          A gradient callout bar sits between the hero and the rails: "Can't decide? Let NEXUS pick something for you." Click the rose "Surprise Me" button and it picks a random title from trending + popular TV and immediately starts playing it — with a toast confirming the pick. Perfect for indecisive moments.
+          **New: My List count badge.**
+          The My List sidebar button now shows a rose count badge (e.g. "3") when you have saved titles — so you always know at a glance. Updates live as you add/remove items.
 
-          **New icon.**
-          Added `Icon.Shuffle` to the icon set.
+          **New: keyboard shortcuts.**
+          - **s** — Surprise Me (picks a random trending/TV title and starts playing immediately). Works from any view — navigates home first if needed, then fires.
+          - **,** — open Settings.
+          Both are documented in the Keyboard Shortcuts overlay (`?`), which now groups browse shortcuts under "Discover".
 
-          **Polish.**
-          - Rail titles now reveal a short rose underline on hover.
-          - Focused cards (keyboard nav) get an enhanced rose glow ring + soft halo.
-          - Detail-page tagline gets a rose left accent bar.
-          - Provider cards lift 2px on hover with a rose border.
-          - Genre chips get an inset top highlight on active.
-          - Surprise bar stacks vertically on narrow screens.
+          **New stores.**
+          `ent-prefs.ts` — `getPrefs()`, `setPrefs()`, `subscribePrefs()` for reactive preference access.
 
-          All v6.3.0 functionality preserved: keyboard shortcuts overlay (?), Recently Viewed rail, command palette (Ctrl+K), hero manual arrows + Up Next, NEW badges, card sheen, hover preview popovers, Top 10 rail, arrow-key nav, scroll-to-top FAB, view transitions, full CineSrc streaming playback, TMDB IPC in main process, mode switching, library, collections, platform detection, launching, playtime, achievements, overlay, console/desktop mode, themes, 4 first-party plugins.
+          All v6.4.0 functionality preserved: toast notifications, Surprise Me bar, command palette (Ctrl+K), hero manual arrows + Up Next, NEW badges, card sheen, hover preview popovers, Top 10 rail, arrow-key nav, scroll-to-top FAB, view transitions, keyboard shortcuts overlay, Recently Viewed rail, full CineSrc streaming playback, TMDB IPC in main process, mode switching, library, collections, platform detection, launching, playtime, achievements, overlay, console/desktop mode, themes, 4 first-party plugins.
 
           **Downloads:**
-          - NEXUS-Setup-6.4.0.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-6.4.0.exe — single-file portable build.
+          - NEXUS-Setup-6.5.0.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-6.5.0.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@

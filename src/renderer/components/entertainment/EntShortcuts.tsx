@@ -24,11 +24,13 @@ const GROUPS: { group: string; items: Shortcut[] }[] = [
       { keys: ["g"], label: "Switch to Games mode" },
       { keys: ["Esc"], label: "Back / close overlay" },
       { keys: ["?"], label: "Show this shortcuts overlay" },
+      { keys: [","], label: "Open Settings" },
     ],
   },
   {
-    group: "Browse",
+    group: "Discover",
     items: [
+      { keys: ["s"], label: "Surprise Me — play a random title" },
       { keys: ["←", "→"], label: "Move focus across cards" },
       { keys: ["↑", "↓"], label: "Jump to prev/next row" },
       { keys: ["Enter"], label: "Open focused card" },

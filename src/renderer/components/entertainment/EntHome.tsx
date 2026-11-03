@@ -96,6 +96,13 @@ export function EntHome({ progressTick, historyTick, onOpen, onWatch, inList, on
     pushToast(`Surprise! Playing ${pick.title}`, "success", <Icon.Sparkles size={14} />);
   };
 
+  // Listen for the global "nx-surprise" event (triggered by the `s` shortcut).
+  useEffect(() => {
+    const handler = () => surpriseMe();
+    window.addEventListener("nx-surprise", handler);
+    return () => window.removeEventListener("nx-surprise", handler);
+  }); // re-bind every render so surpriseMe closes over the latest trending pool
+
   // Bridge: EntRails expects onWatch(mt, id, title) → adapt to full payload.
   const watchFromCard = (mt: TmdbMediaType, id: number, title: string) => {
     const fromList = trending.find(i => i.id === id && i.mediaType === mt)

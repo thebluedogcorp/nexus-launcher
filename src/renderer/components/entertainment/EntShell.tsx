@@ -16,7 +16,8 @@ import { EntPlayer, type WatchPayload } from "./EntPlayer";
 import { EntCommandPalette, type CmdAction } from "./EntCommandPalette";
 import { EntShortcuts } from "./EntShortcuts";
 import { EntToaster, pushToast } from "./EntToaster";
-import { inList as listHas, toggleList as toggleStore, recordHistory } from "../../lib/ent-store";
+import { EntSettings } from "./EntSettings";
+import { inList as listHas, toggleList as toggleStore, recordHistory, getList } from "../../lib/ent-store";
 import type { TmdbItem, TmdbMediaType } from "../../lib/tmdb-types";
 
 type EntView = "home" | "movies" | "tv" | "mylist" | "search" | "detail";
@@ -37,6 +38,7 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
   // Command palette (Ctrl/Cmd+K) + cached trending titles for fuzzy search.
   const [cmdOpen, setCmdOpen] = useState(false);
   const [scOpen, setScOpen] = useState(false);
+  const [setOpen, setSetOpen] = useState(false);
   const [cmdTitles, setCmdTitles] = useState<TmdbItem[]>([]);
   const [historyTick, setHistoryTick] = useState(0);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -115,6 +117,7 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
   ];
 
   // ── My List helpers (tick re-renders consumers) ──
+  const listCount = listTick >= 0 ? getList().length : 0;
   const inListFn = useCallback((mt: TmdbMediaType, id: number) => listHas(mt, id), [listTick]);
   const toggleListFn = useCallback((item: { mediaType?: TmdbMediaType; id: number; title: string; posterPath?: string | null; rating?: number; year?: string }) => {
     const wasIn = listHas(item.mediaType ?? "movie", item.id);
@@ -166,6 +169,15 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
         else if (view !== "home") go("home");
       } else if ((e.key === "g" || e.key === "G") && !typing) {
         onSwitchToGames();
+      } else if ((e.key === "s" || e.key === "S") && !typing) {
+        // Surprise Me — dispatch a global event EntHome listens for.
+        e.preventDefault();
+        if (view !== "home") { go("home"); requestAnimationFrame(() => window.dispatchEvent(new CustomEvent("nx-surprise"))); }
+        else window.dispatchEvent(new CustomEvent("nx-surprise"));
+      } else if ((e.key === "," || e.key === "<") && !typing) {
+        // Settings (comma — like a gear-ish key).
+        e.preventDefault();
+        setSetOpen(o => !o);
       } else if ((e.key === "ArrowRight" || e.key === "ArrowLeft") && !typing) {
         // Focus-card navigation (gamepad-like). Move between cards in the
         // currently visible rail/grid, scrolling into view as needed.
@@ -246,13 +258,25 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
         {sideBtn(view === "home", "Home", <Icon.Home size={17} />, () => go("home"))}
         {sideBtn(view === "movies", "Movies", <Icon.Film size={17} />, () => go("movies"))}
         {sideBtn(view === "tv", "TV Shows", <Icon.Tv size={17} />, () => go("tv"))}
-        {sideBtn(view === "mylist", "My List", <Icon.Bookmark size={17} />, () => go("mylist"))}
+        {/* My List with count badge */}
+        <button
+          className={view === "mylist" ? "ent-side-btn on" : "ent-side-btn"}
+          onClick={() => go("mylist")}
+          title="My List"
+          aria-label="My List"
+          data-label="My List"
+        >
+          <Icon.Bookmark size={17} />
+          <span className="ent-side-bar" />
+          {listCount > 0 && <span className="ent-side-badge">{listCount}</span>}
+        </button>
 
         <div className="ent-side-spacer" />
 
         {sideBtn(false, "Switch to Games mode", <Icon.Gamepad size={17} />, onSwitchToGames)}
         {sideBtn(false, "Mode selector", <Icon.Grid size={17} />, onBackToSplash)}
         {sideBtn(false, "Keyboard shortcuts  (press ?)", <Icon.Keyboard size={17} />, () => setScOpen(true))}
+        {sideBtn(false, "Settings", <Icon.Settings size={17} />, () => setSetOpen(true))}
       </aside>
 
       {/* ── Content ── */}
@@ -352,6 +376,13 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
 
       {/* ── Keyboard shortcuts overlay (? key) ── */}
       <EntShortcuts open={scOpen} onClose={() => setScOpen(false)} />
+
+      {/* ── Settings panel (comma key / gear icon) ── */}
+      <EntSettings
+        open={setOpen}
+        onClose={() => setSetOpen(false)}
+        onDataCleared={() => { setListTick(t => t + 1); setHistoryTick(t => t + 1); }}
+      />
 
       {/* ── Toast notifications ── */}
       <EntToaster />

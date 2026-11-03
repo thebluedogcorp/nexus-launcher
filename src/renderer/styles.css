@@ -3209,3 +3209,87 @@ button.tb-logo:active{transform:scale(0.97)}
 }
 
 
+/* ===================================================================
+   NEXUS TV v6.5.0 — Settings panel, sidebar badge, toggle switches
+   =================================================================== */
+
+/* ── Settings panel ──────────────────────────────────────────── */
+.ent-set-overlay{position:fixed;inset:0;z-index:300;display:flex;
+  justify-content:center;align-items:center;padding:24px;
+  background:rgba(0,0,0,.65);backdrop-filter:blur(8px);
+  animation:ent-fade .15s ease}
+.ent-set{width:min(560px,94vw);max-height:86vh;display:flex;flex-direction:column;
+  background:#0e0e10;border:1px solid var(--border-2);border-radius:var(--r-xl);
+  overflow:hidden;box-shadow:var(--shadow-high),0 0 0 1px rgba(var(--ent-rgb),.18);
+  animation:ent-cmd-in .2s cubic-bezier(.2,.8,.2,1)}
+.ent-set-head{display:flex;align-items:center;justify-content:space-between;
+  padding:16px 20px;border-bottom:1px solid var(--border)}
+.ent-set-title{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:700;color:#fff}
+.ent-set-title svg{color:var(--ent)}
+.ent-set-close{display:flex;align-items:center;justify-content:center;width:32px;height:32px;
+  border-radius:var(--r-sm);background:var(--surface);border:1px solid var(--border-2);
+  color:var(--text-dim);cursor:pointer;transition:all var(--t-fast)}
+.ent-set-close:hover{color:#fff;background:var(--danger);border-color:var(--danger)}
+.ent-set-body{flex:1;overflow-y:auto;padding:8px 20px 20px}
+.ent-set-body::-webkit-scrollbar{width:8px}
+.ent-set-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:4px}
+.ent-set-section{padding:16px 0;border-bottom:1px solid var(--border)}
+.ent-set-section:last-of-type{border-bottom:none}
+.ent-set-h{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ent);margin:0 0 12px}
+.ent-set-row{display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:10px 0}
+.ent-set-row-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.ent-set-row-label{font-size:13.5px;font-weight:600;color:#fff}
+.ent-set-row-desc{font-size:11.5px;color:var(--text-faint);line-height:1.4}
+
+/* Toggle switch */
+.ent-toggle{position:relative;width:42px;height:24px;border-radius:var(--r-pill);
+  background:var(--surface-2);border:1px solid var(--border-2);cursor:pointer;
+  transition:all var(--t-base);flex-shrink:0}
+.ent-toggle.on{background:var(--ent);border-color:var(--ent)}
+.ent-toggle-knob{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;
+  background:#fff;transition:transform var(--t-base);
+  box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.ent-toggle.on .ent-toggle-knob{transform:translateX(18px)}
+
+/* Stats grid */
+.ent-set-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.ent-set-stat{display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 8px;
+  border-radius:var(--r-md);background:var(--surface);border:1px solid var(--border)}
+.ent-set-stat-v{font-size:24px;font-weight:800;color:var(--ent);font-variant-numeric:tabular-nums}
+.ent-set-stat-l{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--text-faint)}
+
+/* Data section */
+.ent-set-note{font-size:12px;color:var(--text-dim);line-height:1.55;margin:0 0 12px}
+.ent-set-danger{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 16px;
+  border-radius:var(--r-sm);font-size:12.5px;font-weight:600;color:var(--danger);
+  background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.3);cursor:pointer;
+  transition:all var(--t-fast)}
+.ent-set-danger:hover{background:rgba(248,113,113,.16);border-color:var(--danger)}
+.ent-set-foot{display:flex;align-items:center;gap:8px;padding:12px 0 0;margin-top:8px;
+  border-top:1px solid var(--border);font-size:11px;color:var(--text-faint)}
+.ent-set-foot svg{color:var(--ent);flex-shrink:0}
+
+/* ── Sidebar My List count badge ─────────────────────────────── */
+.ent-side-btn{position:relative}
+.ent-side-badge{position:absolute;top:-2px;right:-2px;z-index:5;
+  display:flex;align-items:center;justify-content:center;min-width:17px;height:17px;
+  padding:0 4px;border-radius:var(--r-pill);font-size:9px;font-weight:800;
+  color:var(--ent-fg);background:var(--ent);border:2px solid #0c0c0e;
+  font-variant-numeric:tabular-nums;box-shadow:0 2px 6px -1px rgba(var(--ent-rgb),.6)}
+
+/* ── Sidebar settings button accent ─────────────────────────── */
+.ent-side-btn[aria-label="Settings"]:hover{color:var(--ent)}
+
+/* ── Responsive: settings panel full-width on narrow ─────────── */
+@media (max-width:480px){
+  .ent-set{width:96vw}
+  .ent-set-stats{grid-template-columns:1fr 1fr 1fr;gap:6px}
+  .ent-set-stat{padding:10px 4px}
+  .ent-set-stat-v{font-size:18px}
+}
+
+
+
