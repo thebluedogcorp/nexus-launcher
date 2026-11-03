@@ -15,6 +15,7 @@ import { EntDetailPage } from "./EntDetailPage";
 import { EntPlayer, type WatchPayload } from "./EntPlayer";
 import { EntCommandPalette, type CmdAction } from "./EntCommandPalette";
 import { EntShortcuts } from "./EntShortcuts";
+import { EntToaster, pushToast } from "./EntToaster";
 import { inList as listHas, toggleList as toggleStore, recordHistory } from "../../lib/ent-store";
 import type { TmdbItem, TmdbMediaType } from "../../lib/tmdb-types";
 
@@ -80,7 +81,10 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
     requestAnimationFrame(() => bodyRef.current?.scrollTo({ top: 0 }));
   }, []);
 
-  const watch = useCallback((payload: WatchPayload) => setWatching(payload), []);
+  const watch = useCallback((payload: WatchPayload) => {
+    setWatching(payload);
+    pushToast(`Now playing: ${payload.title}`, "success", <Icon.Play size={14} />);
+  }, []);
 
   // Card → watch bridge (EntRails uses onWatch(mt, id, title); detail page
   // already has the full payload, but browse/search/home rails need this adapter).
@@ -113,6 +117,7 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
   // ── My List helpers (tick re-renders consumers) ──
   const inListFn = useCallback((mt: TmdbMediaType, id: number) => listHas(mt, id), [listTick]);
   const toggleListFn = useCallback((item: { mediaType?: TmdbMediaType; id: number; title: string; posterPath?: string | null; rating?: number; year?: string }) => {
+    const wasIn = listHas(item.mediaType ?? "movie", item.id);
     toggleStore({
       mediaType: item.mediaType ?? "movie",
       id: item.id,
@@ -122,6 +127,11 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
       year: item.year ?? "",
     });
     setListTick(t => t + 1);
+    pushToast(
+      wasIn ? `Removed “${item.title}” from My List` : `Added “${item.title}” to My List`,
+      wasIn ? "info" : "success",
+      <Icon.Bookmark size={14} filled={!wasIn} />,
+    );
   }, [listTick]);
 
   // Hero passes a full TmdbItem — adapt to the toggle signature.
@@ -342,6 +352,9 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
 
       {/* ── Keyboard shortcuts overlay (? key) ── */}
       <EntShortcuts open={scOpen} onClose={() => setScOpen(false)} />
+
+      {/* ── Toast notifications ── */}
+      <EntToaster />
     </div>
   );
 }

@@ -50,37 +50,35 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v6.3.0"
-          $title = "NEXUS v6.3.0 — Keyboard shortcuts overlay, Recently Viewed rail, cast hover, polish"
+          $tag = "v6.4.0"
+          $title = "NEXUS v6.4.0 — Toast notifications, Surprise Me, tactile polish"
           $notes = @"
           NEXUS — Universal Game Launcher & Entertainment Hub for Windows.
 
-          **v6.3.0 — Discoverability + memory. A keyboard-shortcuts overlay, a Recently Viewed history rail, and tactile cast/back polish.**
+          **v6.4.0 — Feedback + serendipity. Toast notifications for every action, a Surprise Me random-pick, and tactile micro-polish.**
 
-          **New: Keyboard Shortcuts overlay (press ?).**
-          A clean two-column modal surfaces every NEXUS TV shortcut — Navigation (Ctrl+K, /, g, Esc, ?), Browse (arrows, Enter), Hero (hover arrows, dots), and Player (Esc, S/E inputs). Opens with `?` or the new keyboard icon at the bottom of the sidebar. Closes on Esc, ?, /, or click-outside. Makes the keyboard-first design fully discoverable.
+          **New: Toast notification system.**
+          A lightweight pub/sub toast store (EntToaster) renders a bottom-left stack of glass toasts with kind-colored icons (success=green, info=rose, error=red). Auto-dismisses after 3.2s, manually dismissible. Wired into: add/remove from My List ("Added 'X' to My List" / "Removed 'X' from My List"), start watching ("Now playing: X"), clear history ("History cleared"), and Surprise Me ("Surprise! Playing X").
 
-          **New: Recently Viewed rail.**
-          The home screen now shows a "Recently Viewed" rail (with a clock icon) of the last 18 detail pages you've visited — persisted locally, survives restarts. Each card shows the backdrop, type chip, title, and year. A "Clear" button wipes the history. Dedupes by title so re-visits float to the top. The detail page records the visit as soon as TMDB details load.
+          **New: Surprise Me.**
+          A gradient callout bar sits between the hero and the rails: "Can't decide? Let NEXUS pick something for you." Click the rose "Surprise Me" button and it picks a random title from trending + popular TV and immediately starts playing it — with a toast confirming the pick. Perfect for indecisive moments.
 
-          **New: history store.**
-          `ent-store` now exports `getHistory()`, `recordHistory()`, `clearHistory()`, and `HistoryEntry` — a third local store alongside My List + Continue Watching.
-
-          **New icons.**
-          Added `Icon.Keyboard` and `Icon.Clock2` to the icon set.
+          **New icon.**
+          Added `Icon.Shuffle` to the icon set.
 
           **Polish.**
-          - Hero rating badge now a proper amber pill (bg + border + bold).
-          - Detail-page back pill slides left + turns rose on hover.
-          - Cast cards lift 3px on hover with a rose ring around the avatar.
-          - Shortcuts overlay has backdrop blur + scale-in animation.
-          - Full keyboard a11y: shortcuts overlay closes on capture-phase Esc.
+          - Rail titles now reveal a short rose underline on hover.
+          - Focused cards (keyboard nav) get an enhanced rose glow ring + soft halo.
+          - Detail-page tagline gets a rose left accent bar.
+          - Provider cards lift 2px on hover with a rose border.
+          - Genre chips get an inset top highlight on active.
+          - Surprise bar stacks vertically on narrow screens.
 
-          All v6.2.0 functionality preserved: command palette (Ctrl+K), hero manual arrows + Up Next, NEW badges, card sheen, hover preview popovers, Top 10 rail, arrow-key nav, scroll-to-top FAB, view transitions, full CineSrc streaming playback, TMDB IPC in main process, mode switching, library, collections, platform detection, launching, playtime, achievements, overlay, console/desktop mode, themes, 4 first-party plugins.
+          All v6.3.0 functionality preserved: keyboard shortcuts overlay (?), Recently Viewed rail, command palette (Ctrl+K), hero manual arrows + Up Next, NEW badges, card sheen, hover preview popovers, Top 10 rail, arrow-key nav, scroll-to-top FAB, view transitions, full CineSrc streaming playback, TMDB IPC in main process, mode switching, library, collections, platform detection, launching, playtime, achievements, overlay, console/desktop mode, themes, 4 first-party plugins.
 
           **Downloads:**
-          - NEXUS-Setup-6.3.0.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-6.3.0.exe — single-file portable build.
+          - NEXUS-Setup-6.4.0.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-6.4.0.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@

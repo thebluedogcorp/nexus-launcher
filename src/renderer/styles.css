@@ -3125,3 +3125,87 @@ button.tb-logo:active{transform:scale(0.97)}
   .ent-sc-grid{grid-template-columns:1fr;gap:16px}
 }
 
+
+/* ===================================================================
+   NEXUS TV v6.4.0 — Toast notifications, Surprise Me, polish
+   =================================================================== */
+
+/* ── Toast notifications (bottom-left stack) ─────────────────── */
+.ent-toaster{position:fixed;bottom:24px;left:88px;z-index:280;display:flex;
+  flex-direction:column-reverse;gap:8px;pointer-events:none;max-width:360px}
+.ent-toast{display:flex;align-items:center;gap:10px;padding:11px 14px 11px 12px;
+  background:var(--surface-glass);border:1px solid var(--border-2);
+  border-radius:var(--r-lg);backdrop-filter:blur(14px);
+  box-shadow:var(--shadow-mid);pointer-events:auto;
+  animation:ent-toast-in .3s cubic-bezier(.2,.8,.2,1)}
+@keyframes ent-toast-in{
+  from{opacity:0;transform:translateX(-20px) scale(.96)}
+  to{opacity:1;transform:translateX(0) scale(1)}
+}
+.ent-toast.success{border-color:rgba(70,211,105,.4)}
+.ent-toast.error{border-color:rgba(248,113,113,.4)}
+.ent-toast-icon{display:flex;align-items:center;justify-content:center;width:26px;height:26px;
+  border-radius:50%;flex-shrink:0}
+.ent-toast.success .ent-toast-icon{background:rgba(70,211,105,.16);color:#46d369}
+.ent-toast.error .ent-toast-icon{background:rgba(248,113,113,.16);color:var(--danger)}
+.ent-toast.info .ent-toast-icon{background:rgba(var(--ent-rgb),.16);color:var(--ent)}
+.ent-toast-msg{flex:1;font-size:12.5px;color:#fff;line-height:1.35;
+  white-space:normal;word-break:break-word}
+.ent-toast-close{display:flex;align-items:center;justify-content:center;width:22px;height:22px;
+  border-radius:50%;background:transparent;border:none;color:var(--text-faint);
+  cursor:pointer;transition:all var(--t-fast);flex-shrink:0}
+.ent-toast-close:hover{color:#fff;background:var(--surface-2)}
+/* exit animation via CSS transition on removal */
+.ent-toast.removing{animation:ent-toast-out .25s ease forwards}
+@keyframes ent-toast-out{
+  to{opacity:0;transform:translateX(-20px) scale(.94)}
+}
+
+/* ── Surprise Me bar ─────────────────────────────────────────── */
+.ent-surprise-bar{display:flex;align-items:center;justify-content:space-between;
+  gap:14px;margin:18px 28px 0;padding:14px 18px;border-radius:var(--r-lg);
+  background:linear-gradient(110deg,rgba(var(--ent-rgb),.12),rgba(var(--ent-rgb),.04));
+  border:1px solid rgba(var(--ent-rgb),.2)}
+.ent-surprise-text{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-dim)}
+.ent-surprise-text svg{color:var(--ent);flex-shrink:0}
+.ent-surprise-btn{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 18px;
+  border-radius:var(--r-pill);font-size:13px;font-weight:700;color:var(--ent-fg);
+  background:var(--ent);border:none;cursor:pointer;transition:all var(--t-base);
+  box-shadow:0 6px 18px -6px rgba(var(--ent-rgb),.6);flex-shrink:0}
+.ent-surprise-btn:hover:not(:disabled){background:var(--ent-hover);transform:translateY(-1px);
+  box-shadow:0 10px 24px -6px rgba(var(--ent-rgb),.7)}
+.ent-surprise-btn:disabled{opacity:.5;cursor:default}
+.ent-surprise-btn:active{transform:translateY(0)}
+
+/* ── Rail title hover underline ──────────────────────────────── */
+.ent-rail-title{position:relative;cursor:default}
+.ent-rail-title::after{content:"";position:absolute;left:0;bottom:-3px;width:0;height:2px;
+  background:var(--ent);border-radius:1px;transition:width var(--t-base)}
+.ent-rail:hover .ent-rail-title::after{width:24px}
+
+/* ── Card focus glow enhancement ────────────────────────────── */
+.ent-lcard:focus-visible .ent-lcard-media,
+.ent-pcard:focus-visible .ent-pcard-media{
+  box-shadow:0 0 0 2px var(--ent),0 0 24px -4px rgba(var(--ent-rgb),.5),
+    0 14px 34px -10px rgba(0,0,0,.7)}
+
+/* ── Detail tagline styling refinement ───────────────────────── */
+.ent-dp-tagline{position:relative;padding-left:14px}
+.ent-dp-tagline::before{content:"";position:absolute;left:0;top:4px;bottom:4px;
+  width:3px;border-radius:2px;background:var(--ent);opacity:.7}
+
+/* ── Provider card hover lift ────────────────────────────────── */
+.ent-provider{transition:all var(--t-fast)}
+.ent-provider:hover{transform:translateY(-2px);
+  border-color:rgba(var(--ent-rgb),.4);box-shadow:0 6px 14px -6px rgba(var(--ent-rgb),.3)}
+
+/* ── Genre chip active glow refinement ──────────────────────── */
+.ent-chip.on{box-shadow:0 4px 14px -4px rgba(var(--ent-rgb),.5),inset 0 1px 0 rgba(255,255,255,.2)}
+
+/* ── Responsive: surprise bar stacks on narrow ──────────────── */
+@media (max-width:560px){
+  .ent-surprise-bar{flex-direction:column;align-items:stretch;text-align:center}
+  .ent-surprise-text{justify-content:center}
+}
+
+

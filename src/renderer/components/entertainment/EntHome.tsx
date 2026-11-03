@@ -7,6 +7,7 @@ import { Icon } from "../Icons";
 import { EntHero } from "./EntHero";
 import { EntLandscapeCard, Rail, Top10Rail, type AnyItem } from "./EntRails";
 import type { WatchPayload } from "./EntPlayer";
+import { pushToast } from "./EntToaster";
 import { asItems, asMovies, tmdbImg, type TmdbItem, type TmdbMovie, type TmdbMediaType } from "../../lib/tmdb-types";
 import { getContinue, removeFromContinue, getHistory, clearHistory, type ContinueEntry, type HistoryEntry } from "../../lib/ent-store";
 
@@ -78,7 +79,22 @@ export function EntHome({ progressTick, historyTick, onOpen, onWatch, inList, on
     setHistory(getHistory().slice(0, 12));
   }, [historyTick]);
   const [histCleared, setHistCleared] = useState(false);
-  const clearHist = () => { clearHistory(); setHistory([]); setHistCleared(true); };
+  const clearHist = () => { clearHistory(); setHistory([]); setHistCleared(true); pushToast("History cleared", "info", <Icon.Clock2 size={14} />); };
+
+  // "Surprise Me" — pick a random trending title and start watching it.
+  const surpriseMe = () => {
+    const pool = [...trending, ...popularTv];
+    if (pool.length === 0) return;
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    onWatch({
+      mediaType: pick.mediaType,
+      id: pick.id,
+      title: pick.title,
+      posterPath: pick.posterPath ?? null,
+      backdropPath: pick.backdropPath ?? null,
+    });
+    pushToast(`Surprise! Playing ${pick.title}`, "success", <Icon.Sparkles size={14} />);
+  };
 
   // Bridge: EntRails expects onWatch(mt, id, title) → adapt to full payload.
   const watchFromCard = (mt: TmdbMediaType, id: number, title: string) => {
@@ -104,6 +120,17 @@ export function EntHome({ progressTick, historyTick, onOpen, onWatch, inList, on
         inList={inList}
         onToggleList={toggleAny}
       />
+
+      {/* Surprise Me bar (v6.4.0) */}
+      <div className="ent-surprise-bar">
+        <div className="ent-surprise-text">
+          <Icon.Sparkles size={16} />
+          <span>Can't decide? Let NEXUS pick something for you.</span>
+        </div>
+        <button className="ent-surprise-btn" onClick={surpriseMe} disabled={loading || trending.length === 0}>
+          <Icon.Shuffle size={15} /> Surprise Me
+        </button>
+      </div>
 
       <div className="ent-rails">
         {cont.length > 0 && (
