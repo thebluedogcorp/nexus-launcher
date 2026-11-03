@@ -1,22 +1,32 @@
-// v5.0.0 — EntHero: a cinematic cycling hero banner for the Entertainment mode.
-// Pulls trending (movies + tv), auto-advances every 8s, shows backdrop + title
-// + overview + Play Trailer / More Info actions.
+// v6.0.0 — EntHero: Apple TV+ style cinematic hero (reference image 2).
+// Full-bleed art bleeding right, deep left gradient blend, huge condensed
+// uppercase Oswald title, kicker chip, meta + genre badges, 2-line synopsis,
+// Watch Now / More Info / My List CTAs, pagination dots, auto-advance 8s.
 
 import { useEffect, useState } from "react";
 import { Icon } from "../Icons";
-import { tmdbImg, formatRating, type TmdbItem } from "../../lib/tmdb-types";
+import { tmdbImg, formatRating, MOVIE_GENRES, TV_GENRES, type TmdbItem } from "../../lib/tmdb-types";
 
 interface HeroProps {
   items: TmdbItem[];
   loading: boolean;
   onOpen: (mediaType: "movie" | "tv", id: number) => void;
-  onWatch: (mediaType: "movie" | "tv", id: number, title: string) => void;
-  onBackToSplash: () => void;
+  onWatch: (mediaType: "movie" | "tv", id: number, title: string, backdropPath: string | null, posterPath: string | null) => void;
+  inList: (mediaType: "movie" | "tv", id: number) => boolean;
+  onToggleList: (item: TmdbItem) => void;
 }
 
-const HERO_COUNT = 5;
+const HERO_COUNT = 6;
 
-export function EntHero({ items, loading, onOpen, onWatch, onBackToSplash }: HeroProps) {
+function genreNames(item: TmdbItem): string[] {
+  const catalog = item.mediaType === "tv" ? TV_GENRES : MOVIE_GENRES;
+  return (item.genreIds ?? [])
+    .map(gid => catalog.find(g => g.id === gid)?.name)
+    .filter((n): n is string => !!n)
+    .slice(0, 3);
+}
+
+export function EntHero({ items, loading, onOpen, onWatch, inList, onToggleList }: HeroProps) {
   const heroes = items.filter(i => i.backdropPath && i.overview).slice(0, HERO_COUNT);
   const [idx, setIdx] = useState(0);
 
@@ -26,14 +36,11 @@ export function EntHero({ items, loading, onOpen, onWatch, onBackToSplash }: Her
     return () => clearInterval(t);
   }, [heroes.length]);
 
-  // Clamp idx if heroes shrank.
   useEffect(() => {
     if (idx > heroes.length - 1) setIdx(0);
   }, [heroes.length, idx]);
 
-  if (loading) {
-    return <div className="ent-hero ent-hero-loading" />;
-  }
+  if (loading) return <div className="ent-hero ent-hero-loading" />;
 
   if (heroes.length === 0) {
     return (
@@ -45,77 +52,74 @@ export function EntHero({ items, loading, onOpen, onWatch, onBackToSplash }: Her
   }
 
   const cur = heroes[idx];
-  const backdrop = tmdbImg(cur.backdropPath, "w1280") ?? tmdbImg(cur.backdropPath, "original");
-  const mediaType = cur.mediaType;
+  const mt = cur.mediaType;
+  const genres = genreNames(cur);
+  const listed = inList(mt, cur.id);
 
   return (
     <div className="ent-hero">
-      {/* Crossfade backdrop layers */}
-      <div className="ent-hero-bg">
+      {/* Crossfading art layers */}
+      <div className="ent-hero-media">
         {heroes.map((h, i) => (
           <img
             key={h.id}
             src={tmdbImg(h.backdropPath, "w1280") ?? tmdbImg(h.backdropPath, "original")}
-            alt={h.title}
-            className={i === idx ? "ent-hero-bg-img active" : "ent-hero-bg-img"}
+            alt=""
+            className={i === idx ? "on" : ""}
           />
         ))}
       </div>
-      <div className="ent-hero-scrim" />
-      <div className="ent-hero-scrim-r" />
+      <div className="ent-hero-fade" />
 
-      <div className="ent-hero-content">
-        <div className="ent-hero-badges">
-          <span className="ent-badge ent-badge-ent">
-            <Icon.Film size={11} /> Trending Now
-          </span>
-          {cur.rating > 0 && (
-            <span className="ent-badge ent-badge-star">
-              <Icon.Star size={11} filled /> {formatRating(cur.rating)}
-            </span>
-          )}
-          <span className="ent-badge ent-badge-meta">
-            {mediaType === "tv" ? "TV Series" : "Movie"} · {cur.year}
-          </span>
+      <div className="ent-hero-inner">
+        <div className="ent-hero-kicker">
+          <span className="ent-kicker-brand">NEXUS TV</span>
+          <span className="ent-kicker-sep" />
+          <span>{mt === "tv" ? "Series" : "Film"}</span>
         </div>
 
         <h1 className="ent-hero-title">{cur.title}</h1>
-        <p className="ent-hero-overview">{cur.overview}</p>
 
-        <div className="ent-hero-actions">
-          <button className="ent-btn ent-btn-primary" onClick={() => onWatch(mediaType, cur.id, cur.title)}>
-            <Icon.Play size={16} /> Watch Now
-          </button>
-          <button className="ent-btn ent-btn-ghost" onClick={() => onOpen(mediaType, cur.id)}>
-            <Icon.Info size={16} /> More Info
-          </button>
+        <div className="ent-hero-meta">
+          {cur.rating > 0 && (
+            <span className="ent-hm"><Icon.Star size={11} filled /> {formatRating(cur.rating)}</span>
+          )}
+          {cur.year && <span className="ent-hm">{cur.year}</span>}
+          {genres.slice(0, 2).map(g => <span className="ent-hm badge" key={g}>{g}</span>)}
         </div>
 
-        {heroes.length > 1 && (
-          <div className="ent-hero-dots">
-            <button className="ent-dot-btn" onClick={() => setIdx(i => (i - 1 + heroes.length) % heroes.length)} aria-label="Previous">
-              <Icon.Chevron size={14} />
-            </button>
-            <div className="ent-dots">
-              {heroes.map((h, i) => (
-                <button
-                  key={h.id}
-                  className={i === idx ? "ent-dot active" : "ent-dot"}
-                  onClick={() => setIdx(i)}
-                  aria-label={`Go to ${h.title}`}
-                />
-              ))}
-            </div>
-            <button className="ent-dot-btn" onClick={() => setIdx(i => (i + 1) % heroes.length)} aria-label="Next">
-              <Icon.Chevron size={14} />
-            </button>
-          </div>
-        )}
+        <p className="ent-hero-desc">{cur.overview}</p>
+
+        <div className="ent-hero-cta">
+          <button className="ent-cta primary" onClick={() => onWatch(mt, cur.id, cur.title, cur.backdropPath, cur.posterPath)}>
+            <Icon.Play size={16} /> Watch Now
+          </button>
+          <button className="ent-cta ghost" onClick={() => onOpen(mt, cur.id)}>
+            <Icon.Info size={15} /> More Info
+          </button>
+          <button
+            className={listed ? "ent-cta ghost listed" : "ent-cta ghost"}
+            onClick={() => onToggleList(cur)}
+            title={listed ? "Remove from My List" : "Add to My List"}
+          >
+            <Icon.Bookmark size={15} filled={listed} /> {listed ? "In My List" : "My List"}
+          </button>
+        </div>
       </div>
 
-      <button className="ent-hero-switch" onClick={onBackToSplash} title="Switch mode">
-        <Icon.Chevron size={12} /> Switch mode
-      </button>
+      {/* Pagination dots (image 2) */}
+      {heroes.length > 1 && (
+        <div className="ent-hero-dots">
+          {heroes.map((h, i) => (
+            <button
+              key={h.id}
+              className={i === idx ? "ent-dot on" : "ent-dot"}
+              onClick={() => setIdx(i)}
+              aria-label={`Show ${h.title}`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

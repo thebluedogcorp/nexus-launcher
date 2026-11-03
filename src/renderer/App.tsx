@@ -5,7 +5,7 @@ import { Icon } from "./components/Icons";
 import { NexusMark } from "./components/Logo";
 import { ModeToggle } from "./components/ModeToggle";
 import { ModeSplash } from "./components/ModeSplash";
-import { EntertainmentView } from "./components/entertainment/EntertainmentView";
+import { EntShell } from "./components/entertainment/EntShell";
 import { PlatformMark } from "./components/PlatformMark";
 import { IconGlyph } from "./components/IconGlyph";
 import { ThemeStudio } from "./components/theme/ThemeStudio";
@@ -681,7 +681,7 @@ export function App() {
     return <ModeSplash onChoose={(m) => setAppMode(m)} />;
   }
   if (appMode === "tv") {
-    return <EntertainmentView onBackToSplash={goSplash} onSwitchToGames={goGames} />;
+    return <EntShell onBackToSplash={goSplash} onSwitchToGames={goGames} />;
   }
 
   // Game page

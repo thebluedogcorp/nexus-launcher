@@ -170,12 +170,31 @@ export async function tmdbTopRatedTv(page = 1): Promise<TmdbItem[]> {
 
 export async function tmdbByGenre(genreId: number, page = 1): Promise<TmdbMovie[]> {
   const d = await tmdb<TmdbPage>("/discover/movie", {
-    with_genre: String(genreId),
+    with_genres: String(genreId),
     sort_by: "popularity.desc",
     "vote_count.gte": "200",
     page: String(page),
   });
   return d.results.map(normalize);
+}
+
+/** Discover TV by genre — v6.0.0 Entertainment browse. */
+export async function tmdbByGenreTv(genreId: number, page = 1): Promise<TmdbItem[]> {
+  const d = await tmdb<TmdbMultiPage>("/discover/tv", {
+    with_genres: String(genreId),
+    sort_by: "popularity.desc",
+    "vote_count.gte": "100",
+    page: String(page),
+  });
+  return d.results.map(m => normalizeMulti({ ...m, media_type: "tv" }));
+}
+
+/** Recommendations ("More like this") for a movie or TV show. */
+export async function tmdbRecommendations(mediaType: "movie" | "tv", id: number): Promise<TmdbItem[]> {
+  const d = await tmdb<TmdbMultiPage>(`/${mediaType}/${id}/recommendations`);
+  return (d.results ?? [])
+    .filter(m => m.poster_path || m.backdrop_path)
+    .map(m => normalizeMulti({ ...m, media_type: mediaType }));
 }
 
 export async function tmdbSearch(query: string): Promise<TmdbMovie[]> {

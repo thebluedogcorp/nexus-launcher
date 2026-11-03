@@ -147,6 +147,8 @@ STUB = r"""
     tmdbPopularTv: () => pend(mockTv),
     tmdbTopRatedTv: () => pend(mockTv),
     tmdbByGenre: () => pend(mockMovies),
+    tmdbByGenreTv: () => pend(mockTv),
+    tmdbRecommendations: () => pend(mockItems),
     tmdbSearch: () => pend(mockMovies),
     tmdbSearchMulti: (q) => pend(mockItems.filter(m => m.title.toLowerCase().includes((q || "").toLowerCase()))),
     tmdbDetails: (id) => pend(mockDetails("movie", id)),

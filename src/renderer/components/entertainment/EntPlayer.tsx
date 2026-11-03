@@ -1,67 +1,118 @@
-// v5.1.0 — EntPlayer: full-screen content player that embeds the CineSrc
-// streaming iframe (movies + TV by TMDB ID). For TV, a season/episode
-// selector re-targets the iframe without re-mounting the whole overlay.
-//
-// CineSrc (cinesrc.st) is a free streaming-API that indexes embeddable
-// streams against TMDB IDs — no scraping, no file hosting. The embed pages
-// return 200 with no X-Frame-Options, so they iframe cleanly.
+// v6.0.0 — EntPlayer: full-screen CineSrc player with progress tracking.
+// Embeds cinesrc.st streams by TMDB ID (movie + TV). For TV, a season/episode
+// selector re-targets the iframe. While open, wall-clock progress is tracked
+// and persisted to the local Continue Watching store (native-app advantage:
+// the app remembers where you left off across restarts).
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "../Icons";
-import { cinesrcEmbedUrl, type TmdbMediaType } from "../../lib/tmdb-types";
+import {
+  cinesrcEmbedUrl,
+  type TmdbMediaType,
+} from "../../lib/tmdb-types";
+import {
+  recordContinue,
+  estimateProgress,
+  type ContinueEntry,
+} from "../../lib/ent-store";
+
+/** Everything the player needs to open a stream + save progress. */
+export interface WatchPayload {
+  mediaType: TmdbMediaType;
+  id: number;
+  title: string;
+  posterPath?: string | null;
+  backdropPath?: string | null;
+  numberOfSeasons?: number | null;
+  season?: number;
+  episode?: number;
+  runtimeMin?: number | null;
+}
 
 interface EntPlayerProps {
   open: boolean;
-  mediaType: TmdbMediaType;
-  tmdbId: number;
-  title: string;
-  /** TV only — drives the season dropdown range. */
-  numberOfSeasons: number | null;
+  payload: WatchPayload | null;
   onClose: () => void;
+  /** Fired whenever progress is persisted (so Home's Continue row updates). */
+  onProgress?: () => void;
 }
 
-export function EntPlayer({ open, mediaType, tmdbId, title, numberOfSeasons, onClose }: EntPlayerProps) {
-  const isTv = mediaType === "tv";
+const SAVE_INTERVAL_MS = 20_000;
+
+export function EntPlayer({ open, payload, onClose, onProgress }: EntPlayerProps) {
+  const isTv = payload?.mediaType === "tv";
   const seasons = useMemo(() => {
-    const n = numberOfSeasons && numberOfSeasons > 0 ? numberOfSeasons : 1;
+    const n = payload?.numberOfSeasons && payload.numberOfSeasons > 0 ? payload.numberOfSeasons : 1;
     return Array.from({ length: Math.min(n, 50) }, (_, i) => i + 1);
-  }, [numberOfSeasons]);
+  }, [payload?.numberOfSeasons]);
+
   const [season, setSeason] = useState(1);
   const [episode, setEpisode] = useState(1);
+  const startedAtRef = useRef<number>(0);
+  const seasonRef = useRef(1);
+  const episodeRef = useRef(1);
+  // Keep refs in sync with state inside an effect (never during render).
+  useEffect(() => { seasonRef.current = season; }, [season]);
+  useEffect(() => { episodeRef.current = episode; }, [episode]);
 
-  // Reset selectors when the target changes.
+  // Reset + start tracking when the player opens.
   useEffect(() => {
-    setSeason(1);
-    setEpisode(1);
-  }, [tmdbId, mediaType]);
+    if (!open || !payload) return;
+    setSeason(Math.max(1, payload.season ?? 1));
+    setEpisode(Math.max(1, payload.episode ?? 1));
+    startedAtRef.current = Date.now();
+  }, [open, payload]);
 
-  // Esc to close.
+  // Persist progress on close + periodically while open.
   useEffect(() => {
-    if (!open) return;
+    if (!open || !payload) return;
+    const save = () => {
+      const elapsedSec = (Date.now() - startedAtRef.current) / 1000;
+      if (elapsedSec < 10) return; // too brief to count
+      const progress = estimateProgress(elapsedSec, payload.runtimeMin ?? null);
+      recordContinue({
+        mediaType: payload.mediaType,
+        id: payload.id,
+        title: payload.title,
+        backdropPath: payload.backdropPath ?? null,
+        posterPath: payload.posterPath ?? null,
+        season: seasonRef.current,
+        episode: episodeRef.current,
+        progress,
+      });
+      onProgress?.();
+    };
+    const interval = setInterval(save, SAVE_INTERVAL_MS);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") { save(); onClose(); }
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("keydown", onKey);
+      save(); // final save on unmount/close
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, payload?.mediaType, payload?.id]);
 
-  if (!open) return null;
+  if (!open || !payload) return null;
 
-  const src = cinesrcEmbedUrl(mediaType, tmdbId, season, episode);
+  const src = cinesrcEmbedUrl(payload.mediaType, payload.id, season, episode);
+  const seLabel = isTv ? `S${season} · E${episode}` : "Movie";
 
   return (
-    <div className="ent-player-overlay" role="dialog" aria-modal="true" aria-label={`Playing ${title}`}>
+    <div className="ent-player-overlay" role="dialog" aria-modal="true" aria-label={`Playing ${payload.title}`}>
       {/* Top control bar */}
       <div className="ent-player-bar">
         <div className="ent-player-bar-left">
-          <span className="ent-player-badge">{isTv ? "TV" : "Movie"}</span>
-          <div className="ent-player-title">{title}</div>
+          <span className="ent-player-badge">{isTv ? "Series" : "Movie"}</span>
+          <div className="ent-player-title">{payload.title}</div>
           {isTv && (
             <div className="ent-player-se">
-              {numberOfSeasons && numberOfSeasons > 1 ? (
+              {payload.numberOfSeasons && payload.numberOfSeasons > 1 ? (
                 <label className="ent-player-se-group">
                   <span>S</span>
-                  <select value={season} onChange={e => { setSeason(Number(e.target.value)); setEpisode(1); }}>
+                  <select value={season} onChange={e => { setSeason(Number(e.target.value)); setEpisode(1); startedAtRef.current = Date.now(); }}>
                     {seasons.map(s => <option key={s} value={s}>S{s}</option>)}
                   </select>
                 </label>
@@ -69,14 +120,10 @@ export function EntPlayer({ open, mediaType, tmdbId, title, numberOfSeasons, onC
                 <label className="ent-player-se-group">
                   <span>S</span>
                   <input
-                    type="number"
-                    min={1}
-                    max={50}
-                    value={season}
+                    type="number" min={1} max={50} value={season}
                     onChange={e => {
                       const v = Math.max(1, Math.min(50, Number(e.target.value) || 1));
-                      setSeason(v);
-                      setEpisode(1);
+                      setSeason(v); setEpisode(1); startedAtRef.current = Date.now();
                     }}
                   />
                 </label>
@@ -84,40 +131,27 @@ export function EntPlayer({ open, mediaType, tmdbId, title, numberOfSeasons, onC
               <label className="ent-player-se-group">
                 <span>E</span>
                 <input
-                  type="number"
-                  min={1}
-                  max={99}
-                  value={episode}
+                  type="number" min={1} max={99} value={episode}
                   onChange={e => {
                     const v = Math.max(1, Math.min(99, Number(e.target.value) || 1));
-                    setEpisode(v);
+                    setEpisode(v); startedAtRef.current = Date.now();
                   }}
                 />
               </label>
-              <button
-                className="ent-player-prev"
-                onClick={() => setEpisode(e => Math.max(1, e - 1))}
-                disabled={episode <= 1}
-                title="Previous episode"
-              >
+              <button className="ent-player-prev" onClick={() => setEpisode(e => Math.max(1, e - 1))} disabled={episode <= 1} title="Previous episode">
                 <Icon.Chevron size={14} />
               </button>
-              <button
-                className="ent-player-next"
-                onClick={() => setEpisode(e => Math.min(99, e + 1))}
-                title="Next episode"
-              >
+              <button className="ent-player-next" onClick={() => setEpisode(e => Math.min(99, e + 1))} title="Next episode">
                 <Icon.Chevron size={14} />
               </button>
             </div>
           )}
         </div>
         <div className="ent-player-bar-right">
+          <span className="ent-player-pos">{seLabel}</span>
           <a
             className="ent-player-link"
-            href={src}
-            target="_blank"
-            rel="noopener noreferrer"
+            href={src} target="_blank" rel="noopener noreferrer"
             onClick={e => { e.preventDefault(); void window.nexus.tmdbOpenExternal(src); }}
             title="Open in browser"
           >
@@ -134,7 +168,7 @@ export function EntPlayer({ open, mediaType, tmdbId, title, numberOfSeasons, onC
         <iframe
           key={src}
           src={src}
-          title={title}
+          title={payload.title}
           allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
           allowFullScreen
           referrerPolicy="origin"
@@ -144,8 +178,21 @@ export function EntPlayer({ open, mediaType, tmdbId, title, numberOfSeasons, onC
       {/* Footer note */}
       <div className="ent-player-foot">
         <span className="ent-player-foot-dot" />
-        Streamed via CineSrc · content indexed by TMDB ID · NEXUS does not host or store any video.
+        Streamed via CineSrc · indexed by TMDB ID · NEXUS does not host or store any video · progress is saved locally.
       </div>
     </div>
   );
+}
+
+/** Convenience: build a Continue-row resume payload from a saved entry. */
+export function continueToPayload(e: ContinueEntry): WatchPayload {
+  return {
+    mediaType: e.mediaType,
+    id: e.id,
+    title: e.title,
+    posterPath: e.posterPath,
+    backdropPath: e.backdropPath,
+    season: e.season,
+    episode: e.episode,
+  };
 }

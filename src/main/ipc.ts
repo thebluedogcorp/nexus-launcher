@@ -571,6 +571,15 @@ export function registerIpc(): void {
     const { tmdbDetailsAny } = await import("./tmdb");
     return await tmdbDetailsAny(mediaType, id);
   }));
+  // v6.0.0 — genre browse (TV) + recommendations.
+  ipcMain.handle("tmdb:byGenreTv", (_e, genreId: number, page?: number) => tmdbWrap(async () => {
+    const { tmdbByGenreTv } = await import("./tmdb");
+    return await tmdbByGenreTv(genreId, page ?? 1);
+  }));
+  ipcMain.handle("tmdb:recommendations", (_e, mediaType: "movie" | "tv", id: number) => tmdbWrap(async () => {
+    const { tmdbRecommendations } = await import("./tmdb");
+    return await tmdbRecommendations(mediaType, id);
+  }));
 
   // ===== Achievements =====
   ipcMain.handle("achievements:list", () => getAchievements());

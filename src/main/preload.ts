@@ -187,6 +187,8 @@ const api = {
   tmdbDetails: (id: number) => ipcRenderer.invoke("tmdb:details", id) as Promise<unknown>,
   tmdbDetailsTv: (id: number) => ipcRenderer.invoke("tmdb:detailsTv", id) as Promise<unknown>,
   tmdbDetailsAny: (mediaType: "movie" | "tv", id: number) => ipcRenderer.invoke("tmdb:detailsAny", mediaType, id) as Promise<unknown>,
+  tmdbByGenreTv: (genreId: number, page?: number) => ipcRenderer.invoke("tmdb:byGenreTv", genreId, page) as Promise<unknown>,
+  tmdbRecommendations: (mediaType: "movie" | "tv", id: number) => ipcRenderer.invoke("tmdb:recommendations", mediaType, id) as Promise<unknown>,
   tmdbOpenExternal: (url: string) => ipcRenderer.invoke("shell:openExternal", url) as Promise<{ ok: boolean; message?: string }>,
   // Achievements
   getAchievements: () => ipcRenderer.invoke("achievements:list") as Promise<Array<{ id: string; name: string; description: string; icon: string; unlockedAt: string | null; progress: number; maxProgress: number }>>,
