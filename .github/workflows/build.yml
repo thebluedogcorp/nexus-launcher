@@ -50,40 +50,47 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v7.0.0"
-          $title = "NEXUS v7.0.0 — Major UI overhaul: glitch fixes, immersive hero, keep-alive home, Because You Watched"
+          $tag = "v7.1.0"
+          $title = "NEXUS v7.1.0 — Completely redesigned detail/info page: cinematic hero, rating ring, tabbed panel"
           $notes = @"
           NEXUS — Universal Game Launcher & Entertainment Hub for Windows.
 
-          **v7.0.0 — A major UI overhaul. Fixed real glitches, maximized screen real estate, added a Ken Burns hero zoom, a keep-alive home (no refetch flash), and a "Because You Watched" smart rec rail.**
+          **v7.1.0 — The detail/info page for every movie & TV show has been completely redesigned. More cinematic, more immersive, more useful.**
 
-          **Bug fixes (real glitches the user reported):**
-          - **Detail page poster was collapsed to 23px tall** — the aspect-ratio + height:auto in a CSS grid caused the poster to collapse to a sliver. Fixed with explicit width (152px) + height (228px) + align-self:start + display:block. Now renders at full 228px.
-          - **Ambient backdrop covered the sidebar** — the position:fixed ambient layer with transform:scale(1.2) bled leftward over the 68px sidebar. Fixed by removing the transform (using background-size:120% instead) and scoping left:68px. Now stays within the body area.
-          - **View-transition remount flash** — every navigation used key={view}, forcing a full remount + 6-endpoint TMDB refetch of the home screen every time you returned to it. Fixed with a keep-alive pattern: Home stays mounted (hidden via CSS) when inactive, retaining all its data. No more flash.
-          - **Z-index conflicts** — the command palette, shortcuts overlay, and settings panel all shared z-index:300. Established a clear hierarchy: settings=200, shortcuts=210, palette=220, trailer=230.
+          **Redesigned cinematic hero:**
+          - Taller (58vh, max 680px) with a deeper dual-gradient blend (bottom + left).
+          - Ken Burns zoom on the backdrop (22s slow scale) for a living, cinematic feel.
+          - Bigger title (up to 64px, 900 weight, tighter tracking) with deeper text shadow.
+          - Italic tagline with max-width for readability.
+          - The trailer play ring moved to the upper-center (42% height) so it doesn't crowd the title.
 
-          **Immersive screen real estate:**
-          - Hero is now 72vh (was 62vh) — min 520px, max 820px. Taller, more cinematic.
-          - Rails padding reduced 28px → 20px, page max-width widened 1480px → 1600px.
-          - Landscape cards widened 300px → 320px for denser, richer rails.
-          - Detail body max-width widened 1320px → 1480px.
+          **New: inline rating ring.**
+          The hero now shows a circular SVG rating ring (amber stroke) with the TMDB percentage score inside (e.g. "84%") — a visual score at a glance, next to the year/runtime/seasons/episodes meta and the top-2 genre badges.
 
-          **New: Ken Burns hero zoom.**
-          The active hero backdrop now slowly zooms from scale(1.05) to scale(1.14) over 18 seconds — a subtle, cinematic Ken Burns effect that makes the hero feel alive instead of static. Re-triggers on every hero rotation.
+          **New: action bar below the hero.**
+          A glass action bar with the primary Watch Now (larger 46px), Watch Trailer, IMDb, and Homepage links — plus the resume progress bar (if any) right-aligned. The bookmark/copy-link moved to icon buttons in the top-right of the hero.
 
-          **New: "Because You Watched" smart rec rail.**
-          Home now shows a "Because you watched 'X'" rail that fetches TMDB recommendations for the most-recent item in your Recently Viewed history. Updates automatically as you visit new detail pages. Uses the existing tmdbRecommendations endpoint — no new API calls to maintain.
+          **New: tabbed info panel.**
+          The poster (200×300) sits beside a tabbed content area with 4 tabs:
+          - **Overview** — full storyline (15px, 1.75 line-height, 880px max), all genre pills, and a quick-facts grid (Director / Status / Runtime / Episodes / Starring).
+          - **Cast & Crew** — a responsive grid of cast avatars (80px circles) with name + character, hover-lift with rose ring.
+          - **Where to Watch** — streaming provider chips (only shown if providers exist) + a note that NEXUS streams via CineSrc regardless.
+          - **Facts** — a 2-column grid of all metadata (Type / Release Year / Runtime / Seasons / Episodes / TMDB Rating / Director / Status / IMDb ID / Genres / Top Cast).
+          Tabs animate in on switch. The whole panel has a deeper glass (82% opacity) + entrance animation.
+
+          **New: top-bar icon actions.**
+          The back pill stays top-left, but the right side now has glass icon buttons for Add/Remove My List (toggles rose when listed) and Copy Link — cleaner than the old row of full buttons.
 
           **Cohesion:**
-          - View transition is now a keep-alive swap (display:none/block) with a 6px rise-in, not a full remount.
-          - All overlays use the established z-index hierarchy.
+          - Removed all orphaned CSS from the old detail dialog (ent-dp-glass, ent-dp-section, ent-dp-actions, ent-dp-stat, ent-dp-info, ent-dp-ratings, ent-dp-syn) — the new design uses a clean, unified set of selectors.
+          - The panel entrance animation (ent-dp-glass-in) is retained for the new .ent-dp-panel.
+          - Full responsive: panel collapses to single-column on narrow, poster shrinks to 140×210, cast grid densifies.
 
-          All v6.7.0 functionality preserved: genre quick-bar, Copy Link, hero Watch Trailer modal, ambient detail backdrop, settings panel, My List badge, Surprise/Settings shortcuts, toast notifications, Surprise Me, command palette (Ctrl+K), hero manual arrows + Up Next, NEW badges, card sheen, hover preview popovers, Top 10 rail, arrow-key nav, scroll-to-top FAB, keyboard shortcuts overlay, Recently Viewed rail, full CineSrc streaming playback, TMDB IPC in main process, mode switching, library, collections, platform detection, launching, playtime, achievements, overlay, console/desktop mode, themes, 4 first-party plugins.
+          All v7.0.0 functionality preserved: keep-alive home, Ken Burns hero, Because You Watched rail, glitch fixes, immersive screen real estate, settings panel, My List badge, Surprise/Settings shortcuts, toast notifications, Surprise Me, command palette (Ctrl+K), hero manual arrows + Up Next, NEW badges, card sheen, hover preview popovers, Top 10 rail, arrow-key nav, scroll-to-top FAB, keyboard shortcuts overlay, Recently Viewed rail, full CineSrc streaming playback, TMDB IPC in main process, mode switching, library, collections, platform detection, launching, playtime, achievements, overlay, console/desktop mode, themes, 4 first-party plugins.
 
           **Downloads:**
-          - NEXUS-Setup-7.0.0.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-7.0.0.exe — single-file portable build.
+          - NEXUS-Setup-7.1.0.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-7.1.0.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@
