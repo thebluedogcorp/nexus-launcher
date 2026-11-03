@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 import { Icon } from "../Icons";
 import { Rail } from "./EntRails";
+import { pushToast } from "./EntToaster";
 import type { WatchPayload } from "./EntPlayer";
 import {
   tmdbImg,
@@ -205,6 +206,20 @@ export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, in
                       <Icon.ExternalLink size={14} /> IMDb
                     </a>
                   )}
+                  {/* Copy TMDB link (v6.7.0) */}
+                  <button
+                    className="ent-cta ghost"
+                    onClick={() => {
+                      const url = `https://www.themoviedb.org/${mediaType}/${id}`;
+                      navigator.clipboard?.writeText(url).then(
+                        () => pushToast("Link copied to clipboard", "success", <Icon.Tag size={13} />),
+                        () => pushToast("Couldn't copy — try again", "error", <Icon.Close size={13} />),
+                      );
+                    }}
+                    title="Copy TMDB link"
+                  >
+                    <Icon.Tag size={14} /> Copy Link
+                  </button>
                 </div>
 
                 {/* Resume banner */}

@@ -50,33 +50,31 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v6.6.0"
-          $title = "NEXUS v6.6.0 — Hero Watch Trailer modal, ambient detail backdrop, polish"
+          $tag = "v6.7.0"
+          $title = "NEXUS v6.7.0 — Genre quick-bar on home, Copy Link on detail, polish"
           $notes = @"
           NEXUS — Universal Game Launcher & Entertainment Hub for Windows.
 
-          **v6.6.0 — Cinematic polish. A hero Watch Trailer button + YouTube modal, and an ambient blurred backdrop on the detail page.**
+          **v6.7.0 — Faster discovery + sharing. A genre quick-filter bar on the home screen and a Copy Link button on every detail page.**
 
-          **New: Watch Trailer button on the hero.**
-          The cinematic hero now has a dedicated "Watch Trailer" CTA (between Watch Now and More Info). Clicking it opens a full trailer modal that fetches the YouTube trailer key on-demand via tmdbDetailsAny — so you can preview any featured title without leaving the home screen. The modal has a backdrop blur, scale-in animation, loading + error states, and Esc/click-outside to close.
+          **New: Genre quick-filter bar on home.**
+          Between the Surprise Me bar and the rails, home now shows a "Browse by genre" bar with 14 genre chips — 8 movie genres (Action, Adventure, Animation, Comedy, Crime, Documentary, Drama, Family) + 6 TV genres, separated by a divider. Click any chip and you jump straight to the filtered browse page with that genre pre-selected and active. The browse page's genre state syncs with the pre-selection and clears it when you manually change genres.
 
-          **New: EntTrailerModal component.**
-          A reusable YouTube trailer modal (EntTrailerModal.tsx) — fetches the trailer key via tmdbDetailsAny, embeds youtube-nocookie.com with autoplay, shows a spinner while loading and a graceful "No trailer available" message if TMDB has none. Esc closes (capture-phase).
-
-          **New: Ambient blurred backdrop on the detail page.**
-          The detail page now has a full-viewport blurred, saturated, dimmed copy of the backdrop image behind everything — giving every detail page a cinematic ambient glow that matches the title's color palette. The glass info panel uses a deeper background (86% opacity) so text stays readable against the ambient layer.
+          **New: Copy Link button on detail pages.**
+          Every detail page now has a "Copy Link" button (after IMDb) that copies the title's TMDB URL (themoviedb.org/{type}/{id}) to the clipboard. Success fires a "Link copied to clipboard" toast; failure fires an error toast. The button has a subtle rose-tinted accent so it stands out.
 
           **Polish.**
-          - Hero "Watch Trailer" button gets a subtle rose-tinted accent (border + bg) so it stands out from the other ghost buttons.
-          - Trailer modal has proper backdrop blur + scale-in animation.
-          - Detail-page glass panel deepened to 86% opacity for ambient contrast.
-          - Full responsive: trailer modal fills the viewport on narrow screens.
+          - Genre chips get a hover lift + rose border.
+          - TV genre chips are rose-tinted to distinguish from movie genres.
+          - Copy Link button gets a rose-tinted accent.
+          - Genre bar divider hides on narrow screens.
+          - Browse pre-selection logic: initialGenre prop + onGenreCleared callback so the shell and browse stay in sync.
 
-          All v6.5.0 functionality preserved: settings panel, My List badge, Surprise/Settings shortcuts, toast notifications, Surprise Me bar, command palette (Ctrl+K), hero manual arrows + Up Next, NEW badges, card sheen, hover preview popovers, Top 10 rail, arrow-key nav, scroll-to-top FAB, view transitions, keyboard shortcuts overlay, Recently Viewed rail, full CineSrc streaming playback, TMDB IPC in main process, mode switching, library, collections, platform detection, launching, playtime, achievements, overlay, console/desktop mode, themes, 4 first-party plugins.
+          All v6.6.0 functionality preserved: hero Watch Trailer modal, ambient detail backdrop, settings panel, My List badge, Surprise/Settings shortcuts, toast notifications, Surprise Me bar, command palette (Ctrl+K), hero manual arrows + Up Next, NEW badges, card sheen, hover preview popovers, Top 10 rail, arrow-key nav, scroll-to-top FAB, view transitions, keyboard shortcuts overlay, Recently Viewed rail, full CineSrc streaming playback, TMDB IPC in main process, mode switching, library, collections, platform detection, launching, playtime, achievements, overlay, console/desktop mode, themes, 4 first-party plugins.
 
           **Downloads:**
-          - NEXUS-Setup-6.6.0.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-6.6.0.exe — single-file portable build.
+          - NEXUS-Setup-6.7.0.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-6.7.0.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@

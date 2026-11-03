@@ -3351,5 +3351,40 @@ button.tb-logo:active{transform:scale(0.97)}
 }
 
 
+/* ===================================================================
+   NEXUS TV v6.7.0 — Genre quick-bar, copy-link, polish
+   =================================================================== */
+
+/* ── Genre quick-filter bar (home) ───────────────────────────── */
+.ent-genre-bar{margin:0 28px 4px;padding:14px 18px;border-radius:var(--r-lg);
+  background:var(--surface);border:1px solid var(--border)}
+.ent-genre-bar-head{display:flex;align-items:center;gap:8px;
+  font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--text-faint);margin-bottom:10px}
+.ent-genre-bar-head svg{color:var(--ent)}
+.ent-genre-bar-chips{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.ent-genre-chip{height:30px;padding:0 14px;border-radius:var(--r-pill);font-size:12px;
+  font-weight:600;color:var(--text-dim);background:var(--surface-2);
+  border:1px solid var(--border-2);cursor:pointer;transition:all var(--t-fast)}
+.ent-genre-chip:hover{color:#fff;background:var(--surface);
+  border-color:rgba(var(--ent-rgb),.4);transform:translateY(-1px)}
+.ent-genre-chip.tv{color:#fb7185}
+.ent-genre-chip.tv:hover{border-color:rgba(var(--ent-rgb),.5);color:var(--ent)}
+.ent-genre-bar-sep{width:1px;height:20px;background:var(--border-2);margin:0 4px}
+
+/* ── Copy Link button accent ─────────────────────────────────── */
+.ent-dp-actions .ent-cta.ghost:last-child{border-color:rgba(var(--ent-rgb),.2);
+  background:rgba(var(--ent-rgb),.06)}
+.ent-dp-actions .ent-cta.ghost:last-child:hover{background:rgba(var(--ent-rgb),.16);
+  border-color:rgba(var(--ent-rgb),.4);color:var(--ent)}
+
+/* ── Responsive: genre bar on narrow ─────────────────────────── */
+@media (max-width:560px){
+  .ent-genre-bar{padding:12px 14px}
+  .ent-genre-bar-sep{display:none}
+}
+
+
+
 
 

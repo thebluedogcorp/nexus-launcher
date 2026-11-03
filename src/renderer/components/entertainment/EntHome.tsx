@@ -8,7 +8,7 @@ import { EntHero } from "./EntHero";
 import { EntLandscapeCard, Rail, Top10Rail, type AnyItem } from "./EntRails";
 import type { WatchPayload } from "./EntPlayer";
 import { pushToast } from "./EntToaster";
-import { asItems, asMovies, tmdbImg, type TmdbItem, type TmdbMovie, type TmdbMediaType } from "../../lib/tmdb-types";
+import { asItems, asMovies, tmdbImg, MOVIE_GENRES, TV_GENRES, type TmdbItem, type TmdbMovie, type TmdbMediaType } from "../../lib/tmdb-types";
 import { getContinue, removeFromContinue, getHistory, clearHistory, type ContinueEntry, type HistoryEntry } from "../../lib/ent-store";
 
 interface HomeProps {
@@ -18,9 +18,11 @@ interface HomeProps {
   onWatch: (payload: WatchPayload) => void;
   inList: (mediaType: TmdbMediaType, id: number) => boolean;
   onToggleList: (item: TmdbItem) => void;
+  /** Jump to a filtered browse view. v6.7.0. */
+  onBrowseGenre?: (mediaType: "movie" | "tv", genreId: number) => void;
 }
 
-export function EntHome({ progressTick, historyTick, onOpen, onWatch, inList, onToggleList }: HomeProps) {
+export function EntHome({ progressTick, historyTick, onOpen, onWatch, inList, onToggleList, onBrowseGenre }: HomeProps) {
   // Adapt the shell's TmdbItem-based toggle to the card's AnyItem signature.
   const toggleAny = (item: AnyItem) => {
     onToggleList({
@@ -138,6 +140,29 @@ export function EntHome({ progressTick, historyTick, onOpen, onWatch, inList, on
           <Icon.Shuffle size={15} /> Surprise Me
         </button>
       </div>
+
+      {/* Genre quick-filter bar (v6.7.0) — jump to filtered browse */}
+      {onBrowseGenre && (
+        <div className="ent-genre-bar">
+          <div className="ent-genre-bar-head">
+            <Icon.Tag size={14} />
+            <span>Browse by genre</span>
+          </div>
+          <div className="ent-genre-bar-chips">
+            {MOVIE_GENRES.slice(0, 8).map(g => (
+              <button key={`m-${g.id}`} className="ent-genre-chip" onClick={() => onBrowseGenre("movie", g.id)}>
+                {g.name}
+              </button>
+            ))}
+            <span className="ent-genre-bar-sep" />
+            {TV_GENRES.slice(0, 6).map(g => (
+              <button key={`t-${g.id}`} className="ent-genre-chip tv" onClick={() => onBrowseGenre("tv", g.id)}>
+                {g.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="ent-rails">
         {cont.length > 0 && (

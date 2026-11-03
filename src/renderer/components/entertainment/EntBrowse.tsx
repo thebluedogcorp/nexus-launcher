@@ -19,20 +19,36 @@ interface BrowseProps {
   inList: (mediaType: TmdbMediaType, id: number) => boolean;
   onWatch?: (mt: TmdbMediaType, id: number, title: string) => void;
   onToggleList?: (item: AnyItem) => void;
+  /** Initial genre to pre-select (from the home genre quick-bar). v6.7.0. */
+  initialGenre?: number | null;
+  /** Fired when the user manually changes the genre (so the shell can clear its pre-select). */
+  onGenreCleared?: () => void;
 }
 
 const PAGE_SIZE = 20;
 
-export function EntBrowse({ mediaType, onOpen, inList, onWatch, onToggleList }: BrowseProps) {
+export function EntBrowse({ mediaType, onOpen, inList, onWatch, onToggleList, initialGenre = null, onGenreCleared }: BrowseProps) {
   const genres: GenreDef[] = mediaType === "tv" ? TV_GENRES : MOVIE_GENRES;
   const isMovie = mediaType === "movie";
 
-  const [genreId, setGenreId] = useState<number | null>(null);
+  const [genreId, setGenreId] = useState<number | null>(initialGenre);
   const [items, setItems] = useState<AnyItem[]>([]);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [exhausted, setExhausted] = useState(false);
+
+  // Apply initialGenre when it changes (from the home quick-bar).
+  useEffect(() => {
+    if (initialGenre !== null && initialGenre !== genreId) {
+      setGenreId(initialGenre);
+    }
+  }, [initialGenre]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const pickGenre = (id: number | null) => {
+    setGenreId(id);
+    onGenreCleared?.(); // clear the shell's pre-select so it doesn't reapply
+  };
 
   // Reset when the tab or genre changes.
   useEffect(() => {
@@ -96,7 +112,7 @@ export function EntBrowse({ mediaType, onOpen, inList, onWatch, onToggleList }: 
       <div className="ent-chips">
         <button
           className={genreId === null ? "ent-chip on" : "ent-chip"}
-          onClick={() => setGenreId(null)}
+          onClick={() => pickGenre(null)}
         >
           All
         </button>
@@ -104,7 +120,7 @@ export function EntBrowse({ mediaType, onOpen, inList, onWatch, onToggleList }: 
           <button
             key={g.id}
             className={genreId === g.id ? "ent-chip on" : "ent-chip"}
-            onClick={() => setGenreId(g.id)}
+            onClick={() => pickGenre(g.id)}
           >
             {g.name}
           </button>

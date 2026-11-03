@@ -31,6 +31,8 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
   const [view, setView] = useState<EntView>("home");
   const [detail, setDetail] = useState<{ mediaType: TmdbMediaType; id: number } | null>(null);
   const [watching, setWatching] = useState<WatchPayload | null>(null);
+  // Browse pre-selection (genre quick-filter from home).
+  const [browseGenre, setBrowseGenre] = useState<{ mediaType: "movie" | "tv"; genreId: number } | null>(null);
   // Ticks so views re-read the local stores after mutations.
   const [listTick, setListTick] = useState(0);
   const [progressTick, setProgressTick] = useState(0);
@@ -68,6 +70,14 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
   const go = useCallback((v: EntView) => {
     setView(v);
     if (v !== "detail") setDetail(null);
+    requestAnimationFrame(() => bodyRef.current?.scrollTo({ top: 0 }));
+  }, []);
+
+  // Jump to browse with a genre pre-selected (from the home genre quick-bar).
+  const browseToGenre = useCallback((mediaType: "movie" | "tv", genreId: number) => {
+    setBrowseGenre({ mediaType, genreId });
+    setView(mediaType === "movie" ? "movies" : "tv");
+    setDetail(null);
     requestAnimationFrame(() => bodyRef.current?.scrollTo({ top: 0 }));
   }, []);
 
@@ -297,13 +307,14 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
               onWatch={watch}
               inList={inListFn}
               onToggleList={toggleListItem}
+              onBrowseGenre={browseToGenre}
             />
           )}
           {view === "movies" && (
-            <EntBrowse mediaType="movie" onOpen={openDetail} inList={inListFn} onWatch={watchFromCard} onToggleList={toggleListFn} />
+            <EntBrowse mediaType="movie" initialGenre={view === "movies" ? browseGenre?.mediaType === "movie" ? browseGenre.genreId : null : null} onOpen={openDetail} inList={inListFn} onWatch={watchFromCard} onToggleList={toggleListFn} onGenreCleared={() => setBrowseGenre(null)} />
           )}
           {view === "tv" && (
-            <EntBrowse mediaType="tv" onOpen={openDetail} inList={inListFn} onWatch={watchFromCard} onToggleList={toggleListFn} />
+            <EntBrowse mediaType="tv" initialGenre={view === "tv" ? browseGenre?.mediaType === "tv" ? browseGenre.genreId : null : null} onOpen={openDetail} inList={inListFn} onWatch={watchFromCard} onToggleList={toggleListFn} onGenreCleared={() => setBrowseGenre(null)} />
           )}
           {view === "mylist" && (
             <EntMyList
