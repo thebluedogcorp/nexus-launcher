@@ -1,10 +1,11 @@
 // v6.0.0 — EntHome: the NEXUS TV home screen. Cinematic hero (Apple TV+ style)
-// + Continue Watching rail (local progress) + six browse rails.
+// + Continue Watching rail (local progress) + Top 10 + six browse rails.
+// v6.1.0 — hover preview cards on every rail + direct Watch/List actions.
 
 import { useEffect, useState } from "react";
 import { Icon } from "../Icons";
 import { EntHero } from "./EntHero";
-import { EntLandscapeCard, Rail } from "./EntRails";
+import { EntLandscapeCard, Rail, Top10Rail, type AnyItem } from "./EntRails";
 import type { WatchPayload } from "./EntPlayer";
 import { asItems, asMovies, type TmdbItem, type TmdbMovie, type TmdbMediaType } from "../../lib/tmdb-types";
 import { getContinue, removeFromContinue, type ContinueEntry } from "../../lib/ent-store";
@@ -18,6 +19,20 @@ interface HomeProps {
 }
 
 export function EntHome({ progressTick, onOpen, onWatch, inList, onToggleList }: HomeProps) {
+  // Adapt the shell's TmdbItem-based toggle to the card's AnyItem signature.
+  const toggleAny = (item: AnyItem) => {
+    onToggleList({
+      id: item.id,
+      title: item.title,
+      posterPath: item.posterPath ?? null,
+      backdropPath: item.backdropPath ?? null,
+      rating: item.rating ?? 0,
+      year: item.year ?? "",
+      overview: item.overview ?? "",
+      genreIds: item.genreIds ?? [],
+      mediaType: item.mediaType ?? "movie",
+    } as TmdbItem);
+  };
   // Browse data
   const [trending, setTrending] = useState<TmdbItem[]>([]);
   const [nowPlaying, setNowPlaying] = useState<TmdbMovie[]>([]);
@@ -56,6 +71,20 @@ export function EntHome({ progressTick, onOpen, onWatch, inList, onToggleList }:
     setCont(getContinue().slice(0, 12));
   }, [progressTick]);
 
+  // Bridge: EntRails expects onWatch(mt, id, title) → adapt to full payload.
+  const watchFromCard = (mt: TmdbMediaType, id: number, title: string) => {
+    const fromList = trending.find(i => i.id === id && i.mediaType === mt)
+      ?? popularTv.find(i => i.id === id)
+      ?? topRatedTv.find(i => i.id === id);
+    onWatch({
+      mediaType: mt,
+      id,
+      title,
+      posterPath: fromList?.posterPath ?? null,
+      backdropPath: fromList?.backdropPath ?? null,
+    });
+  };
+
   return (
     <div className="ent-home">
       <EntHero
@@ -64,7 +93,7 @@ export function EntHome({ progressTick, onOpen, onWatch, inList, onToggleList }:
         onOpen={onOpen}
         onWatch={(mt, id, title, backdropPath, posterPath) => onWatch({ mediaType: mt, id, title, backdropPath, posterPath })}
         inList={inList}
-        onToggleList={onToggleList}
+        onToggleList={toggleAny}
       />
 
       <div className="ent-rails">
@@ -98,12 +127,23 @@ export function EntHome({ progressTick, onOpen, onWatch, inList, onToggleList }:
           </section>
         )}
 
-        <Rail title="Trending This Week" items={trending} loading={loading} onOpen={onOpen} />
-        <Rail title="Now Playing in Theaters" items={nowPlaying} forceMediaType="movie" loading={loading} onOpen={onOpen} />
-        <Rail title="Popular Movies" items={popular} forceMediaType="movie" loading={loading} onOpen={onOpen} />
-        <Rail title="Popular Series" items={popularTv} forceMediaType="tv" loading={loading} onOpen={onOpen} />
-        <Rail title="Top Rated Movies" items={topRated} forceMediaType="movie" loading={loading} onOpen={onOpen} />
-        <Rail title="Top Rated Series" items={topRatedTv} forceMediaType="tv" loading={loading} onOpen={onOpen} />
+        {/* Top 10 Movies (Netflix-style numbered rail) */}
+        <Top10Rail
+          title="Top 10 Movies Today"
+          items={topRated}
+          forceMediaType="movie"
+          loading={loading}
+          onOpen={onOpen}
+          onWatch={watchFromCard}
+          onToggleList={toggleAny}
+          inList={inList}
+        />
+
+        <Rail title="Trending This Week" items={trending} loading={loading} onOpen={onOpen} onWatch={watchFromCard} onToggleList={toggleAny} inList={inList} enableHover />
+        <Rail title="Now Playing in Theaters" items={nowPlaying} forceMediaType="movie" loading={loading} onOpen={onOpen} onWatch={watchFromCard} onToggleList={toggleAny} inList={inList} enableHover />
+        <Rail title="Popular Movies" items={popular} forceMediaType="movie" loading={loading} onOpen={onOpen} onWatch={watchFromCard} onToggleList={toggleAny} inList={inList} enableHover />
+        <Rail title="Popular Series" items={popularTv} forceMediaType="tv" loading={loading} onOpen={onOpen} onWatch={watchFromCard} onToggleList={toggleAny} inList={inList} enableHover />
+        <Rail title="Top Rated Series" items={topRatedTv} forceMediaType="tv" loading={loading} onOpen={onOpen} onWatch={watchFromCard} onToggleList={toggleAny} inList={inList} enableHover />
 
         {/* Brand strip */}
         <div className="ent-brandstrip">

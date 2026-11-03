@@ -39,6 +39,18 @@ export function EntMyList({ listTick, progressTick, onOpen, onWatch, inList }: M
 
   const empty = cont.length === 0 && list.length === 0;
 
+  // PosterGrid uses onWatch(mt, id, title); bridge to the full payload.
+  const watchFromCard = (mt: TmdbMediaType, id: number, title: string) => {
+    const li = list.find(i => i.id === id);
+    onWatch({
+      mediaType: mt,
+      id,
+      title,
+      posterPath: li?.posterPath ?? null,
+      backdropPath: null,
+    });
+  };
+
   return (
     <div className="ent-page">
       <div className="ent-page-head">
@@ -96,6 +108,8 @@ export function EntMyList({ listTick, progressTick, onOpen, onWatch, inList }: M
             items={list}
             onOpen={onOpen}
             inList={inList}
+            onWatch={watchFromCard}
+            enableHover
           />
           <div className="ent-ml-hint">
             <Icon.Info size={12} /> Click a poster for details. Manage items from any detail page.

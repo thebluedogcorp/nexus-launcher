@@ -62,11 +62,28 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
 
   const watch = useCallback((payload: WatchPayload) => setWatching(payload), []);
 
+  // Card → watch bridge (EntRails uses onWatch(mt, id, title); detail page
+  // already has the full payload, but browse/search/home rails need this adapter).
+  const watchFromCard = useCallback((mt: TmdbMediaType, id: number, title: string) => {
+    watch({ mediaType: mt, id, title });
+  }, [watch]);
+
+  // ── Scroll-to-top FAB ──
+  const [showTop, setShowTop] = useState(false);
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    const onScroll = () => setShowTop(el.scrollTop > 600);
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [view]);
+  const scrollTop = () => bodyRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+
   // ── My List helpers (tick re-renders consumers) ──
   const inListFn = useCallback((mt: TmdbMediaType, id: number) => listHas(mt, id), [listTick]);
-  const toggleListFn = useCallback((item: { mediaType: TmdbMediaType; id: number; title: string; posterPath?: string | null; rating?: number; year?: string }) => {
+  const toggleListFn = useCallback((item: { mediaType?: TmdbMediaType; id: number; title: string; posterPath?: string | null; rating?: number; year?: string }) => {
     toggleStore({
-      mediaType: item.mediaType,
+      mediaType: item.mediaType ?? "movie",
       id: item.id,
       title: item.title,
       posterPath: item.posterPath ?? null,
@@ -82,6 +99,7 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
   }, [toggleListFn]);
 
   // ── Keyboard shortcuts (native app feel) ──
+  //  / → search · Esc → back · g → games · Arrow keys move focus across cards ──
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (watching) return; // player handles its own Esc
@@ -95,11 +113,49 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
       } else if (e.key === "Escape") {
         if (view === "detail") backFromDetail();
         else if (view !== "home") go("home");
+      } else if ((e.key === "g" || e.key === "G") && !typing) {
+        onSwitchToGames();
+      } else if ((e.key === "ArrowRight" || e.key === "ArrowLeft") && !typing) {
+        // Focus-card navigation (gamepad-like). Move between cards in the
+        // currently visible rail/grid, scrolling into view as needed.
+        const cards = Array.from(document.querySelectorAll<HTMLElement>(
+          ".ent-lcard, .ent-pcard, .ent-top10-item .ent-pcard"
+        ));
+        if (cards.length === 0) return;
+        const current = document.activeElement as HTMLElement | null;
+        const idx = cards.indexOf(current as HTMLElement);
+        let nextIdx = idx < 0 ? 0 : (e.key === "ArrowRight" ? idx + 1 : idx - 1);
+        nextIdx = Math.max(0, Math.min(cards.length - 1, nextIdx));
+        const next = cards[nextIdx];
+        next.focus({ preventScroll: false });
+        next.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
+        e.preventDefault();
+      } else if ((e.key === "ArrowUp" || e.key === "ArrowDown") && !typing) {
+        // Vertical nav: jump to the prev/next rail/row in the same column.
+        const cards = Array.from(document.querySelectorAll<HTMLElement>(".ent-lcard, .ent-pcard"));
+        if (cards.length === 0) return;
+        const current = document.activeElement as HTMLElement | null;
+        const idx = cards.indexOf(current as HTMLElement);
+        if (idx < 0) { cards[0].focus(); e.preventDefault(); return; }
+        const curRect = current!.getBoundingClientRect();
+        const dir = e.key === "ArrowDown" ? 1 : -1;
+        let best: HTMLElement | null = null;
+        let bestDist = Infinity;
+        for (let i = 0; i < cards.length; i++) {
+          if (i === idx) continue;
+          const r = cards[i].getBoundingClientRect();
+          if (dir > 0 ? r.top <= curRect.top + 4 : r.top >= curRect.top - 4) continue;
+          const horiz = Math.abs(r.left - curRect.left);
+          const vert = Math.abs(r.top - curRect.top);
+          const d = vert + horiz * 0.4;
+          if (d < bestDist) { bestDist = d; best = cards[i]; }
+        }
+        if (best) { best.focus(); best.scrollIntoView({ block: "center", behavior: "smooth" }); e.preventDefault(); }
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [view, watching, backFromDetail, go]);
+  }, [view, watching, backFromDetail, go, onSwitchToGames]);
 
   const sideBtn = (active: boolean, label: string, icon: React.ReactNode, onClick: () => void) => (
     <button
@@ -107,6 +163,7 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
       onClick={onClick}
       title={label}
       aria-label={label}
+      data-label={label}
     >
       {icon}
       <span className="ent-side-bar" />
@@ -136,49 +193,64 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
 
       {/* ── Content ── */}
       <div className="ent-body" ref={bodyRef}>
-        {/* Floating glass clock (image 3) */}
+        {/* Floating glass clock */}
         <div className="ent-clock" aria-hidden="true">
           <span className="ent-clock-time">{timeStr}</span>
           <span className="ent-clock-date">{dateStr}</span>
         </div>
 
-        {view === "home" && (
-          <EntHome
-            progressTick={progressTick}
-            onOpen={openDetail}
-            onWatch={watch}
-            inList={inListFn}
-            onToggleList={toggleListItem}
-          />
-        )}
-        {view === "movies" && (
-          <EntBrowse mediaType="movie" onOpen={openDetail} inList={inListFn} />
-        )}
-        {view === "tv" && (
-          <EntBrowse mediaType="tv" onOpen={openDetail} inList={inListFn} />
-        )}
-        {view === "mylist" && (
-          <EntMyList
-            listTick={listTick}
-            progressTick={progressTick}
-            onOpen={openDetail}
-            onWatch={watch}
-            inList={inListFn}
-          />
-        )}
-        {view === "search" && (
-          <EntSearchView focusSignal={searchSignal} onOpen={openDetail} inList={inListFn} />
-        )}
-        {view === "detail" && detail && (
-          <EntDetailPage
-            mediaType={detail.mediaType}
-            id={detail.id}
-            onBack={backFromDetail}
-            onOpenDetail={openDetail}
-            onWatch={watch}
-            inList={inListFn}
-            onToggleList={toggleListFn}
-          />
+        {/* View transition wrapper — key forces remount + fade-in animation */}
+        <div className="ent-view" key={view}>
+          {view === "home" && (
+            <EntHome
+              progressTick={progressTick}
+              onOpen={openDetail}
+              onWatch={watch}
+              inList={inListFn}
+              onToggleList={toggleListItem}
+            />
+          )}
+          {view === "movies" && (
+            <EntBrowse mediaType="movie" onOpen={openDetail} inList={inListFn} onWatch={watchFromCard} onToggleList={toggleListFn} />
+          )}
+          {view === "tv" && (
+            <EntBrowse mediaType="tv" onOpen={openDetail} inList={inListFn} onWatch={watchFromCard} onToggleList={toggleListFn} />
+          )}
+          {view === "mylist" && (
+            <EntMyList
+              listTick={listTick}
+              progressTick={progressTick}
+              onOpen={openDetail}
+              onWatch={watch}
+              inList={inListFn}
+            />
+          )}
+          {view === "search" && (
+            <EntSearchView focusSignal={searchSignal} onOpen={openDetail} inList={inListFn} onWatch={watchFromCard} onToggleList={toggleListFn} />
+          )}
+          {view === "detail" && detail && (
+            <EntDetailPage
+              mediaType={detail.mediaType}
+              id={detail.id}
+              onBack={backFromDetail}
+              onOpenDetail={openDetail}
+              onWatch={watch}
+              inList={inListFn}
+              onToggleList={toggleListFn}
+            />
+          )}
+        </div>
+
+        {/* Scroll-to-top FAB */}
+        {showTop && (
+          <button
+            className="ent-fab-top"
+            onClick={scrollTop}
+            aria-label="Scroll to top"
+            title="Back to top"
+          >
+            <Icon.Chevron size={20} />
+          </button>
         )}
 
         {/* Footer */}

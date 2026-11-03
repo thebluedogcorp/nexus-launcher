@@ -9,9 +9,11 @@ interface SearchProps {
   focusSignal: number;
   onOpen: (mediaType: TmdbMediaType, id: number) => void;
   inList: (mediaType: TmdbMediaType, id: number) => boolean;
+  onWatch?: (mt: TmdbMediaType, id: number, title: string) => void;
+  onToggleList?: (item: AnyItem) => void;
 }
 
-export function EntSearchView({ focusSignal, onOpen, inList }: SearchProps) {
+export function EntSearchView({ focusSignal, onOpen, inList, onWatch, onToggleList }: SearchProps) {
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const [results, setResults] = useState<AnyItem[]>([]);
@@ -78,7 +80,7 @@ export function EntSearchView({ focusSignal, onOpen, inList }: SearchProps) {
 
       {active ? (
         loading ? (
-          <PosterGrid items={[]} loading onOpen={onOpen} />
+          <PosterGrid items={[]} loading onOpen={onOpen} onWatch={onWatch} onToggleList={onToggleList} inList={inList} enableHover />
         ) : results.length === 0 ? (
           <div className="ent-empty">
             <Icon.Search size={34} />
@@ -86,7 +88,7 @@ export function EntSearchView({ focusSignal, onOpen, inList }: SearchProps) {
             <span>Try a different title, or check the spelling.</span>
           </div>
         ) : (
-          <PosterGrid items={results} onOpen={onOpen} inList={inList} />
+          <PosterGrid items={results} onOpen={onOpen} inList={inList} onWatch={onWatch} onToggleList={onToggleList} enableHover />
         )
       ) : (
         <div className="ent-search-hints">

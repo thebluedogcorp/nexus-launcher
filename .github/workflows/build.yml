@@ -50,47 +50,46 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v6.0.0"
-          $title = "NEXUS v6.0.0 — Entertainment UI overhaul: full premium OTT design system for NEXUS TV"
+          $tag = "v6.1.0"
+          $title = "NEXUS v6.1.0 — NEXUS TV premium UX: hover preview cards, Top 10 rail, arrow-key nav, FAB, view transitions"
           $notes = @"
           NEXUS — Universal Game Launcher & Entertainment Hub for Windows.
 
-          **v6.0.0 — A top-to-bottom Entertainment UI overhaul. NEXUS TV is now a full premium OTT / native-Windows-app experience, not a website.**
+          **v6.1.0 — Premium UX layer for NEXUS TV. Hover previews, ranked rails, keyboard navigation, and micro-animations that make it feel like a top-tier native OTT app.**
 
-          **What changed.**
-          The entire NEXUS TV module was rebuilt around a dedicated design system with its own rose identity (--ent), a narrow icon sidebar, a floating glass clock, a cinematic hero, landscape rails, poster grids, a full detail page, and a full-screen player — all styled as a cohesive, production-quality native app.
+          **New: hover preview popover (Netflix-style).**
+          Hover any card on a rail or grid for 450ms and a rich preview card lifts up showing the poster, title, year, type, a "% match" score, top genres, a 3-line overview, and quick **Watch** + **My List** actions — so you can decide or start watching without opening the full detail page. Cards at the right edge reposition the popover so it never clips off-screen.
 
-          **New app shell (EntShell).**
-          - Narrow 68px icon sidebar (Search / Home / Movies / TV / My List + Switch to Games / Mode selector at the bottom) with an animated rose active indicator bar.
-          - Floating glass clock (top-right) with tabular-nums time + uppercase date — a native telemetry feel.
-          - Keyboard shortcuts: press "/" anywhere to jump to Search, Esc to go back.
-          - Sticky glass footer with brand + capability badges.
+          **New: Top 10 Movies Today rail.**
+          A Netflix-style numbered row with giant stroked rose numerals (1-10) behind each poster. The top 3 get a brighter stroke + glow. Uses the Top Rated Movies feed, ranked.
 
-          **Cinematic hero (EntHero).**
-          - Full-bleed crossfading backdrops (8s auto-advance), deep left-to-right gradient blend, huge condensed title, NEXUS TV kicker chip, rating + year + genre badges, 2-line synopsis, Watch Now / More Info / My List CTAs, and pagination dots.
+          **New: arrow-key navigation (gamepad-like).**
+          - ArrowLeft / ArrowRight — move focus across cards in the current rail/grid; the focused card auto-scrolls into view.
+          - ArrowUp / ArrowDown — jump to the nearest card in the prev/next row (same column), with smooth scroll.
+          - A clear rose focus ring (2px) appears on the focused card.
+          - **g** — instant switch to Games mode. **/** — jump to Search. **Esc** — back.
 
-          **Rails + cards (EntRails).**
-          - Landscape 16:9 cards with type chip, hover scale + rose ring + play overlay, bottom gradient title/meta, and a Continue-Watching progress bar.
-          - Portrait 2:3 poster cards with rating chip, type chip, in-list bookmark badge, hover lift + glow.
-          - Rails with hover-reveal scroll arrows, snap scrolling, count badges, and shimmer skeletons.
+          **New: scroll-to-top FAB.**
+          A glass floating action button appears in the bottom-right after scrolling past 600px. Click (or it animates in) to smooth-scroll back to the top. Turns rose on hover.
 
-          **Browse (EntBrowse).** Movies + TV pages with genre filter chips, paginated Show-More loading, responsive poster grid.
+          **New: view transitions.**
+          Every view switch (Home → Movies → Detail → Search…) now fades + rises in over 350ms via a keyed wrapper, so navigation feels alive instead of instant-swap. Detail-page sections stagger in sequence.
 
-          **My List (EntMyList).** Continue Watching (landscape cards with resume + remove) and Saved Titles (poster grid), persisted locally via the ent-store.
+          **Bug fix: hero was not full-bleed.**
+          The floating clock used `float:right`, which caused the hero (and its backdrops) to wrap around the clock's footprint — shrinking the hero by ~124px on the right and leaving a black gap. Fixed by switching the clock to `position:fixed`, so it overlays without affecting flow. Hero is now true full-width (verified: hero width = body width).
 
-          **Search (EntSearchView).** Big glass search bar with clear button, debounced multi-search across movies + TV, suggestion chips, and empty/no-results states.
+          **Polish.**
+          - Sidebar buttons now show a CSS tooltip label on hover (in addition to the native title).
+          - Continue-Watching progress bars get a subtle live shine pulse.
+          - Cards lift 2px on hover (whole wrap, not just the image).
+          - Hero meta items get proper dot separators.
+          - Full `prefers-reduced-motion` support — all new animations disable for users who prefer reduced motion.
 
-          **Detail page (EntDetailPage).** Full-bleed backdrop hero with centered Play-Trailer ring, glass info panel overlapping the hero (poster + ratings + synopsis + genre pills + Watch Now / Trailer / My List / IMDb actions + resume bar), a stats column (director / status / runtime / episodes / starring), cast row with avatar circles, storyline, where-to-watch providers, and a More Like This recommendations rail.
-
-          **Full-screen player (EntPlayer).** Glass top control bar (type badge + title + TV season/episode selector + position + open-in-browser + close), CineSrc iframe stage, Esc-to-close, and a local progress store so the app remembers where you left off across restarts.
-
-          **Design tokens.** New --ent / --ent-rgb / --ent-hover / --ent-fg / --ent-soft rose tokens added to :root so the Entertainment identity is fully distinct from the Games (emerald) side and propagates everywhere live.
-
-          All v5.1.0 functionality preserved: full CineSrc streaming playback, Games & Entertainment selector, TMDB IPC in main process, mode switching, library, collections, platform detection, launching, playtime, achievements, overlay, console/desktop mode, themes, 4 first-party plugins.
+          All v6.0.0 functionality preserved: full NEXUS TV design system, CineSrc streaming playback, TMDB IPC in main process, mode switching, library, collections, platform detection, launching, playtime, achievements, overlay, console/desktop mode, themes, 4 first-party plugins.
 
           **Downloads:**
-          - NEXUS-Setup-6.0.0.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-6.0.0.exe — single-file portable build.
+          - NEXUS-Setup-6.1.0.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-6.1.0.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@

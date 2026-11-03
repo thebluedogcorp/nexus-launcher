@@ -2322,9 +2322,11 @@ button.tb-logo:active{transform:scale(0.97)}
 .ent-body::-webkit-scrollbar-thumb:hover{background:rgba(var(--ent-rgb),.45);
   background-clip:padding-box;border:3px solid transparent}
 
-/* Floating glass clock (top-right telemetry) */
-.ent-clock{position:sticky;top:14px;float:right;z-index:var(--z-content);
-  margin:14px 24px 0 0;display:flex;flex-direction:column;align-items:flex-end;
+/* Floating glass clock (top-right telemetry) — position:fixed so it never
+   wraps/pushes hero or any flow content (the float:right approach shrank
+   the hero width by the clock's footprint). */
+.ent-clock{position:fixed;top:14px;right:20px;z-index:var(--z-content);
+  display:flex;flex-direction:column;align-items:flex-end;
   padding:8px 14px;border-radius:var(--r-lg);background:var(--surface-glass);
   border:1px solid var(--border-2);backdrop-filter:blur(16px);
   box-shadow:var(--shadow-low);pointer-events:none}
@@ -2743,3 +2745,167 @@ button.tb-logo:active{transform:scale(0.97)}
   .ent-foot-meta{gap:12px}
 }
 
+
+/* ===================================================================
+   NEXUS TV v6.1.0 — Premium UI additions
+   Hover preview popover, Top 10 numbered rail, scroll-to-top FAB,
+   view transitions, richer card meta, and sidebar tooltips.
+   =================================================================== */
+
+/* ── View transition (fade + rise on navigation) ─────────────── */
+.ent-view{animation:ent-view-in .35s cubic-bezier(.2,.8,.2,1)}
+@keyframes ent-view-in{
+  from{opacity:0;transform:translateY(8px)}
+  to{opacity:1;transform:translateY(0)}
+}
+
+/* ── Hover preview popover (Netflix-style) ───────────────────── */
+.ent-hover{position:absolute;z-index:50;top:-12px;left:50%;
+  transform:translateX(-50%);width:320px;pointer-events:auto;
+  background:#0e0e10;border:1px solid var(--border-2);
+  border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--shadow-high),
+    0 0 0 1px rgba(var(--ent-rgb),.18);
+  animation:ent-hover-in .18s cubic-bezier(.2,.8,.2,1)}
+@keyframes ent-hover-in{
+  from{opacity:0;transform:translateX(-50%) translateY(8px) scale(.96)}
+  to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}
+}
+.ent-lcard-wrap,.ent-pcard-wrap{position:relative}
+.ent-lcard-wrap .ent-hover{top:auto;bottom:calc(100% + 8px)}
+.ent-pcard-wrap .ent-hover{top:auto;bottom:calc(100% + 8px)}
+
+.ent-hover-media{position:relative;aspect-ratio:16/9;background:var(--surface);
+  overflow:hidden}
+.ent-hover-media img{width:100%;height:100%;object-fit:cover}
+.ent-hover-media .ent-lcard-ph{position:absolute;inset:0}
+.ent-hover-body{padding:12px 14px 14px}
+.ent-hover-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px}
+.ent-hover-title{font-size:14px;font-weight:700;color:#fff;line-height:1.25;
+  flex:1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ent-hover-actions{display:flex;gap:6px;flex-shrink:0}
+.ent-hover-play{display:flex;align-items:center;justify-content:center;width:32px;height:32px;
+  border-radius:50%;background:var(--ent);color:var(--ent-fg);border:none;cursor:pointer;
+  transition:all var(--t-fast);box-shadow:0 4px 12px -2px rgba(var(--ent-rgb),.6)}
+.ent-hover-play:hover{background:var(--ent-hover);transform:scale(1.08)}
+.ent-hover-btn{display:flex;align-items:center;justify-content:center;width:30px;height:30px;
+  border-radius:50%;background:var(--surface-2);color:var(--text-dim);border:1px solid var(--border-2);
+  cursor:pointer;transition:all var(--t-fast)}
+.ent-hover-btn:hover{color:#fff;background:var(--surface);border-color:var(--border-strong)}
+.ent-hover-btn.on{color:var(--ent);border-color:rgba(var(--ent-rgb),.4);background:rgba(var(--ent-rgb),.12)}
+.ent-hover-meta{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px;
+  font-size:11px;color:var(--text-dim)}
+.ent-hover-meta>span{display:inline-flex;align-items:center;gap:3px}
+.ent-hover-type{padding:2px 7px;border-radius:var(--r-pill);background:var(--surface-2);
+  border:1px solid var(--border-2);font-size:9.5px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--text-dim)}
+.ent-hover-match{color:#46d369;font-weight:600}
+.ent-hover-match svg{color:#46d369}
+.ent-hover-genres{font-size:11px;color:var(--text-dim);margin-bottom:6px}
+.ent-hover-overview{font-size:11.5px;line-height:1.5;color:var(--text-dim);margin:0;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+
+/* edge: keep hover card on-screen when card is at the far right */
+.ent-rail-track .ent-lcard-wrap:last-child .ent-hover,
+.ent-grid .ent-pcard-wrap:nth-last-child(-n+2) .ent-hover{
+  left:auto;right:-8px;transform:none;
+  animation:ent-hover-in-r .18s cubic-bezier(.2,.8,.2,1)}
+@keyframes ent-hover-in-r{
+  from{opacity:0;transform:translateY(8px) scale(.96)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+
+/* ── Top 10 numbered rail ────────────────────────────────────── */
+.ent-top10 .ent-rail-title{display:inline-flex;align-items:center;gap:6px}
+.ent-top10 .ent-rail-title svg{color:var(--ent)}
+.ent-top10-track{display:flex;gap:6px;padding:4px 2px 10px}
+.ent-top10-item{position:relative;flex:0 0 auto;display:flex;align-items:flex-end;
+  padding-left:0}
+.ent-top10-num{font-size:140px;font-weight:900;line-height:.78;
+  letter-spacing:-.06em;color:transparent;
+  -webkit-text-stroke:2px rgba(var(--ent-rgb),.5);
+  text-stroke:2px rgba(var(--ent-rgb),.5);
+  margin-right:-14px;margin-bottom:-4px;font-family:"Inter","Segoe UI",system-ui,sans-serif;
+  user-select:none;pointer-events:none;flex-shrink:0;
+  text-shadow:0 0 30px rgba(var(--ent-rgb),.15)}
+.ent-top10-item .ent-pcard{width:150px}
+.ent-top10-item .ent-pcard-media{width:150px}
+.ent-top10-item:nth-child(-n+3) .ent-top10-num{
+  -webkit-text-stroke:2px rgba(var(--ent-rgb),.75);
+  text-shadow:0 0 40px rgba(var(--ent-rgb),.25)}
+
+/* ── Scroll-to-top FAB ───────────────────────────────────────── */
+.ent-fab-top{position:fixed;right:24px;bottom:28px;z-index:var(--z-content);
+  display:flex;align-items:center;justify-content:center;width:44px;height:44px;
+  border-radius:50%;background:var(--surface-glass);border:1px solid var(--border-2);
+  backdrop-filter:blur(14px);color:#fff;cursor:pointer;
+  box-shadow:var(--shadow-mid);transition:all var(--t-base);
+  animation:ent-fab-in .25s cubic-bezier(.2,.8,.2,1)}
+@keyframes ent-fab-in{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:scale(1)}}
+.ent-fab-top:hover{background:var(--ent);color:var(--ent-fg);
+  border-color:var(--ent);transform:translateY(-2px);
+  box-shadow:0 10px 24px -6px rgba(var(--ent-rgb),.6)}
+.ent-fab-top svg{transform:rotate(180deg)}
+
+/* ── Sidebar tooltips (native title attr fallback → CSS label) ─ */
+.ent-side-btn{position:relative}
+.ent-side-btn::after{content:attr(data-label);position:absolute;left:calc(100% + 12px);
+  top:50%;transform:translateY(-50%) translateX(-6px);padding:5px 10px;
+  background:#1c1c1f;color:#fff;font-size:11px;font-weight:600;white-space:nowrap;
+  border-radius:var(--r-sm);border:1px solid var(--border-2);
+  opacity:0;pointer-events:none;transition:all var(--t-fast);z-index:60}
+.ent-side-btn:hover::after{opacity:1;transform:translateY(-50%) translateX(0)}
+
+/* ── Richer hero meta divider ────────────────────────────────── */
+.ent-hero-meta .ent-hm:not(.badge)::after{content:"·";margin-left:10px;color:var(--text-faint);opacity:.6}
+.ent-hero-meta .ent-hm:last-child:not(.badge)::after{content:none}
+.ent-hero-meta .ent-hm.badge::after{content:none}
+
+/* ── Detail page: subtle entrance for the glass panel ────────── */
+.ent-dp-glass{animation:ent-dp-glass-in .4s cubic-bezier(.2,.8,.2,1)}
+@keyframes ent-dp-glass-in{
+  from{opacity:0;transform:translateY(20px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.ent-dp-section{animation:ent-view-in .4s cubic-bezier(.2,.8,.2,1) both}
+.ent-dp-section:nth-child(2){animation-delay:.06s}
+.ent-dp-section:nth-child(3){animation-delay:.12s}
+.ent-dp-section:nth-child(4){animation-delay:.18s}
+.ent-dp-recs{animation:ent-view-in .4s cubic-bezier(.2,.8,.2,1) .24s both}
+
+/* ── Poster card: refined year+rating sub line ──────────────── */
+.ent-pcard-year{display:flex;align-items:center;gap:4px}
+.ent-pcard-year::before{content:"";width:3px;height:3px;border-radius:50%;background:var(--text-faint);opacity:0}
+
+/* ── Landscape card hover: lift the whole wrap ──────────────── */
+.ent-lcard-wrap{transition:transform var(--t-base)}
+.ent-lcard-wrap:hover{transform:translateY(-2px)}
+.ent-pcard-wrap{transition:transform var(--t-base)}
+.ent-pcard-wrap:hover{transform:translateY(-2px)}
+
+/* ── Continue Watching card: live-pulse on the progress bar ── */
+.ent-lcard-bar{position:relative}
+.ent-lcard-bar::after{content:"";position:absolute;right:0;top:0;bottom:0;width:8px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.5));
+  animation:ent-progress-shine 2s ease-in-out infinite}
+@keyframes ent-progress-shine{
+  0%,100%{opacity:0}
+  50%{opacity:1}
+}
+
+/* ── Reduced motion: disable non-essential animations ───────── */
+@media (prefers-reduced-motion:reduce){
+  .ent-view,.ent-hover,.ent-fab-top,.ent-dp-glass,.ent-dp-section,.ent-dp-recs{
+    animation:none}
+  .ent-lcard-bar::after{animation:none}
+  .ent-hero-media img{transition:none}
+}
+
+/* ── Keyboard focus ring (arrow-key navigation) ──────────────── */
+.ent-lcard:focus-visible,.ent-pcard:focus-visible{
+  outline:none}
+.ent-lcard:focus-visible .ent-lcard-media,
+.ent-pcard:focus-visible .ent-pcard-media{
+  border-color:var(--ent);
+  box-shadow:0 0 0 2px rgba(var(--ent-rgb),.6),0 14px 34px -10px rgba(0,0,0,.7)}
+.ent-lcard:focus-visible .ent-lcard-hover,
+.ent-pcard:focus-visible .ent-pcard-hover{opacity:.7}

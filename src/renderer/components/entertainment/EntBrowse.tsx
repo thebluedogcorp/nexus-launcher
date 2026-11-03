@@ -17,11 +17,13 @@ interface BrowseProps {
   mediaType: Extract<TmdbMediaType, "movie" | "tv">;
   onOpen: (mediaType: TmdbMediaType, id: number) => void;
   inList: (mediaType: TmdbMediaType, id: number) => boolean;
+  onWatch?: (mt: TmdbMediaType, id: number, title: string) => void;
+  onToggleList?: (item: AnyItem) => void;
 }
 
 const PAGE_SIZE = 20;
 
-export function EntBrowse({ mediaType, onOpen, inList }: BrowseProps) {
+export function EntBrowse({ mediaType, onOpen, inList, onWatch, onToggleList }: BrowseProps) {
   const genres: GenreDef[] = mediaType === "tv" ? TV_GENRES : MOVIE_GENRES;
   const isMovie = mediaType === "movie";
 
@@ -115,6 +117,9 @@ export function EntBrowse({ mediaType, onOpen, inList }: BrowseProps) {
         loading={loading}
         onOpen={onOpen}
         inList={inList}
+        onWatch={onWatch}
+        onToggleList={onToggleList}
+        enableHover
       />
 
       {/* Load More strip (image 1) */}
