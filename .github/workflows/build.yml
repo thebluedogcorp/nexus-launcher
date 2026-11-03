@@ -50,46 +50,37 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v6.1.0"
-          $title = "NEXUS v6.1.0 — NEXUS TV premium UX: hover preview cards, Top 10 rail, arrow-key nav, FAB, view transitions"
+          $tag = "v6.2.0"
+          $title = "NEXUS v6.2.0 — Command palette (Ctrl+K), hero manual controls, NEW badges, premium polish"
           $notes = @"
           NEXUS — Universal Game Launcher & Entertainment Hub for Windows.
 
-          **v6.1.0 — Premium UX layer for NEXUS TV. Hover previews, ranked rails, keyboard navigation, and micro-animations that make it feel like a top-tier native OTT app.**
+          **v6.2.0 — Power-user UX for NEXUS TV. A command palette, manual hero controls, release badges, and tactile micro-polish that make the app feel like a top-tier native product.**
 
-          **New: hover preview popover (Netflix-style).**
-          Hover any card on a rail or grid for 450ms and a rich preview card lifts up showing the poster, title, year, type, a "% match" score, top genres, a 3-line overview, and quick **Watch** + **My List** actions — so you can decide or start watching without opening the full detail page. Cards at the right edge reposition the popover so it never clips off-screen.
+          **New: Command Palette (Ctrl/Cmd+K).**
+          A native-app command palette opens anywhere with Ctrl+K (or click the search icon at the top of the sidebar). Fuzzy-search across cached trending titles + your My List, with quick-action shortcuts to every view (Home / Movies / TV / My List / Search / Switch to Games / Mode selector). Fully keyboard-driven: ↑↓ navigate, ↵ activates, Esc closes. The sidebar trigger pulses with a rose dot so it's discoverable. Title hits show poster thumbnails + type tags.
 
-          **New: Top 10 Movies Today rail.**
-          A Netflix-style numbered row with giant stroked rose numerals (1-10) behind each poster. The top 3 get a brighter stroke + glow. Uses the Top Rated Movies feed, ranked.
+          **New: Manual hero prev/next arrows.**
+          The cinematic hero now has prev/next arrows on the left/right edges (reveal on hover) so you can flip between featured titles directly instead of waiting for the 8s auto-advance. An "Up Next" glass chip in the bottom-right previews the next title. Pagination dots still work.
 
-          **New: arrow-key navigation (gamepad-like).**
-          - ArrowLeft / ArrowRight — move focus across cards in the current rail/grid; the focused card auto-scrolls into view.
-          - ArrowUp / ArrowDown — jump to the nearest card in the prev/next row (same column), with smooth scroll.
-          - A clear rose focus ring (2px) appears on the focused card.
-          - **g** — instant switch to Games mode. **/** — jump to Search. **Esc** — back.
+          **New: NEW badge on recent releases.**
+          Poster cards for titles released within the last ~18 months get a green "NEW" pill in the top-left corner — so fresh content stands out at a glance in browse/search/my-list grids.
 
-          **New: scroll-to-top FAB.**
-          A glass floating action button appears in the bottom-right after scrolling past 600px. Click (or it animates in) to smooth-scroll back to the top. Turns rose on hover.
-
-          **New: view transitions.**
-          Every view switch (Home → Movies → Detail → Search…) now fades + rises in over 350ms via a keyed wrapper, so navigation feels alive instead of instant-swap. Detail-page sections stagger in sequence.
-
-          **Bug fix: hero was not full-bleed.**
-          The floating clock used `float:right`, which caused the hero (and its backdrops) to wrap around the clock's footprint — shrinking the hero by ~124px on the right and leaving a black gap. Fixed by switching the clock to `position:fixed`, so it overlays without affecting flow. Hero is now true full-width (verified: hero width = body width).
+          **New: card hover sheen sweep.**
+          Both landscape and poster cards now get a subtle diagonal light-sheen that sweeps across the art on hover — a small but premium tactile detail.
 
           **Polish.**
-          - Sidebar buttons now show a CSS tooltip label on hover (in addition to the native title).
-          - Continue-Watching progress bars get a subtle live shine pulse.
-          - Cards lift 2px on hover (whole wrap, not just the image).
-          - Hero meta items get proper dot separators.
-          - Full `prefers-reduced-motion` support — all new animations disable for users who prefer reduced motion.
+          - Sidebar active indicator bar now pulses with a rose glow (2.2s breathe).
+          - Focus-visible rings on ALL interactive elements (CTAs, chips, dots, arrows, load-more, clear) — full keyboard accessibility.
+          - Hero text block slides in on every rotation.
+          - Command palette has a proper backdrop blur + scale-in animation.
+          - New `isNewRelease()` helper exported from tmdb-types.
 
-          All v6.0.0 functionality preserved: full NEXUS TV design system, CineSrc streaming playback, TMDB IPC in main process, mode switching, library, collections, platform detection, launching, playtime, achievements, overlay, console/desktop mode, themes, 4 first-party plugins.
+          All v6.1.0 functionality preserved: hover preview popovers, Top 10 rail, arrow-key card navigation, scroll-to-top FAB, view transitions, full CineSrc streaming playback, TMDB IPC in main process, mode switching, library, collections, platform detection, launching, playtime, achievements, overlay, console/desktop mode, themes, 4 first-party plugins.
 
           **Downloads:**
-          - NEXUS-Setup-6.1.0.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-6.1.0.exe — single-file portable build.
+          - NEXUS-Setup-6.2.0.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-6.2.0.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@

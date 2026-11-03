@@ -13,6 +13,7 @@ import { Icon } from "../Icons";
 import {
   tmdbImg,
   formatRating,
+  isNewRelease,
   MOVIE_GENRES,
   TV_GENRES,
   type TmdbMediaType,
@@ -237,6 +238,7 @@ export function EntPosterCard({ item, forceMediaType, onOpen, inList, onWatch, o
             <div className="ent-pcard-rating"><Icon.Star size={9} filled /> {formatRating(item.rating!)}</div>
           )}
           <span className={mt === "tv" ? "ent-lchip tv" : "ent-lchip"}>{mt === "tv" ? "TV" : "Film"}</span>
+          {isNewRelease(item.year) && <span className="ent-pcard-new">NEW</span>}
           {inList && (
             <div className="ent-pcard-listed" title="In My List"><Icon.Bookmark size={11} filled /></div>
           )}

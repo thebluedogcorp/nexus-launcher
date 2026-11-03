@@ -111,6 +111,15 @@ export function formatRating(v: number | null | undefined): string {
   return v.toFixed(1);
 }
 
+/** True if the title was released within the last ~18 months (a "NEW" badge). */
+export function isNewRelease(year: string | undefined): boolean {
+  if (!year) return false;
+  const y = parseInt(year, 10);
+  if (isNaN(y)) return false;
+  const now = new Date();
+  return y >= now.getFullYear() - 1;
+}
+
 /**
  * CineSrc embed URL — cinesrc.st is a free streaming API that embeds movies &
  * TV shows by TMDB ID (no scraping; it indexes streams against TMDB IDs).

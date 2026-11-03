@@ -2909,3 +2909,142 @@ button.tb-logo:active{transform:scale(0.97)}
   box-shadow:0 0 0 2px rgba(var(--ent-rgb),.6),0 14px 34px -10px rgba(0,0,0,.7)}
 .ent-lcard:focus-visible .ent-lcard-hover,
 .ent-pcard:focus-visible .ent-pcard-hover{opacity:.7}
+
+
+/* ===================================================================
+   NEXUS TV v6.2.0 — Command palette, hero arrows, NEW badge, polish
+   =================================================================== */
+
+/* ── Command palette (Ctrl/Cmd+K) ────────────────────────────── */
+.ent-cmd-overlay{position:fixed;inset:0;z-index:300;display:flex;
+  justify-content:center;align-items:flex-start;padding-top:12vh;
+  background:rgba(0,0,0,.6);backdrop-filter:blur(6px);
+  animation:ent-fade .15s ease}
+.ent-cmd{width:min(640px,92vw);max-height:76vh;display:flex;flex-direction:column;
+  background:#0e0e10;border:1px solid var(--border-2);border-radius:var(--r-xl);
+  overflow:hidden;box-shadow:var(--shadow-high),0 0 0 1px rgba(var(--ent-rgb),.18);
+  animation:ent-cmd-in .2s cubic-bezier(.2,.8,.2,1)}
+@keyframes ent-cmd-in{
+  from{opacity:0;transform:translateY(-12px) scale(.98)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+.ent-cmd-input-wrap{display:flex;align-items:center;gap:12px;padding:16px 18px;
+  border-bottom:1px solid var(--border);background:rgba(255,255,255,.02)}
+.ent-cmd-input-wrap>svg{color:var(--text-dim);flex-shrink:0}
+.ent-cmd-input{flex:1;background:transparent;border:none;outline:none;
+  color:#fff;font-size:15px;font-family:inherit}
+.ent-cmd-input::placeholder{color:var(--text-faint)}
+.ent-cmd-kbd{font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--text-faint);
+  padding:3px 7px;border-radius:var(--r-sm);background:var(--surface-2);
+  border:1px solid var(--border-2)}
+.ent-cmd-list{flex:1;overflow-y:auto;padding:6px 0}
+.ent-cmd-list::-webkit-scrollbar{width:8px}
+.ent-cmd-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:4px}
+.ent-cmd-empty{display:flex;flex-direction:column;align-items:center;gap:8px;
+  padding:40px 24px;color:var(--text-faint);text-align:center}
+.ent-cmd-empty p{font-size:13px;margin:0}
+.ent-cmd-group{padding:6px 8px}
+.ent-cmd-group-h{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--text-faint);padding:8px 10px 6px}
+.ent-cmd-row{display:flex;align-items:center;gap:12px;width:100%;padding:9px 10px;
+  border-radius:var(--r-md);background:transparent;border:none;cursor:pointer;
+  text-align:left;transition:background var(--t-fast)}
+.ent-cmd-row.on{background:rgba(var(--ent-rgb),.14)}
+.ent-cmd-row-icon{display:flex;align-items:center;justify-content:center;width:28px;height:28px;
+  border-radius:var(--r-sm);background:var(--surface);color:var(--ent);flex-shrink:0;
+  border:1px solid var(--border-2)}
+.ent-cmd-row.on .ent-cmd-row-icon{background:rgba(var(--ent-rgb),.18);border-color:rgba(var(--ent-rgb),.32)}
+.ent-cmd-row-label{flex:1;font-size:13.5px;color:#fff;font-weight:500;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ent-cmd-row-hint{font-size:10.5px;color:var(--text-faint);padding:2px 6px;border-radius:var(--r-sm);
+  background:var(--surface);border:1px solid var(--border-2)}
+.ent-cmd-row-poster{width:24px;height:36px;border-radius:3px;overflow:hidden;flex-shrink:0;
+  background:var(--surface);border:1px solid var(--border-2)}
+.ent-cmd-row-poster img{width:100%;height:100%;object-fit:cover}
+.ent-cmd-row-poster-ph{display:flex;align-items:center;justify-content:center;width:100%;height:100%;
+  color:var(--text-faint);background:var(--surface-2)}
+.ent-cmd-row-meta{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim)}
+.ent-cmd-tag{padding:2px 6px;border-radius:var(--r-pill);font-size:9px;font-weight:700;
+  letter-spacing:.06em;background:var(--surface-2);border:1px solid var(--border-2);color:var(--text-dim)}
+.ent-cmd-tag.tv{background:rgba(var(--ent-rgb),.16);color:var(--ent);border-color:rgba(var(--ent-rgb),.3)}
+.ent-cmd-foot{display:flex;align-items:center;gap:16px;padding:10px 18px;
+  border-top:1px solid var(--border);background:rgba(255,255,255,.015);
+  font-size:11px;color:var(--text-faint)}
+.ent-cmd-foot span{display:inline-flex;align-items:center;gap:4px}
+.ent-cmd-foot kbd{font-size:9.5px;font-weight:700;padding:2px 5px;border-radius:3px;
+  background:var(--surface-2);border:1px solid var(--border-2);color:var(--text-dim)}
+.ent-cmd-foot-brand{margin-left:auto;color:var(--ent);font-weight:700;letter-spacing:.04em}
+
+/* Sidebar command trigger — distinct accent + Ctrl+K hint dot */
+.ent-side-cmd{position:relative}
+.ent-side-cmd::before{content:"";position:absolute;top:5px;right:5px;width:6px;height:6px;
+  border-radius:50%;background:var(--ent);box-shadow:0 0 8px rgba(var(--ent-rgb),.8);
+  animation:ent-cmd-pulse 2.4s ease-in-out infinite}
+@keyframes ent-cmd-pulse{
+  0%,100%{opacity:.5;transform:scale(.85)}
+  50%{opacity:1;transform:scale(1.1)}
+}
+
+/* ── Hero prev/next arrows + Up Next chip ────────────────────── */
+.ent-hero-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:4;
+  display:flex;align-items:center;justify-content:center;width:44px;height:64px;
+  border:none;background:rgba(0,0,0,.45);color:#fff;cursor:pointer;
+  backdrop-filter:blur(6px);transition:all var(--t-base);opacity:0}
+.ent-hero:hover .ent-hero-arrow{opacity:1}
+.ent-hero-arrow:hover{background:var(--ent);color:var(--ent-fg)}
+.ent-hero-arrow.prev{left:0;border-radius:0 var(--r-md) var(--r-md) 0}
+.ent-hero-arrow.next{right:0;border-radius:var(--r-md) 0 0 var(--r-md)}
+.ent-hero-arrow.prev svg{transform:rotate(180deg)}
+
+.ent-hero-next{position:absolute;right:32px;bottom:78px;z-index:4;display:flex;
+  flex-direction:column;align-items:flex-end;gap:2px;padding:8px 12px;
+  border-radius:var(--r-md);background:var(--surface-glass);border:1px solid var(--border-2);
+  backdrop-filter:blur(10px);max-width:240px;pointer-events:none;
+  animation:ent-view-in .3s ease}
+.ent-hero-next-label{font-size:9.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ent)}
+.ent-hero-next-title{font-size:12px;font-weight:600;color:#fff;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;max-width:216px}
+
+/* ── NEW badge on poster cards ───────────────────────────────── */
+.ent-pcard-new{position:absolute;top:7px;left:7px;z-index:3;
+  display:inline-flex;align-items:center;padding:3px 7px;border-radius:var(--r-pill);
+  font-size:8.5px;font-weight:800;letter-spacing:.1em;
+  background:#46d369;color:#0a1a0a;
+  box-shadow:0 2px 8px -2px rgba(70,211,105,.6)}
+/* when both NEW + inList (bookmark) present, move bookmark below NEW */
+.ent-pcard-media:has(.ent-pcard-new) .ent-pcard-listed{top:34px}
+
+/* ── Card hover sheen sweep (premium detail) ─────────────────── */
+.ent-pcard-media,.ent-lcard-media{position:relative;overflow:hidden}
+.ent-pcard-media::after,.ent-lcard-media::after{content:"";position:absolute;top:0;left:0;
+  width:60%;height:100%;background:linear-gradient(110deg,transparent,rgba(255,255,255,.08),transparent);
+  transform:translateX(-120%) skewX(-12deg);pointer-events:none;transition:transform .7s ease}
+.ent-pcard:hover .ent-pcard-media::after,.ent-lcard:hover .ent-lcard-media::after{
+  transform:translateX(220%) skewX(-12deg)}
+
+/* ── Sidebar active pulse on the indicator bar ───────────────── */
+.ent-side-btn.on .ent-side-bar{animation:ent-side-pulse 2.2s ease-in-out infinite}
+@keyframes ent-side-pulse{
+  0%,100%{box-shadow:0 0 12px rgba(var(--ent-rgb),.7)}
+  50%{box-shadow:0 0 18px rgba(var(--ent-rgb),1),0 0 4px rgba(var(--ent-rgb),.8)}
+}
+
+/* ── Focus-visible on CTAs + glass pills (keyboard a11y) ────── */
+.ent-cta:focus-visible,.ent-glass-pill:focus-visible,.ent-chip:focus-visible,
+.ent-dot:focus-visible,.ent-rail-arrows button:focus-visible,
+.ent-loadmore-btn:focus-visible,.ent-searchbar-clear:focus-visible{
+  outline:2px solid var(--ent);outline-offset:2px}
+
+/* ── Hero meta: subtle slide-in on rotation ──────────────────── */
+.ent-hero-inner{animation:ent-hero-slide .6s cubic-bezier(.2,.8,.2,1)}
+@keyframes ent-hero-slide{
+  from{opacity:0;transform:translateY(14px)}
+  to{opacity:1;transform:translateY(0)}
+}
+
+/* ── Responsive: hide hero arrows + up-next on narrow ────────── */
+@media (max-width:720px){
+  .ent-hero-arrow{display:none}
+  .ent-hero-next{display:none}
+}

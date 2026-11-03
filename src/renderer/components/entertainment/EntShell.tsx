@@ -1,7 +1,8 @@
 // v6.0.0 — EntShell: the NEXUS TV app shell (reference image 3).
 // Narrow icon sidebar (search / home / movies / tv / my list + games/selector
 // at the bottom), floating glass clock (top-right), keyboard shortcuts
-// ("/" → search, Esc → back), view routing, and the player overlay.
+// ("/" → search, Esc → back, Ctrl/Cmd+K → command palette), view routing,
+// and the player overlay.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "../Icons";
@@ -12,6 +13,7 @@ import { EntMyList } from "./EntMyList";
 import { EntSearchView } from "./EntSearchView";
 import { EntDetailPage } from "./EntDetailPage";
 import { EntPlayer, type WatchPayload } from "./EntPlayer";
+import { EntCommandPalette, type CmdAction } from "./EntCommandPalette";
 import { inList as listHas, toggleList as toggleStore } from "../../lib/ent-store";
 import type { TmdbItem, TmdbMediaType } from "../../lib/tmdb-types";
 
@@ -30,6 +32,9 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
   const [listTick, setListTick] = useState(0);
   const [progressTick, setProgressTick] = useState(0);
   const [searchSignal, setSearchSignal] = useState(0);
+  // Command palette (Ctrl/Cmd+K) + cached trending titles for fuzzy search.
+  const [cmdOpen, setCmdOpen] = useState(false);
+  const [cmdTitles, setCmdTitles] = useState<TmdbItem[]>([]);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   // ── Clock (image 3 telemetry feel) ──
@@ -40,6 +45,18 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
   }, []);
   const timeStr = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
   const dateStr = now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+
+  // ── Cache trending titles for the command palette (one-time fetch) ──
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const items = await window.nexus.tmdbTrendingAll();
+        if (!cancelled && Array.isArray(items)) setCmdTitles(items as TmdbItem[]);
+      } catch { /* non-fatal — palette still works with My List */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // ── Navigation ──
   const go = useCallback((v: EntView) => {
@@ -79,6 +96,17 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
   }, [view]);
   const scrollTop = () => bodyRef.current?.scrollTo({ top: 0, behavior: "smooth" });
 
+  // ── Command palette actions ──
+  const cmdActions: CmdAction[] = [
+    { id: "home", label: "Go to Home", icon: <Icon.Home size={15} />, group: "Navigate", run: () => go("home") },
+    { id: "movies", label: "Browse Movies", icon: <Icon.Film size={15} />, group: "Navigate", run: () => go("movies") },
+    { id: "tv", label: "Browse TV Shows", icon: <Icon.Tv size={15} />, group: "Navigate", run: () => go("tv") },
+    { id: "mylist", label: "Open My List", icon: <Icon.Bookmark size={15} />, group: "Navigate", run: () => go("mylist") },
+    { id: "search", label: "Search", hint: "/", icon: <Icon.Search size={15} />, group: "Navigate", run: () => { setView("search"); setSearchSignal(s => s + 1); } },
+    { id: "games", label: "Switch to Games mode", hint: "g", icon: <Icon.Gamepad size={15} />, group: "Mode", run: onSwitchToGames },
+    { id: "splash", label: "Mode selector", icon: <Icon.Grid size={15} />, group: "Mode", run: onBackToSplash },
+  ];
+
   // ── My List helpers (tick re-renders consumers) ──
   const inListFn = useCallback((mt: TmdbMediaType, id: number) => listHas(mt, id), [listTick]);
   const toggleListFn = useCallback((item: { mediaType?: TmdbMediaType; id: number; title: string; posterPath?: string | null; rating?: number; year?: string }) => {
@@ -99,12 +127,19 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
   }, [toggleListFn]);
 
   // ── Keyboard shortcuts (native app feel) ──
-  //  / → search · Esc → back · g → games · Arrow keys move focus across cards ──
+  //  Ctrl/Cmd+K → command palette · / → search · Esc → back · g → games
+  //  Arrow keys move focus across cards ──
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (watching) return; // player handles its own Esc
       const target = e.target as HTMLElement | null;
       const typing = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+      // Ctrl/Cmd+K → command palette (works even while typing in a search box).
+      if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) {
+        e.preventDefault();
+        setCmdOpen(o => !o);
+        return;
+      }
       if (e.key === "/" && !typing) {
         e.preventDefault();
         setView("search");
@@ -178,6 +213,18 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
           <NexusMark size={22} />
         </button>
         <div className="ent-side-sep" />
+
+        {/* Command palette trigger (Ctrl/Cmd+K) */}
+        <button
+          className="ent-side-btn ent-side-cmd"
+          onClick={() => setCmdOpen(true)}
+          title="Command palette  (Ctrl+K)"
+          aria-label="Command palette  (Ctrl+K)"
+          data-label="Command  (Ctrl+K)"
+        >
+          <Icon.Search size={17} />
+          <span className="ent-side-bar" />
+        </button>
 
         {sideBtn(view === "search", "Search  (press /)", <Icon.Search size={17} />, () => { setView("search"); setSearchSignal(s => s + 1); })}
         {sideBtn(view === "home", "Home", <Icon.Home size={17} />, () => go("home"))}
@@ -273,6 +320,15 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
         payload={watching}
         onClose={() => setWatching(null)}
         onProgress={() => setProgressTick(t => t + 1)}
+      />
+
+      {/* ── Command palette (Ctrl/Cmd+K) ── */}
+      <EntCommandPalette
+        open={cmdOpen}
+        onClose={() => setCmdOpen(false)}
+        actions={cmdActions}
+        titles={cmdTitles}
+        onOpenTitle={openDetail}
       />
     </div>
   );

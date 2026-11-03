@@ -120,6 +120,31 @@ export function EntHero({ items, loading, onOpen, onWatch, inList, onToggleList 
           ))}
         </div>
       )}
+
+      {/* Manual prev/next arrows (v6.2.0) */}
+      {heroes.length > 1 && (
+        <>
+          <button
+            className="ent-hero-arrow prev"
+            onClick={() => setIdx(i => (i - 1 + heroes.length) % heroes.length)}
+            aria-label="Previous title"
+          >
+            <Icon.Chevron size={22} />
+          </button>
+          <button
+            className="ent-hero-arrow next"
+            onClick={() => setIdx(i => (i + 1) % heroes.length)}
+            aria-label="Next title"
+          >
+            <Icon.Chevron size={22} />
+          </button>
+          {/* Up-next preview chip */}
+          <div className="ent-hero-next" aria-hidden="true">
+            <span className="ent-hero-next-label">Up Next</span>
+            <span className="ent-hero-next-title">{heroes[(idx + 1) % heroes.length].title}</span>
+          </div>
+        </>
+      )}
     </div>
   );
 }
