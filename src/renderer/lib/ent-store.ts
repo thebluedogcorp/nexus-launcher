@@ -2,13 +2,16 @@
 // Both persist in localStorage (survives app restarts; scoped to the NEXUS TV
 // partition). This is the "native app" advantage over a website — the app
 // remembers exactly where you left off, on disk, locally.
+// v6.3.0 — Recently Viewed history (tracks detail-page visits).
 
 import type { TmdbMediaType } from "./tmdb-types";
 
 const LIST_KEY = "nx-ent-list";
 const PROGRESS_KEY = "nx-ent-progress";
+const HISTORY_KEY = "nx-ent-history";
 const MAX_LIST = 300;
 const MAX_PROGRESS = 20;
+const MAX_HISTORY = 18;
 
 export interface ListItem {
   mediaType: TmdbMediaType;
@@ -147,4 +150,33 @@ export function removeFromContinue(mediaType: TmdbMediaType, id: number): void {
 export function estimateProgress(elapsedSec: number, runtimeMin: number | null): number {
   const total = (runtimeMin ?? 110) * 60; // sensible default for movies
   return Math.min(elapsedSec / Math.max(total, 60), 1);
+}
+
+// ─── Recently Viewed (history) ──────────────────────────────────────────────
+
+export interface HistoryEntry {
+  mediaType: TmdbMediaType;
+  id: number;
+  title: string;
+  posterPath: string | null;
+  backdropPath: string | null;
+  rating: number;
+  year: string;
+  viewedAt: number;
+}
+
+export function getHistory(): HistoryEntry[] {
+  return read<HistoryEntry[]>(HISTORY_KEY, []).sort((a, b) => b.viewedAt - a.viewedAt);
+}
+
+export function recordHistory(entry: Omit<HistoryEntry, "viewedAt">): void {
+  const all = read<HistoryEntry[]>(HISTORY_KEY, []);
+  const idx = all.findIndex(e => e.mediaType === entry.mediaType && e.id === entry.id);
+  if (idx >= 0) all.splice(idx, 1); // dedupe — move to top
+  all.unshift({ ...entry, viewedAt: Date.now() });
+  write(HISTORY_KEY, all.slice(0, MAX_HISTORY));
+}
+
+export function clearHistory(): void {
+  write(HISTORY_KEY, []);
 }

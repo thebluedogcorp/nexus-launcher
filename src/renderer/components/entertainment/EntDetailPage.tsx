@@ -17,7 +17,7 @@ import {
   type TmdbMediaType,
   type TmdbMovieDetails,
 } from "../../lib/tmdb-types";
-import { getContinueFor } from "../../lib/ent-store";
+import { getContinueFor, recordHistory } from "../../lib/ent-store";
 
 interface DetailProps {
   mediaType: TmdbMediaType;
@@ -27,9 +27,10 @@ interface DetailProps {
   onWatch: (payload: WatchPayload) => void;
   inList: (mediaType: TmdbMediaType, id: number) => boolean;
   onToggleList: (item: { mediaType: TmdbMediaType; id: number; title: string; posterPath: string | null; rating: number; year: string }) => void;
+  onHistoryChange?: () => void;
 }
 
-export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, inList, onToggleList }: DetailProps) {
+export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, inList, onToggleList, onHistoryChange }: DetailProps) {
   const [detail, setDetail] = useState<TmdbMovieDetails | null>(null);
   const [recs, setRecs] = useState<TmdbItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,7 +52,20 @@ export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, in
       if (cancelled) return;
       const parsed = asDetails(d);
       if (!parsed) setError("Couldn't load details. TMDB may be rate-limited — try again shortly.");
-      else setDetail(parsed);
+      else {
+        setDetail(parsed);
+        // Record this visit in the Recently Viewed history (v6.3.0).
+        recordHistory({
+          mediaType,
+          id,
+          title: parsed.title,
+          posterPath: parsed.posterPath,
+          backdropPath: parsed.backdropPath,
+          rating: parsed.rating,
+          year: parsed.year,
+        });
+        onHistoryChange?.();
+      }
       setRecs(asItems(r));
       setLoading(false);
     })();

@@ -7,18 +7,19 @@ import { Icon } from "../Icons";
 import { EntHero } from "./EntHero";
 import { EntLandscapeCard, Rail, Top10Rail, type AnyItem } from "./EntRails";
 import type { WatchPayload } from "./EntPlayer";
-import { asItems, asMovies, type TmdbItem, type TmdbMovie, type TmdbMediaType } from "../../lib/tmdb-types";
-import { getContinue, removeFromContinue, type ContinueEntry } from "../../lib/ent-store";
+import { asItems, asMovies, tmdbImg, type TmdbItem, type TmdbMovie, type TmdbMediaType } from "../../lib/tmdb-types";
+import { getContinue, removeFromContinue, getHistory, clearHistory, type ContinueEntry, type HistoryEntry } from "../../lib/ent-store";
 
 interface HomeProps {
   progressTick: number;
+  historyTick: number;
   onOpen: (mediaType: TmdbMediaType, id: number) => void;
   onWatch: (payload: WatchPayload) => void;
   inList: (mediaType: TmdbMediaType, id: number) => boolean;
   onToggleList: (item: TmdbItem) => void;
 }
 
-export function EntHome({ progressTick, onOpen, onWatch, inList, onToggleList }: HomeProps) {
+export function EntHome({ progressTick, historyTick, onOpen, onWatch, inList, onToggleList }: HomeProps) {
   // Adapt the shell's TmdbItem-based toggle to the card's AnyItem signature.
   const toggleAny = (item: AnyItem) => {
     onToggleList({
@@ -71,6 +72,14 @@ export function EntHome({ progressTick, onOpen, onWatch, inList, onToggleList }:
     setCont(getContinue().slice(0, 12));
   }, [progressTick]);
 
+  // Recently Viewed history (re-read whenever a detail page is visited).
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  useEffect(() => {
+    setHistory(getHistory().slice(0, 12));
+  }, [historyTick]);
+  const [histCleared, setHistCleared] = useState(false);
+  const clearHist = () => { clearHistory(); setHistory([]); setHistCleared(true); };
+
   // Bridge: EntRails expects onWatch(mt, id, title) → adapt to full payload.
   const watchFromCard = (mt: TmdbMediaType, id: number, title: string) => {
     const fromList = trending.find(i => i.id === id && i.mediaType === mt)
@@ -122,6 +131,40 @@ export function EntHome({ progressTick, onOpen, onWatch, inList, onToggleList }:
                   subLabel={e.mediaType === "tv" ? `S${e.season} · E${e.episode}` : "Resume"}
                   onRemove={() => { removeFromContinue(e.mediaType, e.id); setCont(getContinue().slice(0, 12)); }}
                 />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Recently Viewed (v6.3.0) — portrait cards of detail-page visits */}
+        {history.length > 0 && !histCleared && (
+          <section className="ent-rail ent-rail-history">
+            <div className="ent-rail-head">
+              <h2 className="ent-rail-title"><Icon.Clock2 size={14} /> Recently Viewed</h2>
+              <span className="ent-rail-count">{history.length}</span>
+              <button className="ent-rail-clear" onClick={clearHist} title="Clear history" aria-label="Clear history">
+                <Icon.Close size={12} /> Clear
+              </button>
+            </div>
+            <div className="ent-rail-track">
+              {history.map(h => (
+                <div className="ent-lcard-wrap ent-history-card" key={`${h.mediaType}-${h.id}`}>
+                  <button className="ent-lcard" onClick={() => onOpen(h.mediaType, h.id)} title={h.title}>
+                    <div className="ent-lcard-media">
+                      {(h.backdropPath || h.posterPath) ? (
+                        <img src={tmdbImg(h.backdropPath, "w780") ?? tmdbImg(h.posterPath, "w500") ?? ""} alt={h.title} loading="lazy" />
+                      ) : (
+                        <div className="ent-lcard-ph"><Icon.Film size={26} /></div>
+                      )}
+                      <span className={h.mediaType === "tv" ? "ent-lchip tv" : "ent-lchip"}>{h.mediaType === "tv" ? "Series" : "Film"}</span>
+                      <div className="ent-lcard-hover"><span className="ent-lcard-play"><Icon.Play size={18} /></span></div>
+                      <div className="ent-lcard-meta">
+                        <div className="ent-lcard-title">{h.title}</div>
+                        <div className="ent-lcard-sub">{h.year || "—"}</div>
+                      </div>
+                    </div>
+                  </button>
+                </div>
               ))}
             </div>
           </section>

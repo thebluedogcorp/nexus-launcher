@@ -14,7 +14,8 @@ import { EntSearchView } from "./EntSearchView";
 import { EntDetailPage } from "./EntDetailPage";
 import { EntPlayer, type WatchPayload } from "./EntPlayer";
 import { EntCommandPalette, type CmdAction } from "./EntCommandPalette";
-import { inList as listHas, toggleList as toggleStore } from "../../lib/ent-store";
+import { EntShortcuts } from "./EntShortcuts";
+import { inList as listHas, toggleList as toggleStore, recordHistory } from "../../lib/ent-store";
 import type { TmdbItem, TmdbMediaType } from "../../lib/tmdb-types";
 
 type EntView = "home" | "movies" | "tv" | "mylist" | "search" | "detail";
@@ -34,7 +35,9 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
   const [searchSignal, setSearchSignal] = useState(0);
   // Command palette (Ctrl/Cmd+K) + cached trending titles for fuzzy search.
   const [cmdOpen, setCmdOpen] = useState(false);
+  const [scOpen, setScOpen] = useState(false);
   const [cmdTitles, setCmdTitles] = useState<TmdbItem[]>([]);
+  const [historyTick, setHistoryTick] = useState(0);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   // ── Clock (image 3 telemetry feel) ──
@@ -145,6 +148,9 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
         setView("search");
         setSearchSignal(s => s + 1);
         requestAnimationFrame(() => bodyRef.current?.scrollTo({ top: 0 }));
+      } else if (e.key === "?" || (e.shiftKey && e.key === "/")) {
+        e.preventDefault();
+        setScOpen(o => !o);
       } else if (e.key === "Escape") {
         if (view === "detail") backFromDetail();
         else if (view !== "home") go("home");
@@ -236,6 +242,7 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
 
         {sideBtn(false, "Switch to Games mode", <Icon.Gamepad size={17} />, onSwitchToGames)}
         {sideBtn(false, "Mode selector", <Icon.Grid size={17} />, onBackToSplash)}
+        {sideBtn(false, "Keyboard shortcuts  (press ?)", <Icon.Keyboard size={17} />, () => setScOpen(true))}
       </aside>
 
       {/* ── Content ── */}
@@ -251,6 +258,7 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
           {view === "home" && (
             <EntHome
               progressTick={progressTick}
+              historyTick={historyTick}
               onOpen={openDetail}
               onWatch={watch}
               inList={inListFn}
@@ -284,6 +292,7 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
               onWatch={watch}
               inList={inListFn}
               onToggleList={toggleListFn}
+              onHistoryChange={() => setHistoryTick(t => t + 1)}
             />
           )}
         </div>
@@ -330,6 +339,9 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
         titles={cmdTitles}
         onOpenTitle={openDetail}
       />
+
+      {/* ── Keyboard shortcuts overlay (? key) ── */}
+      <EntShortcuts open={scOpen} onClose={() => setScOpen(false)} />
     </div>
   );
 }
