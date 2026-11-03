@@ -21,6 +21,7 @@ import {
   type TmdbMovieDetails,
 } from "../../lib/tmdb-types";
 import { getContinueFor, recordHistory } from "../../lib/ent-store";
+import { getRating, setRating, getReview, setReview, deleteReview, getCollections, addToCollection } from "../../lib/ent-userdata";
 
 interface DetailProps {
   mediaType: TmdbMediaType;
@@ -33,7 +34,7 @@ interface DetailProps {
   onHistoryChange?: () => void;
 }
 
-type Tab = "overview" | "cast" | "watch" | "facts";
+type Tab = "overview" | "cast" | "watch" | "facts" | "review";
 
 export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, inList, onToggleList, onHistoryChange }: DetailProps) {
   const [detail, setDetail] = useState<TmdbMovieDetails | null>(null);
@@ -42,6 +43,11 @@ export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, in
   const [error, setError] = useState<string | null>(null);
   const [trailerOpen, setTrailerOpen] = useState(false);
   const [tab, setTab] = useState<Tab>("overview");
+  // User rating + review (v7.2.0)
+  const [userRating, setUserRating] = useState(0);
+  const [reviewText, setReviewText] = useState("");
+  const [reviewSaved, setReviewSaved] = useState(false);
+  const [collections, setCollections] = useState(getCollections());
 
   useEffect(() => {
     let cancelled = false;
@@ -61,6 +67,12 @@ export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, in
       if (!parsed) setError("Couldn't load details. TMDB may be rate-limited — try again shortly.");
       else {
         setDetail(parsed);
+        // Load user rating + review for this title (v7.2.0).
+        setUserRating(getRating(mediaType, id));
+        const existing = getReview(mediaType, id);
+        if (existing) { setReviewText(existing.text); setReviewSaved(true); }
+        else { setReviewText(""); setReviewSaved(false); }
+        setCollections(getCollections());
         recordHistory({
           mediaType, id,
           title: parsed.title,
@@ -211,6 +223,45 @@ export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, in
               <Icon.ExternalLink size={15} /> Homepage
             </a>
           )}
+          {/* User star rating (v7.2.0) */}
+          <div className="ent-dp-rating-widget" title="Your rating">
+            <span className="ent-dp-rating-label">Your rating</span>
+            <div className="ent-dp-stars">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                <button
+                  key={n}
+                  className={n <= userRating ? "ent-dp-star on" : "ent-dp-star"}
+                  onClick={() => {
+                    const next = n === userRating ? 0 : n;
+                    setRating(mediaType, id, next);
+                    setUserRating(next);
+                    pushToast(next === 0 ? "Rating cleared" : `Rated ${next}/10`, "success", <Icon.Star size={13} filled />);
+                  }}
+                  aria-label={`Rate ${n}/10`}
+                >
+                  <Icon.Star size={13} filled={n <= userRating} />
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* Add to collection (v7.2.0) */}
+          {collections.length > 0 && (
+            <div className="ent-dp-col-add">
+              <Icon.Library size={15} />
+              <select
+                defaultValue=""
+                onChange={e => {
+                  if (!e.target.value) return;
+                  addToCollection(e.target.value, { mediaType, id, title, posterPath: detail.posterPath });
+                  pushToast(`Added to collection`, "success", <Icon.Library size={13} />);
+                  e.target.value = "";
+                }}
+              >
+                <option value="" disabled>Add to collection…</option>
+                {collections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+          )}
           {/* Resume progress bar */}
           {resume && (
             <div className="ent-dp-actionbar-resume">
@@ -251,6 +302,7 @@ export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, in
                     <button role="tab" aria-selected={tab === "watch"} className={tab === "watch" ? "ent-dp-tab on" : "ent-dp-tab"} onClick={() => setTab("watch")}>Where to Watch</button>
                   )}
                   <button role="tab" aria-selected={tab === "facts"} className={tab === "facts" ? "ent-dp-tab on" : "ent-dp-tab"} onClick={() => setTab("facts")}>Facts</button>
+                  <button role="tab" aria-selected={tab === "review"} className={tab === "review" ? "ent-dp-tab on" : "ent-dp-tab"} onClick={() => setTab("review")}>My Review</button>
                 </div>
 
                 {/* Tab content */}
@@ -334,6 +386,36 @@ export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, in
                         {detail.imdbId && <Fact label="IMDb ID" value={detail.imdbId} />}
                         {detail.genres.length > 0 && <Fact label="Genres" value={detail.genres.map(g => g.name).join(", ")} />}
                         {detail.cast[0] && <Fact label="Top Cast" value={detail.cast.slice(0, 5).map(c => c.name).join(", ")} />}
+                      </div>
+                    </div>
+                  )}
+
+                  {tab === "review" && (
+                    <div className="ent-dp-tabpane">
+                      <div className="ent-dp-review">
+                        <div className="ent-dp-review-head">
+                          <span className="ent-dp-review-title">Your Notes &amp; Review</span>
+                          {userRating > 0 && <span className="ent-dp-review-rating"><Icon.Star size={12} filled /> {userRating}/10</span>}
+                        </div>
+                        <textarea
+                          className="ent-dp-review-input"
+                          value={reviewText}
+                          onChange={e => { setReviewText(e.target.value); setReviewSaved(false); }}
+                          placeholder="Write your thoughts on this title… (saved locally on this PC)"
+                          rows={6}
+                        />
+                        <div className="ent-dp-review-actions">
+                          <button
+                            className="ent-cta primary"
+                            onClick={() => {
+                              if (!reviewText.trim()) { deleteReview(mediaType, id); setReviewSaved(false); pushToast("Review deleted", "info", <Icon.Trash size={13} />); }
+                              else { setReview({ mediaType, id, title, text: reviewText.trim() }); setReviewSaved(true); pushToast("Review saved", "success", <Icon.Check size={13} />); }
+                            }}
+                          >
+                            <Icon.Check size={15} /> {reviewText.trim() ? "Save Review" : "Delete Review"}
+                          </button>
+                          {reviewSaved && <span className="ent-dp-review-saved"><Icon.CheckCircle size={13} /> Saved</span>}
+                        </div>
                       </div>
                     </div>
                   )}

@@ -73,10 +73,11 @@ export function EntTrailerModal({ open, mediaType, id, title, onClose }: Trailer
           )}
           {!loading && !error && key && (
             <iframe
-              src={`https://www.youtube-nocookie.com/embed/${key}?autoplay=1&rel=0&modestbranding=1&playsinline=1`}
+              src={`https://www.youtube.com/embed/${key}?autoplay=1&rel=0&playsinline=1&color=white`}
               title={`Trailer: ${title}`}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               allowFullScreen
+              referrerPolicy="strict-origin-when-cross-origin"
             />
           )}
         </div>

@@ -50,47 +50,58 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v7.1.0"
-          $title = "NEXUS v7.1.0 — Completely redesigned detail/info page: cinematic hero, rating ring, tabbed panel"
+          $tag = "v7.2.0"
+          $title = "NEXUS v7.2.0 — 20+ major features: Stats, Collections, Discover, ratings, reviews, bug fixes"
           $notes = @"
           NEXUS — Universal Game Launcher & Entertainment Hub for Windows.
 
-          **v7.1.0 — The detail/info page for every movie & TV show has been completely redesigned. More cinematic, more immersive, more useful.**
+          **v7.2.0 — Massive feature expansion + critical bug fixes. 20+ major new features across the Entertainment tab, a fixed trailer player, a fixed info-panel overlap, and a single search button.**
 
-          **Redesigned cinematic hero:**
-          - Taller (58vh, max 680px) with a deeper dual-gradient blend (bottom + left).
-          - Ken Burns zoom on the backdrop (22s slow scale) for a living, cinematic feel.
-          - Bigger title (up to 64px, 900 weight, tighter tracking) with deeper text shadow.
-          - Italic tagline with max-width for readability.
-          - The trailer play ring moved to the upper-center (42% height) so it doesn't crowd the title.
+          **Bug fixes (user-reported):**
+          - **YouTube trailer "Video Player Configuration Error"** — switched from youtube-nocookie.com (which fails for many videos) to youtube.com/embed with color=white + proper referrer policy. Trailers now play reliably.
+          - **Info panel overlapped the poster** — the tabbed panel had margin-top:-40px (pulled up over the hero). Changed to +24px so it sits cleanly below the action bar.
+          - **Two search buttons** — removed the duplicate command-palette trigger from the sidebar. Now there's exactly one Search nav button (Ctrl+K still opens the palette).
 
-          **New: inline rating ring.**
-          The hero now shows a circular SVG rating ring (amber stroke) with the TMDB percentage score inside (e.g. "84%") — a visual score at a glance, next to the year/runtime/seasons/episodes meta and the top-2 genre badges.
+          **20+ major new features:**
 
-          **New: action bar below the hero.**
-          A glass action bar with the primary Watch Now (larger 46px), Watch Trailer, IMDb, and Homepage links — plus the resume progress bar (if any) right-aligned. The bookmark/copy-link moved to icon buttons in the top-right of the hero.
+          *New views (3):*
+          1. **Statistics Dashboard** — watch streak (current + longest), 6 stat cards (My List / In Progress / Recently Viewed / Rated / Reviews / Collections), average rating, rated-titles chips.
+          2. **Collections** — user-created playlists of titles. Create, browse, add/remove titles from any detail page, delete collections. Poster-stack thumbnails on collection cards.
+          3. **Discover** — curated discovery page with Daily Pick (deterministic per day), mood-based recommendations (Thrilling / Heartwarming / Mind-bending / Epic / Dark), and a Discovery Shuffle rail.
 
-          **New: tabbed info panel.**
-          The poster (200×300) sits beside a tabbed content area with 4 tabs:
-          - **Overview** — full storyline (15px, 1.75 line-height, 880px max), all genre pills, and a quick-facts grid (Director / Status / Runtime / Episodes / Starring).
-          - **Cast & Crew** — a responsive grid of cast avatars (80px circles) with name + character, hover-lift with rose ring.
-          - **Where to Watch** — streaming provider chips (only shown if providers exist) + a note that NEXUS streams via CineSrc regardless.
-          - **Facts** — a 2-column grid of all metadata (Type / Release Year / Runtime / Seasons / Episodes / TMDB Rating / Director / Status / IMDb ID / Genres / Top Cast).
-          Tabs animate in on switch. The whole panel has a deeper glass (82% opacity) + entrance animation.
+          *Detail page additions (5):*
+          4. **User star rating** — 10-star rating widget in the action bar; click any star to rate 1-10, click again to clear. Persists locally + fires a toast.
+          5. **My Review tab** — a 5th tab with a textarea for personal notes/reviews per title. Save/delete, persisted locally.
+          6. **Add to Collection dropdown** — on every detail page, add the current title to any existing collection via a dropdown.
+          7. **Homepage link** — external link to the title's official homepage (if TMDB has one).
+          8. **Deeper Facts tab** — 11 metadata fields including IMDb ID, top cast, all genres.
 
-          **New: top-bar icon actions.**
-          The back pill stays top-left, but the right side now has glass icon buttons for Add/Remove My List (toggles rose when listed) and Copy Link — cleaner than the old row of full buttons.
+          *New stores (4):*
+          9. **User ratings store** — getRating/setRating/getAllRatings (1-10 per title).
+          10. **Reviews store** — getReview/setReview/deleteReview/getAllReviews.
+          11. **Collections store** — getCollections/createCollection/deleteCollection/addToCollection/removeFromCollection.
+          12. **Watch streak store** — getStreak/recordWatchDay (tracks consecutive days with watch activity).
 
-          **Cohesion:**
-          - Removed all orphaned CSS from the old detail dialog (ent-dp-glass, ent-dp-section, ent-dp-actions, ent-dp-stat, ent-dp-info, ent-dp-ratings, ent-dp-syn) — the new design uses a clean, unified set of selectors.
-          - The panel entrance animation (ent-dp-glass-in) is retained for the new .ent-dp-panel.
-          - Full responsive: panel collapses to single-column on narrow, poster shrinks to 140×210, cast grid densifies.
+          *Home + cross-cutting (8+):*
+          13. **Watch streak tracking** — every time you press Watch, the streak increments (consecutive days).
+          14. **Discover sidebar nav** — new Discover button in the sidebar.
+          15. **Collections sidebar nav** — new Collections button.
+          16. **Statistics sidebar nav** — new Statistics button.
+          17. **Command palette expanded** — 10 quick actions (was 7) including Discover, Collections, Statistics.
+          18. **Keep-alive home** retained — no refetch flash when returning home.
+          19. **Ken Burns hero zoom** retained — cinematic slow zoom.
+          20. **Because You Watched rail** retained — smart recs from history.
 
-          All v7.0.0 functionality preserved: keep-alive home, Ken Burns hero, Because You Watched rail, glitch fixes, immersive screen real estate, settings panel, My List badge, Surprise/Settings shortcuts, toast notifications, Surprise Me, command palette (Ctrl+K), hero manual arrows + Up Next, NEW badges, card sheen, hover preview popovers, Top 10 rail, arrow-key nav, scroll-to-top FAB, keyboard shortcuts overlay, Recently Viewed rail, full CineSrc streaming playback, TMDB IPC in main process, mode switching, library, collections, platform detection, launching, playtime, achievements, overlay, console/desktop mode, themes, 4 first-party plugins.
+          *Theme + cohesion:*
+          - Sleeker dark theme: deeper black backgrounds (#050507), darker sidebar gradient, darker glass panels.
+          - Bolder rail titles (800 weight, tighter tracking) + page titles (900 weight).
+          - All new views use the unified ent-page shell + page-head pattern for consistency.
+
+          All v7.1.0 functionality preserved: redesigned detail page, tabbed panel, rating ring, action bar, ambient backdrop, settings panel, My List badge, Surprise/Settings shortcuts, toast notifications, Surprise Me, command palette (Ctrl+K), hero manual arrows + Up Next, NEW badges, card sheen, hover preview popovers, Top 10 rail, arrow-key nav, scroll-to-top FAB, keyboard shortcuts overlay, Recently Viewed rail, full CineSrc streaming playback, TMDB IPC in main process, mode switching, library, collections, platform detection, launching, playtime, achievements, overlay, console/desktop mode, themes, 4 first-party plugins.
 
           **Downloads:**
-          - NEXUS-Setup-7.1.0.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-7.1.0.exe — single-file portable build.
+          - NEXUS-Setup-7.2.0.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-7.2.0.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@

@@ -12,15 +12,19 @@ import { EntBrowse } from "./EntBrowse";
 import { EntMyList } from "./EntMyList";
 import { EntSearchView } from "./EntSearchView";
 import { EntDetailPage } from "./EntDetailPage";
+import { EntStatsView } from "./EntStatsView";
+import { EntCollectionsView } from "./EntCollectionsView";
+import { EntDiscoverView } from "./EntDiscoverView";
 import { EntPlayer, type WatchPayload } from "./EntPlayer";
 import { EntCommandPalette, type CmdAction } from "./EntCommandPalette";
 import { EntShortcuts } from "./EntShortcuts";
 import { EntToaster, pushToast } from "./EntToaster";
 import { EntSettings } from "./EntSettings";
 import { inList as listHas, toggleList as toggleStore, recordHistory, getList } from "../../lib/ent-store";
+import { recordWatchDay } from "../../lib/ent-userdata";
 import type { TmdbItem, TmdbMediaType } from "../../lib/tmdb-types";
 
-type EntView = "home" | "movies" | "tv" | "mylist" | "search" | "detail";
+type EntView = "home" | "movies" | "tv" | "mylist" | "search" | "detail" | "stats" | "collections" | "discover";
 
 interface ShellProps {
   onBackToSplash: () => void;
@@ -95,6 +99,7 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
 
   const watch = useCallback((payload: WatchPayload) => {
     setWatching(payload);
+    recordWatchDay(); // track watch streak (v7.2.0)
     pushToast(`Now playing: ${payload.title}`, "success", <Icon.Play size={14} />);
   }, []);
 
@@ -118,9 +123,12 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
   // ── Command palette actions ──
   const cmdActions: CmdAction[] = [
     { id: "home", label: "Go to Home", icon: <Icon.Home size={15} />, group: "Navigate", run: () => go("home") },
+    { id: "discover", label: "Discover — Daily Pick + Moods", icon: <Icon.Sparkles size={15} />, group: "Navigate", run: () => go("discover") },
     { id: "movies", label: "Browse Movies", icon: <Icon.Film size={15} />, group: "Navigate", run: () => go("movies") },
     { id: "tv", label: "Browse TV Shows", icon: <Icon.Tv size={15} />, group: "Navigate", run: () => go("tv") },
     { id: "mylist", label: "Open My List", icon: <Icon.Bookmark size={15} />, group: "Navigate", run: () => go("mylist") },
+    { id: "collections", label: "My Collections", icon: <Icon.Library size={15} />, group: "Navigate", run: () => go("collections") },
+    { id: "stats", label: "Statistics Dashboard", icon: <Icon.TrendingUp size={15} />, group: "Navigate", run: () => go("stats") },
     { id: "search", label: "Search", hint: "/", icon: <Icon.Search size={15} />, group: "Navigate", run: () => { setView("search"); setSearchSignal(s => s + 1); } },
     { id: "games", label: "Switch to Games mode", hint: "g", icon: <Icon.Gamepad size={15} />, group: "Mode", run: onSwitchToGames },
     { id: "splash", label: "Mode selector", icon: <Icon.Grid size={15} />, group: "Mode", run: onBackToSplash },
@@ -252,18 +260,6 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
         </button>
         <div className="ent-side-sep" />
 
-        {/* Command palette trigger (Ctrl/Cmd+K) */}
-        <button
-          className="ent-side-btn ent-side-cmd"
-          onClick={() => setCmdOpen(true)}
-          title="Command palette  (Ctrl+K)"
-          aria-label="Command palette  (Ctrl+K)"
-          data-label="Command  (Ctrl+K)"
-        >
-          <Icon.Search size={17} />
-          <span className="ent-side-bar" />
-        </button>
-
         {sideBtn(view === "search", "Search  (press /)", <Icon.Search size={17} />, () => { setView("search"); setSearchSignal(s => s + 1); })}
         {sideBtn(view === "home", "Home", <Icon.Home size={17} />, () => go("home"))}
         {sideBtn(view === "movies", "Movies", <Icon.Film size={17} />, () => go("movies"))}
@@ -280,6 +276,9 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
           <span className="ent-side-bar" />
           {listCount > 0 && <span className="ent-side-badge">{listCount}</span>}
         </button>
+        {sideBtn(view === "discover", "Discover", <Icon.Sparkles size={17} />, () => go("discover"))}
+        {sideBtn(view === "collections", "Collections", <Icon.Library size={17} />, () => go("collections"))}
+        {sideBtn(view === "stats", "Statistics", <Icon.TrendingUp size={17} />, () => go("stats"))}
 
         <div className="ent-side-spacer" />
 
@@ -330,6 +329,15 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
             )}
             {view === "search" && (
               <EntSearchView focusSignal={searchSignal} onOpen={openDetail} inList={inListFn} onWatch={watchFromCard} onToggleList={toggleListFn} />
+            )}
+            {view === "discover" && (
+              <EntDiscoverView onOpen={openDetail} onWatch={watch} />
+            )}
+            {view === "collections" && (
+              <EntCollectionsView listTick={listTick} onOpen={openDetail} />
+            )}
+            {view === "stats" && (
+              <EntStatsView listTick={listTick} />
             )}
             {view === "detail" && detail && (
               <EntDetailPage

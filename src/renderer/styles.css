@@ -2655,9 +2655,9 @@ button.tb-logo:active{transform:scale(0.97)}
 .ent-dp-loading svg{animation:ent-spin 1s linear infinite;color:var(--ent)}
 @keyframes ent-spin{to{transform:rotate(360deg)}}
 
-/* Poster + tabbed info panel */
+/* Poster + tabbed info panel — sits cleanly below the action bar (no overlap) */
 .ent-dp-panel{display:grid;grid-template-columns:200px 1fr;gap:28px;
-  margin-top:-40px;position:relative;z-index:3;padding:24px;border-radius:var(--r-xl);
+  margin-top:24px;position:relative;z-index:3;padding:24px;border-radius:var(--r-xl);
   background:rgba(14,14,16,.82);border:1px solid var(--border-2);
   backdrop-filter:blur(20px);box-shadow:var(--shadow-high);
   animation:ent-dp-glass-in .45s cubic-bezier(.2,.8,.2,1)}
@@ -3444,6 +3444,135 @@ button.tb-logo:active{transform:scale(0.97)}
   .ent-genre-bar{padding:12px 14px}
   .ent-genre-bar-sep{display:none}
 }
+
+
+/* ===================================================================
+   NEXUS TV v7.2.0 — Statistics, Collections, Discover, Rating, Review
+   20+ major features. Dark, sleek, cohesive.
+   =================================================================== */
+
+/* ── Statistics dashboard ────────────────────────────────────── */
+.ent-stats-streak{display:flex;align-items:center;gap:0;margin-bottom:24px;
+  padding:24px 28px;border-radius:var(--r-xl);background:linear-gradient(135deg,rgba(var(--ent-rgb),.14),rgba(var(--ent-rgb),.04));
+  border:1px solid rgba(var(--ent-rgb),.2)}
+.ent-stats-streak-icon{display:flex;align-items:center;justify-content:center;width:56px;height:56px;
+  border-radius:50%;background:rgba(var(--ent-rgb),.2);color:var(--ent);margin-right:20px;flex-shrink:0}
+.ent-stats-streak-body{display:flex;flex-direction:column;gap:2px}
+.ent-stats-streak-current{font-size:32px;font-weight:900;color:#fff;line-height:1;letter-spacing:-.02em}
+.ent-stats-streak-long{font-size:28px;font-weight:800;color:var(--text);line-height:1}
+.ent-stats-streak-avg{font-size:28px;font-weight:800;color:#fbbf24;line-height:1}
+.ent-stats-streak-label{font-size:11px;font-weight:600;color:var(--text-faint);text-transform:uppercase;letter-spacing:.1em}
+.ent-stats-streak-divider{width:1px;height:48px;background:var(--border-2);margin:0 24px}
+.ent-stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:28px}
+.ent-stats-card{display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px 12px;
+  border-radius:var(--r-lg);background:var(--surface);border:1px solid var(--border);transition:all var(--t-base)}
+.ent-stats-card:hover{border-color:var(--border-strong);transform:translateY(-2px)}
+.ent-stats-card-icon{display:flex;align-items:center;justify-content:center;width:40px;height:40px;
+  border-radius:var(--r-md);background:var(--surface-2);margin-bottom:4px}
+.ent-stats-card-v{font-size:28px;font-weight:800;color:#fff;line-height:1;font-variant-numeric:tabular-nums}
+.ent-stats-card-l{font-size:11px;font-weight:600;color:var(--text-faint);text-transform:uppercase;letter-spacing:.08em}
+.ent-stats-section{margin-bottom:28px}
+.ent-stats-h{font-size:14px;font-weight:700;color:#fff;margin:0 0 14px}
+.ent-stats-ratings{display:flex;flex-wrap:wrap;gap:8px}
+.ent-stats-rating-chip{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:var(--r-pill);
+  background:var(--surface);border:1px solid var(--border-2);font-size:12px;font-weight:700;color:#fbbf24}
+.ent-stats-rating-type{font-size:9px;color:var(--text-faint);margin-left:2px}
+
+/* ── Collections view ────────────────────────────────────────── */
+.ent-col-create{display:flex;gap:10px;margin-bottom:24px}
+.ent-col-input{flex:1;height:40px;padding:0 14px;border-radius:var(--r-md);background:var(--surface);
+  border:1px solid var(--border-2);color:#fff;font-size:14px;font-family:inherit;outline:none}
+.ent-col-input:focus{border-color:var(--ent)}
+.ent-col-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+.ent-col-card{display:flex;gap:14px;padding:16px;border-radius:var(--r-lg);background:var(--surface);
+  border:1px solid var(--border);cursor:pointer;transition:all var(--t-base)}
+.ent-col-card:hover{border-color:rgba(var(--ent-rgb),.4);transform:translateY(-2px);background:var(--surface-2)}
+.ent-col-card-posters{position:relative;width:80px;height:108px;flex-shrink:0}
+.ent-col-card-poster{position:absolute;width:52px;height:78px;border-radius:var(--r-sm);overflow:hidden;
+  border:2px solid var(--surface);background:var(--surface-2)}
+.ent-col-card-poster img{width:100%;height:100%;object-fit:cover}
+.ent-col-card-poster:nth-child(1){left:0;top:0;transform:rotate(-4deg)}
+.ent-col-card-poster:nth-child(2){left:14px;top:4px;transform:rotate(2deg)}
+.ent-col-card-poster:nth-child(3){left:28px;top:0;transform:rotate(6deg)}
+.ent-col-card-empty{display:flex;align-items:center;justify-content:center;width:100%;height:100%;color:var(--text-faint)}
+.ent-col-card-body{display:flex;flex-direction:column;justify-content:center;gap:4px;min-width:0}
+.ent-col-card-name{font-size:15px;font-weight:700;color:#fff;line-height:1.2;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ent-col-card-meta{font-size:12px;color:var(--text-faint)}
+.ent-col-detail-head{display:flex;align-items:center;gap:14px;margin-bottom:24px;flex-wrap:wrap}
+.ent-col-detail-title{flex:1;font-size:24px;font-weight:800;color:#fff;margin:0}
+.ent-col-remove{position:absolute;top:6px;right:6px;z-index:5;display:flex;align-items:center;justify-content:center;
+  width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;border:1px solid var(--border-2);
+  cursor:pointer;opacity:0;transition:all var(--t-fast)}
+.ent-pcard-wrap:hover .ent-col-remove{opacity:1}
+.ent-col-remove:hover{background:var(--danger);border-color:var(--danger)}
+
+/* ── Discover view ───────────────────────────────────────────── */
+.ent-discover-daily{margin-bottom:32px}
+.ent-discover-daily-label{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--ent);margin-bottom:12px}
+.ent-discover-daily-card{display:grid;grid-template-columns:1.4fr 1fr;gap:0;border-radius:var(--r-xl);
+  overflow:hidden;background:var(--surface);border:1px solid var(--border-2);box-shadow:var(--shadow-high)}
+.ent-discover-daily-art{position:relative;aspect-ratio:16/9;min-height:280px}
+.ent-discover-daily-art img{width:100%;height:100%;object-fit:cover}
+.ent-discover-daily-overlay{position:absolute;inset:0;background:linear-gradient(90deg,transparent 60%,var(--surface) 100%)}
+.ent-discover-daily-info{padding:24px 28px;display:flex;flex-direction:column;justify-content:center;gap:10px}
+.ent-discover-daily-title{font-size:clamp(22px,2.6vw,32px);font-weight:800;color:#fff;margin:6px 0 4px;line-height:1.1}
+.ent-discover-daily-overview{font-size:13px;line-height:1.6;color:var(--text-dim);margin:0 0 12px;
+  display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.ent-discover-daily-actions{display:flex;gap:8px;flex-wrap:wrap}
+.ent-discover-section{margin-bottom:28px}
+.ent-discover-h{font-size:15px;font-weight:700;color:#fff;margin:0 0 14px}
+.ent-mood-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.ent-mood-chip{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 16px;border-radius:var(--r-pill);
+  font-size:13px;font-weight:600;color:var(--text-dim);background:var(--surface);border:1px solid var(--border-2);
+  cursor:pointer;transition:all var(--t-fast)}
+.ent-mood-chip:hover{color:#fff;border-color:var(--border-strong)}
+.ent-mood-chip.on{color:var(--ent-fg);background:var(--ent);border-color:transparent}
+.ent-mood-chip svg{flex-shrink:0}
+@media (max-width:760px){
+  .ent-discover-daily-card{grid-template-columns:1fr}
+  .ent-discover-daily-overlay{background:linear-gradient(0deg,transparent 40%,var(--surface) 100%)}
+}
+
+/* ── Detail: user rating widget ──────────────────────────────── */
+.ent-dp-rating-widget{display:flex;align-items:center;gap:10px;margin-left:auto;
+  padding-left:16px;border-left:1px solid var(--border)}
+.ent-dp-rating-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text-faint)}
+.ent-dp-stars{display:flex;gap:1px}
+.ent-dp-star{display:flex;align-items:center;justify-content:center;width:22px;height:22px;
+  background:transparent;border:none;color:var(--text-faint);cursor:pointer;transition:all var(--t-fast);padding:0}
+.ent-dp-star:hover{color:#fbbf24;transform:scale(1.15)}
+.ent-dp-star.on{color:#fbbf24}
+
+/* ── Detail: add-to-collection dropdown ──────────────────────── */
+.ent-dp-col-add{display:flex;align-items:center;gap:8px;color:var(--text-dim)}
+.ent-dp-col-add select{height:34px;padding:0 10px;border-radius:var(--r-sm);background:var(--surface);
+  border:1px solid var(--border-2);color:#fff;font-size:12px;font-family:inherit;outline:none;cursor:pointer}
+.ent-dp-col-add select:hover{border-color:rgba(var(--ent-rgb),.4)}
+
+/* ── Detail: review tab ──────────────────────────────────────── */
+.ent-dp-review{display:flex;flex-direction:column;gap:14px;max-width:680px}
+.ent-dp-review-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.ent-dp-review-title{font-size:15px;font-weight:700;color:#fff}
+.ent-dp-review-rating{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:var(--r-pill);
+  background:rgba(251,191,36,.14);border:1px solid rgba(251,191,36,.3);color:#fbbf24;font-size:12px;font-weight:700}
+.ent-dp-review-input{width:100%;padding:14px 16px;border-radius:var(--r-md);background:var(--surface);
+  border:1px solid var(--border-2);color:#fff;font-size:14px;line-height:1.6;font-family:inherit;outline:none;
+  resize:vertical;min-height:120px}
+.ent-dp-review-input:focus{border-color:var(--ent);box-shadow:0 0 0 1px rgba(var(--ent-rgb),.2)}
+.ent-dp-review-actions{display:flex;align-items:center;gap:12px}
+.ent-dp-review-saved{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#46d369}
+
+/* ── Sleek dark theme refinements ────────────────────────────── */
+.ent-shell{background:#050507}
+.ent-side{background:linear-gradient(180deg,rgba(8,8,10,.98),rgba(0,0,0,.98))}
+.ent-body{background:#050507}
+.ent-dp-panel{background:rgba(8,8,10,.88)}
+.ent-dp-actionbar{background:rgba(8,8,10,.7)}
+.ent-rail-title{font-weight:800;letter-spacing:-.012em}
+.ent-page-title{font-weight:900;letter-spacing:-.024em}
+
 
 
 
