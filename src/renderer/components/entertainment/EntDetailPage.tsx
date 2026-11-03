@@ -95,6 +95,9 @@ export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, in
 
   return (
     <div className="ent-dp">
+      {/* Ambient blurred backdrop (v6.6.0) — fills the page behind everything */}
+      {backdrop && <div className="ent-dp-ambient" style={{ backgroundImage: `url(${backdrop})` }} aria-hidden="true" />}
+
       {/* ── Hero ── */}
       <div className="ent-dp-hero">
         {trailerPlaying && trailerKey ? (

@@ -50,36 +50,33 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v6.5.0"
-          $title = "NEXUS v6.5.0 — Settings panel, My List badge, Surprise/Settings shortcuts"
+          $tag = "v6.6.0"
+          $title = "NEXUS v6.6.0 — Hero Watch Trailer modal, ambient detail backdrop, polish"
           $notes = @"
           NEXUS — Universal Game Launcher & Entertainment Hub for Windows.
 
-          **v6.5.0 — Preferences + discoverability. A native settings panel, a live My List count badge, and two new keyboard shortcuts.**
+          **v6.6.0 — Cinematic polish. A hero Watch Trailer button + YouTube modal, and an ambient blurred backdrop on the detail page.**
 
-          **New: NEXUS TV Settings panel (press `,` or click the gear icon).**
-          A proper native-app settings modal with three sections:
-          - **Playback**: toggle Hero auto-advance (8s rotation), Reduced motion (disable non-essential animations), NEW release badges.
-          - **Your Library**: live stats — My List count, In Progress count, Recently Viewed count.
-          - **Data**: a "Clear all NEXUS TV data" button that wipes My List + Continue Watching + History + preferences from this PC, with a confirmation toast.
-          Each toggle fires a toast and persists instantly via a new `ent-prefs` store (localStorage).
+          **New: Watch Trailer button on the hero.**
+          The cinematic hero now has a dedicated "Watch Trailer" CTA (between Watch Now and More Info). Clicking it opens a full trailer modal that fetches the YouTube trailer key on-demand via tmdbDetailsAny — so you can preview any featured title without leaving the home screen. The modal has a backdrop blur, scale-in animation, loading + error states, and Esc/click-outside to close.
 
-          **New: My List count badge.**
-          The My List sidebar button now shows a rose count badge (e.g. "3") when you have saved titles — so you always know at a glance. Updates live as you add/remove items.
+          **New: EntTrailerModal component.**
+          A reusable YouTube trailer modal (EntTrailerModal.tsx) — fetches the trailer key via tmdbDetailsAny, embeds youtube-nocookie.com with autoplay, shows a spinner while loading and a graceful "No trailer available" message if TMDB has none. Esc closes (capture-phase).
 
-          **New: keyboard shortcuts.**
-          - **s** — Surprise Me (picks a random trending/TV title and starts playing immediately). Works from any view — navigates home first if needed, then fires.
-          - **,** — open Settings.
-          Both are documented in the Keyboard Shortcuts overlay (`?`), which now groups browse shortcuts under "Discover".
+          **New: Ambient blurred backdrop on the detail page.**
+          The detail page now has a full-viewport blurred, saturated, dimmed copy of the backdrop image behind everything — giving every detail page a cinematic ambient glow that matches the title's color palette. The glass info panel uses a deeper background (86% opacity) so text stays readable against the ambient layer.
 
-          **New stores.**
-          `ent-prefs.ts` — `getPrefs()`, `setPrefs()`, `subscribePrefs()` for reactive preference access.
+          **Polish.**
+          - Hero "Watch Trailer" button gets a subtle rose-tinted accent (border + bg) so it stands out from the other ghost buttons.
+          - Trailer modal has proper backdrop blur + scale-in animation.
+          - Detail-page glass panel deepened to 86% opacity for ambient contrast.
+          - Full responsive: trailer modal fills the viewport on narrow screens.
 
-          All v6.4.0 functionality preserved: toast notifications, Surprise Me bar, command palette (Ctrl+K), hero manual arrows + Up Next, NEW badges, card sheen, hover preview popovers, Top 10 rail, arrow-key nav, scroll-to-top FAB, view transitions, keyboard shortcuts overlay, Recently Viewed rail, full CineSrc streaming playback, TMDB IPC in main process, mode switching, library, collections, platform detection, launching, playtime, achievements, overlay, console/desktop mode, themes, 4 first-party plugins.
+          All v6.5.0 functionality preserved: settings panel, My List badge, Surprise/Settings shortcuts, toast notifications, Surprise Me bar, command palette (Ctrl+K), hero manual arrows + Up Next, NEW badges, card sheen, hover preview popovers, Top 10 rail, arrow-key nav, scroll-to-top FAB, view transitions, keyboard shortcuts overlay, Recently Viewed rail, full CineSrc streaming playback, TMDB IPC in main process, mode switching, library, collections, platform detection, launching, playtime, achievements, overlay, console/desktop mode, themes, 4 first-party plugins.
 
           **Downloads:**
-          - NEXUS-Setup-6.5.0.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-6.5.0.exe — single-file portable build.
+          - NEXUS-Setup-6.6.0.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-6.6.0.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@

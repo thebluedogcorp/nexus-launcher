@@ -1,11 +1,13 @@
 // v6.0.0 — EntHero: Apple TV+ style cinematic hero (reference image 2).
 // Full-bleed art bleeding right, deep left gradient blend, huge condensed
 // uppercase Oswald title, kicker chip, meta + genre badges, 2-line synopsis,
-// Watch Now / More Info / My List CTAs, pagination dots, auto-advance 8s.
+// Watch Now / Watch Trailer / More Info / My List CTAs, pagination dots,
+// auto-advance 8s. v6.6.0 — Watch Trailer button + modal.
 
 import { useEffect, useState } from "react";
 import { Icon } from "../Icons";
-import { tmdbImg, formatRating, MOVIE_GENRES, TV_GENRES, type TmdbItem } from "../../lib/tmdb-types";
+import { tmdbImg, formatRating, MOVIE_GENRES, TV_GENRES, type TmdbItem, type TmdbMediaType } from "../../lib/tmdb-types";
+import { EntTrailerModal } from "./EntTrailerModal";
 
 interface HeroProps {
   items: TmdbItem[];
@@ -29,6 +31,7 @@ function genreNames(item: TmdbItem): string[] {
 export function EntHero({ items, loading, onOpen, onWatch, inList, onToggleList }: HeroProps) {
   const heroes = items.filter(i => i.backdropPath && i.overview).slice(0, HERO_COUNT);
   const [idx, setIdx] = useState(0);
+  const [trailerFor, setTrailerFor] = useState<{ mt: TmdbMediaType; id: number; title: string } | null>(null);
 
   useEffect(() => {
     if (heroes.length <= 1) return;
@@ -94,6 +97,9 @@ export function EntHero({ items, loading, onOpen, onWatch, inList, onToggleList 
           <button className="ent-cta primary" onClick={() => onWatch(mt, cur.id, cur.title, cur.backdropPath, cur.posterPath)}>
             <Icon.Play size={16} /> Watch Now
           </button>
+          <button className="ent-cta ghost" onClick={() => setTrailerFor({ mt, id: cur.id, title: cur.title })}>
+            <Icon.Film size={15} /> Watch Trailer
+          </button>
           <button className="ent-cta ghost" onClick={() => onOpen(mt, cur.id)}>
             <Icon.Info size={15} /> More Info
           </button>
@@ -145,6 +151,15 @@ export function EntHero({ items, loading, onOpen, onWatch, inList, onToggleList 
           </div>
         </>
       )}
+
+      {/* Watch Trailer modal (v6.6.0) */}
+      <EntTrailerModal
+        open={trailerFor !== null}
+        mediaType={trailerFor?.mt ?? "movie"}
+        id={trailerFor?.id ?? 0}
+        title={trailerFor?.title ?? ""}
+        onClose={() => setTrailerFor(null)}
+      />
     </div>
   );
 }
