@@ -81,7 +81,25 @@ export function EntHome({ progressTick, historyTick, onOpen, onWatch, inList, on
     setHistory(getHistory().slice(0, 12));
   }, [historyTick]);
   const [histCleared, setHistCleared] = useState(false);
-  const clearHist = () => { clearHistory(); setHistory([]); setHistCleared(true); pushToast("History cleared", "info", <Icon.Clock2 size={14} />); };
+  const clearHist = () => { clearHistory(); setHistory([]); setHistCleared(true); setBcw(null); pushToast("History cleared", "info", <Icon.Clock2 size={14} />); };
+
+  // "Because you watched X" — fetch recommendations for the most-recent history item.
+  const [bcw, setBcw] = useState<{ source: string; items: TmdbItem[] } | null>(null);
+  useEffect(() => {
+    const h = getHistory();
+    if (h.length === 0) { setBcw(null); return; }
+    let cancelled = false;
+    const last = h[0];
+    (async () => {
+      try {
+        const r = await window.nexus.tmdbRecommendations(last.mediaType, last.id);
+        if (cancelled) return;
+        const items = (Array.isArray(r) ? r : []).slice(0, 12) as TmdbItem[];
+        if (items.length > 0) setBcw({ source: last.title, items });
+      } catch { /* non-fatal */ }
+    })();
+    return () => { cancelled = true; };
+  }, [historyTick]);
 
   // "Surprise Me" — pick a random trending title and start watching it.
   const surpriseMe = () => {
@@ -227,6 +245,20 @@ export function EntHome({ progressTick, historyTick, onOpen, onWatch, inList, on
               ))}
             </div>
           </section>
+        )}
+
+        {/* Because you watched X — smart recs from the most-recent history item (v7.0.0) */}
+        {bcw && bcw.items.length > 0 && (
+          <Rail
+            title={`Because you watched “${bcw.source}”`}
+            items={bcw.items}
+            loading={false}
+            onOpen={onOpen}
+            onWatch={watchFromCard}
+            onToggleList={toggleAny}
+            inList={inList}
+            enableHover
+          />
         )}
 
         {/* Top 10 Movies (Netflix-style numbered rail) */}

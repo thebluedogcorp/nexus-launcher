@@ -297,50 +297,54 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
           <span className="ent-clock-date">{dateStr}</span>
         </div>
 
-        {/* View transition wrapper — key forces remount + fade-in animation */}
-        <div className="ent-view" key={view}>
-          {view === "home" && (
-            <EntHome
-              progressTick={progressTick}
-              historyTick={historyTick}
-              onOpen={openDetail}
-              onWatch={watch}
-              inList={inListFn}
-              onToggleList={toggleListItem}
-              onBrowseGenre={browseToGenre}
-            />
-          )}
-          {view === "movies" && (
-            <EntBrowse mediaType="movie" initialGenre={view === "movies" ? browseGenre?.mediaType === "movie" ? browseGenre.genreId : null : null} onOpen={openDetail} inList={inListFn} onWatch={watchFromCard} onToggleList={toggleListFn} onGenreCleared={() => setBrowseGenre(null)} />
-          )}
-          {view === "tv" && (
-            <EntBrowse mediaType="tv" initialGenre={view === "tv" ? browseGenre?.mediaType === "tv" ? browseGenre.genreId : null : null} onOpen={openDetail} inList={inListFn} onWatch={watchFromCard} onToggleList={toggleListFn} onGenreCleared={() => setBrowseGenre(null)} />
-          )}
-          {view === "mylist" && (
-            <EntMyList
-              listTick={listTick}
-              progressTick={progressTick}
-              onOpen={openDetail}
-              onWatch={watch}
-              inList={inListFn}
-            />
-          )}
-          {view === "search" && (
-            <EntSearchView focusSignal={searchSignal} onOpen={openDetail} inList={inListFn} onWatch={watchFromCard} onToggleList={toggleListFn} />
-          )}
-          {view === "detail" && detail && (
-            <EntDetailPage
-              mediaType={detail.mediaType}
-              id={detail.id}
-              onBack={backFromDetail}
-              onOpenDetail={openDetail}
-              onWatch={watch}
-              inList={inListFn}
-              onToggleList={toggleListFn}
-              onHistoryChange={() => setHistoryTick(t => t + 1)}
-            />
-          )}
+        {/* View layer — Home is keep-alive (stays mounted, retains data);
+            other views mount on demand. Eliminates the refetch flash. */}
+        <div className={view === "home" ? "ent-view ent-view-active" : "ent-view ent-view-hidden"} aria-hidden={view !== "home"}>
+          <EntHome
+            progressTick={progressTick}
+            historyTick={historyTick}
+            onOpen={openDetail}
+            onWatch={watch}
+            inList={inListFn}
+            onToggleList={toggleListItem}
+            onBrowseGenre={browseToGenre}
+          />
         </div>
+
+        {view !== "home" && (
+          <div className="ent-view ent-view-active" key={view === "detail" ? `detail-${detail?.mediaType}-${detail?.id}` : view}>
+            {view === "movies" && (
+              <EntBrowse mediaType="movie" initialGenre={browseGenre?.mediaType === "movie" ? browseGenre.genreId : null} onOpen={openDetail} inList={inListFn} onWatch={watchFromCard} onToggleList={toggleListFn} onGenreCleared={() => setBrowseGenre(null)} />
+            )}
+            {view === "tv" && (
+              <EntBrowse mediaType="tv" initialGenre={browseGenre?.mediaType === "tv" ? browseGenre.genreId : null} onOpen={openDetail} inList={inListFn} onWatch={watchFromCard} onToggleList={toggleListFn} onGenreCleared={() => setBrowseGenre(null)} />
+            )}
+            {view === "mylist" && (
+              <EntMyList
+                listTick={listTick}
+                progressTick={progressTick}
+                onOpen={openDetail}
+                onWatch={watch}
+                inList={inListFn}
+              />
+            )}
+            {view === "search" && (
+              <EntSearchView focusSignal={searchSignal} onOpen={openDetail} inList={inListFn} onWatch={watchFromCard} onToggleList={toggleListFn} />
+            )}
+            {view === "detail" && detail && (
+              <EntDetailPage
+                mediaType={detail.mediaType}
+                id={detail.id}
+                onBack={backFromDetail}
+                onOpenDetail={openDetail}
+                onWatch={watch}
+                inList={inListFn}
+                onToggleList={toggleListFn}
+                onHistoryChange={() => setHistoryTick(t => t + 1)}
+              />
+            )}
+          </div>
+        )}
 
         {/* Scroll-to-top FAB */}
         {showTop && (

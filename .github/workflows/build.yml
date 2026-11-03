@@ -50,31 +50,40 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v6.7.0"
-          $title = "NEXUS v6.7.0 — Genre quick-bar on home, Copy Link on detail, polish"
+          $tag = "v7.0.0"
+          $title = "NEXUS v7.0.0 — Major UI overhaul: glitch fixes, immersive hero, keep-alive home, Because You Watched"
           $notes = @"
           NEXUS — Universal Game Launcher & Entertainment Hub for Windows.
 
-          **v6.7.0 — Faster discovery + sharing. A genre quick-filter bar on the home screen and a Copy Link button on every detail page.**
+          **v7.0.0 — A major UI overhaul. Fixed real glitches, maximized screen real estate, added a Ken Burns hero zoom, a keep-alive home (no refetch flash), and a "Because You Watched" smart rec rail.**
 
-          **New: Genre quick-filter bar on home.**
-          Between the Surprise Me bar and the rails, home now shows a "Browse by genre" bar with 14 genre chips — 8 movie genres (Action, Adventure, Animation, Comedy, Crime, Documentary, Drama, Family) + 6 TV genres, separated by a divider. Click any chip and you jump straight to the filtered browse page with that genre pre-selected and active. The browse page's genre state syncs with the pre-selection and clears it when you manually change genres.
+          **Bug fixes (real glitches the user reported):**
+          - **Detail page poster was collapsed to 23px tall** — the aspect-ratio + height:auto in a CSS grid caused the poster to collapse to a sliver. Fixed with explicit width (152px) + height (228px) + align-self:start + display:block. Now renders at full 228px.
+          - **Ambient backdrop covered the sidebar** — the position:fixed ambient layer with transform:scale(1.2) bled leftward over the 68px sidebar. Fixed by removing the transform (using background-size:120% instead) and scoping left:68px. Now stays within the body area.
+          - **View-transition remount flash** — every navigation used key={view}, forcing a full remount + 6-endpoint TMDB refetch of the home screen every time you returned to it. Fixed with a keep-alive pattern: Home stays mounted (hidden via CSS) when inactive, retaining all its data. No more flash.
+          - **Z-index conflicts** — the command palette, shortcuts overlay, and settings panel all shared z-index:300. Established a clear hierarchy: settings=200, shortcuts=210, palette=220, trailer=230.
 
-          **New: Copy Link button on detail pages.**
-          Every detail page now has a "Copy Link" button (after IMDb) that copies the title's TMDB URL (themoviedb.org/{type}/{id}) to the clipboard. Success fires a "Link copied to clipboard" toast; failure fires an error toast. The button has a subtle rose-tinted accent so it stands out.
+          **Immersive screen real estate:**
+          - Hero is now 72vh (was 62vh) — min 520px, max 820px. Taller, more cinematic.
+          - Rails padding reduced 28px → 20px, page max-width widened 1480px → 1600px.
+          - Landscape cards widened 300px → 320px for denser, richer rails.
+          - Detail body max-width widened 1320px → 1480px.
 
-          **Polish.**
-          - Genre chips get a hover lift + rose border.
-          - TV genre chips are rose-tinted to distinguish from movie genres.
-          - Copy Link button gets a rose-tinted accent.
-          - Genre bar divider hides on narrow screens.
-          - Browse pre-selection logic: initialGenre prop + onGenreCleared callback so the shell and browse stay in sync.
+          **New: Ken Burns hero zoom.**
+          The active hero backdrop now slowly zooms from scale(1.05) to scale(1.14) over 18 seconds — a subtle, cinematic Ken Burns effect that makes the hero feel alive instead of static. Re-triggers on every hero rotation.
 
-          All v6.6.0 functionality preserved: hero Watch Trailer modal, ambient detail backdrop, settings panel, My List badge, Surprise/Settings shortcuts, toast notifications, Surprise Me bar, command palette (Ctrl+K), hero manual arrows + Up Next, NEW badges, card sheen, hover preview popovers, Top 10 rail, arrow-key nav, scroll-to-top FAB, view transitions, keyboard shortcuts overlay, Recently Viewed rail, full CineSrc streaming playback, TMDB IPC in main process, mode switching, library, collections, platform detection, launching, playtime, achievements, overlay, console/desktop mode, themes, 4 first-party plugins.
+          **New: "Because You Watched" smart rec rail.**
+          Home now shows a "Because you watched 'X'" rail that fetches TMDB recommendations for the most-recent item in your Recently Viewed history. Updates automatically as you visit new detail pages. Uses the existing tmdbRecommendations endpoint — no new API calls to maintain.
+
+          **Cohesion:**
+          - View transition is now a keep-alive swap (display:none/block) with a 6px rise-in, not a full remount.
+          - All overlays use the established z-index hierarchy.
+
+          All v6.7.0 functionality preserved: genre quick-bar, Copy Link, hero Watch Trailer modal, ambient detail backdrop, settings panel, My List badge, Surprise/Settings shortcuts, toast notifications, Surprise Me, command palette (Ctrl+K), hero manual arrows + Up Next, NEW badges, card sheen, hover preview popovers, Top 10 rail, arrow-key nav, scroll-to-top FAB, keyboard shortcuts overlay, Recently Viewed rail, full CineSrc streaming playback, TMDB IPC in main process, mode switching, library, collections, platform detection, launching, playtime, achievements, overlay, console/desktop mode, themes, 4 first-party plugins.
 
           **Downloads:**
-          - NEXUS-Setup-6.7.0.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-6.7.0.exe — single-file portable build.
+          - NEXUS-Setup-7.0.0.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-7.0.0.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@

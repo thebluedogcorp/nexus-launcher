@@ -2361,15 +2361,20 @@ button.tb-logo:active{transform:scale(0.97)}
 .ent-glass-pill:hover{background:var(--surface-2);border-color:var(--border-strong)}
 
 /* ── Hero ────────────────────────────────────────────────────── */
-.ent-hero{position:relative;height:62vh;min-height:440px;max-height:720px;
+.ent-hero{position:relative;height:72vh;min-height:520px;max-height:820px;
   overflow:hidden}
 .ent-hero-loading{background:linear-gradient(135deg,#0c0c0e,#16121a 60%,#0c0c0e)}
 .ent-hero-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:14px;color:var(--text-faint);background:#0c0c0e}
 .ent-hero-media{position:absolute;inset:0}
 .ent-hero-media img{position:absolute;inset:0;width:100%;height:100%;
-  object-fit:cover;opacity:0;transition:opacity 900ms cubic-bezier(.4,0,.2,1)}
-.ent-hero-media img.on{opacity:1}
+  object-fit:cover;opacity:0;transition:opacity 900ms cubic-bezier(.4,0,.2,1);
+  transform:scale(1.05)}
+.ent-hero-media img.on{opacity:1;animation:ent-kenburns 18s ease-out forwards}
+@keyframes ent-kenburns{
+  from{transform:scale(1.05)}
+  to{transform:scale(1.14)}
+}
 .ent-hero-fade{position:absolute;inset:0;pointer-events:none;
   background:linear-gradient(90deg,#000 0%,rgba(0,0,0,.86) 22%,rgba(0,0,0,.4) 48%,rgba(0,0,0,.12) 72%,transparent 100%),
     linear-gradient(0deg,#000 0%,rgba(0,0,0,.5) 30%,transparent 60%)}
@@ -2403,8 +2408,8 @@ button.tb-logo:active{transform:scale(0.97)}
 .ent-dot.on{width:24px;border-radius:4px;background:var(--ent)}
 
 /* ── Rails container ─────────────────────────────────────────── */
-.ent-rails{padding:8px 28px 0}
-.ent-rail{margin-bottom:30px}
+.ent-rails{padding:8px 20px 0}
+.ent-rail{margin-bottom:28px}
 .ent-rail-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
 .ent-rail-title{font-size:16px;font-weight:700;letter-spacing:-.01em;color:#fff;margin:0}
 .ent-rail-count{font-size:11px;font-weight:600;color:var(--text-faint);
@@ -2425,7 +2430,7 @@ button.tb-logo:active{transform:scale(0.97)}
 .ent-rail-track::-webkit-scrollbar{display:none}
 
 /* ── Landscape card (16:9) ───────────────────────────────────── */
-.ent-lcard-wrap{position:relative;flex:0 0 auto;width:300px;scroll-snap-align:start}
+.ent-lcard-wrap{position:relative;flex:0 0 auto;width:320px;scroll-snap-align:start}
 .ent-lcard{display:block;width:100%;border:none;padding:0;cursor:pointer;
   background:transparent}
 .ent-lcard-media{position:relative;aspect-ratio:16/9;border-radius:var(--r-lg);
@@ -2509,7 +2514,7 @@ button.tb-logo:active{transform:scale(0.97)}
 .ent-brandstrip svg{color:var(--ent);flex-shrink:0}
 
 /* ── Generic page shell (browse / mylist / search) ──────────── */
-.ent-page{padding:26px 28px 40px;max-width:1480px}
+.ent-page{padding:24px 20px 40px;max-width:1600px}
 .ent-page-head{display:flex;align-items:flex-end;justify-content:space-between;
   gap:16px;margin-bottom:18px}
 .ent-page-label{font-size:10.5px;font-weight:800;letter-spacing:.18em;
@@ -2603,7 +2608,7 @@ button.tb-logo:active{transform:scale(0.97)}
 .ent-dp-tagline{font-size:14px;font-style:italic;color:var(--text-dim);margin:8px 0 0}
 .ent-dp-topbar{position:absolute;top:18px;left:0;right:0;z-index:3;padding:0 28px}
 
-.ent-dp-body{padding:0 28px 40px;max-width:1320px;margin:0 auto}
+.ent-dp-body{padding:0 20px 40px;max-width:1480px;margin:0 auto}
 .ent-dp-loading{display:flex;align-items:center;gap:10px;justify-content:center;
   padding:50px;color:var(--text-dim)}
 .ent-dp-loading svg{animation:ent-spin 1s linear infinite;color:var(--ent)}
@@ -2613,8 +2618,8 @@ button.tb-logo:active{transform:scale(0.97)}
   margin-top:-70px;position:relative;z-index:3;padding:22px;border-radius:var(--r-xl);
   background:var(--surface-glass);border:1px solid var(--border-2);
   backdrop-filter:blur(18px);box-shadow:var(--shadow-high)}
-.ent-dp-poster{flex-shrink:0}
-.ent-dp-poster img{width:148px;height:auto;aspect-ratio:2/3;object-fit:cover;
+.ent-dp-poster{flex-shrink:0;width:152px;align-self:start}
+.ent-dp-poster img{display:block;width:152px;height:228px;object-fit:cover;
   border-radius:var(--r-md);border:1px solid var(--border-2);box-shadow:var(--shadow-mid)}
 .ent-dp-info{min-width:0}
 .ent-dp-ratings{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;
@@ -2752,10 +2757,12 @@ button.tb-logo:active{transform:scale(0.97)}
    view transitions, richer card meta, and sidebar tooltips.
    =================================================================== */
 
-/* ── View transition (fade + rise on navigation) ─────────────── */
-.ent-view{animation:ent-view-in .35s cubic-bezier(.2,.8,.2,1)}
+/* ── View layer (keep-alive: Home stays mounted, hidden when inactive) ── */
+.ent-view{animation:ent-view-in .3s cubic-bezier(.2,.8,.2,1)}
+.ent-view-hidden{display:none}
+.ent-view-active{display:block}
 @keyframes ent-view-in{
-  from{opacity:0;transform:translateY(8px)}
+  from{opacity:0;transform:translateY(6px)}
   to{opacity:1;transform:translateY(0)}
 }
 
@@ -2916,7 +2923,7 @@ button.tb-logo:active{transform:scale(0.97)}
    =================================================================== */
 
 /* ── Command palette (Ctrl/Cmd+K) ────────────────────────────── */
-.ent-cmd-overlay{position:fixed;inset:0;z-index:300;display:flex;
+.ent-cmd-overlay{position:fixed;inset:0;z-index:220;display:flex;
   justify-content:center;align-items:flex-start;padding-top:12vh;
   background:rgba(0,0,0,.6);backdrop-filter:blur(6px);
   animation:ent-fade .15s ease}
@@ -3055,7 +3062,7 @@ button.tb-logo:active{transform:scale(0.97)}
    =================================================================== */
 
 /* ── Keyboard shortcuts overlay (? key) ──────────────────────── */
-.ent-sc-overlay{position:fixed;inset:0;z-index:300;display:flex;
+.ent-sc-overlay{position:fixed;inset:0;z-index:210;display:flex;
   justify-content:center;align-items:center;padding:24px;
   background:rgba(0,0,0,.65);backdrop-filter:blur(8px);
   animation:ent-fade .15s ease}
@@ -3214,7 +3221,7 @@ button.tb-logo:active{transform:scale(0.97)}
    =================================================================== */
 
 /* ── Settings panel ──────────────────────────────────────────── */
-.ent-set-overlay{position:fixed;inset:0;z-index:300;display:flex;
+.ent-set-overlay{position:fixed;inset:0;z-index:200;display:flex;
   justify-content:center;align-items:center;padding:24px;
   background:rgba(0,0,0,.65);backdrop-filter:blur(8px);
   animation:ent-fade .15s ease}
@@ -3297,7 +3304,7 @@ button.tb-logo:active{transform:scale(0.97)}
    =================================================================== */
 
 /* ── Trailer modal ───────────────────────────────────────────── */
-.ent-trailer-overlay{position:fixed;inset:0;z-index:310;display:flex;
+.ent-trailer-overlay{position:fixed;inset:0;z-index:230;display:flex;
   justify-content:center;align-items:center;padding:24px;
   background:rgba(0,0,0,.82);backdrop-filter:blur(10px);
   animation:ent-fade .15s ease}
@@ -3328,11 +3335,13 @@ button.tb-logo:active{transform:scale(0.97)}
 .ent-trailer-error svg{color:var(--text-faint)}
 
 /* ── Ambient blurred backdrop (detail page) ──────────────────── */
+/* Scoped to the body area (left:68px) so it never covers the sidebar.
+   No transform:scale (it shifts the element left); background-size:120%
+   avoids edge blur artifacts instead. */
 .ent-dp{position:relative}
-.ent-dp-ambient{position:fixed;inset:0;z-index:0;pointer-events:none;
-  background-size:cover;background-position:center;
-  filter:blur(60px) saturate(1.3) brightness(.4);
-  transform:scale(1.2);opacity:.5}
+.ent-dp-ambient{position:fixed;top:0;left:68px;right:0;bottom:0;z-index:0;
+  pointer-events:none;background-size:120% 120%;background-position:center;
+  filter:blur(60px) saturate(1.3) brightness(.4);opacity:.45}
 .ent-dp-hero,.ent-dp-body{position:relative;z-index:1}
 
 /* ── Hero CTA: trailer button accent ─────────────────────────── */
