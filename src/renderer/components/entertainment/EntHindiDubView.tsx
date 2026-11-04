@@ -123,8 +123,9 @@ export function EntHindiDubView({ onOpen, onWatch, inList, onToggleList }: Hindi
       <div className="ent-hindi-note">
         <Icon.Languages size={14} />
         <span>
-          Watch opens on the Hindi audio source. If a Hindi track isn't available for a title,
-          switch to <strong>English</strong> or pick another <strong>source</strong> in the player bar.
+          Playback uses <strong>CineSrc</strong> (the verified-working source). Hindi-origin titles play with
+          Hindi audio automatically. For Hollywood dubbed in Hindi, tap <strong>⚙ Settings</strong> inside the
+          player to pick a Hindi server.
         </span>
       </div>
 

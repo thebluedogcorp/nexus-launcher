@@ -59,7 +59,7 @@ const GROUPS: { group: string; items: Shortcut[] }[] = [
     items: [
       { keys: ["Esc"], label: "Close player (saves progress)" },
       { keys: ["S/E inputs"], label: "Change TV season / episode" },
-      { keys: ["EN / हिं"], label: "Switch audio language (English / Hindi)" },
+      { keys: ["Source"], label: "Switch stream source (CineSrc default)" },
     ],
   },
 ];

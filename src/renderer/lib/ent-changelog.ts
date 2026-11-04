@@ -13,6 +13,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "9.1.1",
+    date: "2026-11-05",
+    title: "Hindi Dub honesty fix — verified-playback via CineSrc, fake audio switch removed",
+    kind: "major",
+    items: [
+      "Fix: clicking Hindi no longer errors — the broken 2Embed route (CSP-blocked + does not actually play in an iframe) has been removed",
+      "Verified via network tracking: CineSrc is the ONLY source that genuinely plays (loads .m3u8 + init.mp4 + segments). 2Embed and VidSrc embeds return HTTP 200 but load only their document shell and make zero video requests — they do not play",
+      "Fix: all playback now routes through CineSrc (the verified-working, CSP-allowed source) — no more ERR_BLOCKED_BY_CSP",
+      "Honest redesign: removed the fake EN/हिं audio toggle that pretended to switch audio tracks (impossible cross-origin). The stream-source selector remains (CineSrc recommended; 2Embed/VidSrc labeled experimental)",
+      "Hindi Dub hub is the genuine Hindi delivery: Hindi-origin titles (Bollywood etc.) play with Hindi audio automatically via CineSrc (India-focused). For Hollywood dubbed in Hindi, the player shows a one-time guide toast to pick a Hindi server in CineSrc's in-player ⚙ Settings",
+      "Verified there is no URL param to force Hindi on CineSrc (embed HTML identical with/without ?lang=hi) — audio selection is inside CineSrc's player UI, so the honest path is content-selection + in-player guidance",
+    ],
+  },
+  {
     version: "9.1.0",
     date: "2026-11-04",
     title: "Hindi Dub — dedicated hub + multi-source player with live audio-language switching",

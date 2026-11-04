@@ -191,40 +191,32 @@ export function cinesrcEmbedUrl(
   return `https://cinesrc.st/embed/movie/${tmdbId}`;
 }
 
-// ─── v9.1.0 — Multi-source streaming + Hindi dub ────────────────────────────
+// ─── v9.1.1 — Streaming source resolution (honest, verified) ────────────────
 //
-// CineSrc is the default and verified-working embed (India-focused aggregator;
-// carries Hindi audio for many titles via its in-player server/settings picker).
-// For an explicit Hindi-audio stream we switch to the 2embed network, whose
-// embed shell accepts an `aud=hi` query parameter that requests the Hindi
-// audio track. VidSrc is a third multi-server aggregator kept as a fallback.
+// CineSrc is the ONLY source verified to actually play in an iframe — it
+// bootstraps a real HLS player (loads .m3u8 + init.mp4 + segments). 2Embed and
+// VidSrc embeds return HTTP 200 but load only their document shell and make
+// ZERO video requests (verified via network tracking 2026-11-05), so they do
+// not play. They are kept here ONLY as manual "experimental" fallback options
+// for advanced users (third-party sources change over time); the default is
+// always CineSrc.
 //
-// Because the player iframe uses `key={src}` (EntPlayer.tsx), changing the
-// language or source at runtime cleanly remounts the embed — the switch is
-// live and real, not cosmetic.
-//
-// Verified 2026-11-04:
-//   • cinesrc.st/embed/movie/{id}            → HTTP 200, renders real player
-//   • 2embed.cc/embed/{id}?aud=hi            → HTTP 200, aud param echoed
-//   • 2embed.cc/embedtv/{id}&s={s}&e={e}&aud=hi → HTTP 200
-//   • vidsrc.to/embed/movie/{id}             → HTTP 200 (multi-server shim)
+// Hindi audio: CineSrc is India-focused and serves Hindi-origin titles with
+// Hindi audio by default. For Hollywood titles dubbed in Hindi, CineSrc's
+// in-player Settings (gear) menu exposes multi-server / multi-audio selection
+// — there is no URL param to force Hindi (verified: the embed HTML is identical
+// with/without ?lang=hi). The Hindi Dub hub surfaces content CineSrc most
+// reliably serves with Hindi audio, and the player shows a one-time guide
+// toast when opened from that hub.
 
 export type StreamSource = "auto" | "cinesrc" | "twoembed" | "vidsrc";
 export type StreamLanguage = "en" | "hi";
 
-/** Resolve the "auto" source for a given language (Hindi → 2embed, else CineSrc). */
-function resolveSource(source: StreamSource, language: StreamLanguage): Exclude<StreamSource, "auto"> {
-  if (source !== "auto") return source;
-  return language === "hi" ? "twoembed" : "cinesrc";
-}
-
 /**
- * Build the embed URL for any (source, language) combination.
- * - CineSrc: language-agnostic (the player's in-settings server picker carries
- *   Hindi audio; CineSrc auto-serves Hindi for Hindi-origin titles).
- * - 2embed: appends `aud=hi` when Hindi is selected — a real, server-accepted
- *   parameter that requests the Hindi audio track from the multi-audio source.
- * - VidSrc: multi-server aggregator (kept as a manual fallback).
+ * Build the embed URL for a given source. Language is intentionally NOT routed
+ * to the URL — CineSrc (the only working source) is language-agnostic at the
+ * URL level; Hindi audio is selected inside its in-player Settings menu.
+ * `twoembed` and `vidsrc` are experimental fallbacks (may not play).
  */
 export function streamEmbedUrl(
   mediaType: "movie" | "tv",
@@ -232,10 +224,9 @@ export function streamEmbedUrl(
   season?: number,
   episode?: number,
   source: StreamSource = "auto",
-  language: StreamLanguage = "en",
+  _language?: StreamLanguage,
 ): string {
-  const s = resolveSource(source, language);
-  const hi = language === "hi";
+  const s: Exclude<StreamSource, "auto"> = source === "auto" ? "cinesrc" : source;
   if (s === "cinesrc") {
     return cinesrcEmbedUrl(mediaType, tmdbId, season, episode);
   }
@@ -247,20 +238,19 @@ export function streamEmbedUrl(
     }
     return `https://vidsrc.to/embed/movie/${tmdbId}`;
   }
-  // 2embed — the multi-audio source. ?aud=hi (movie) / &aud=hi (TV) requests Hindi.
+  // 2embed — experimental fallback (may not play in an iframe).
   if (mediaType === "tv") {
     const se = Math.max(1, season ?? 1);
     const ep = Math.max(1, episode ?? 1);
-    return `https://www.2embed.cc/embedtv/${tmdbId}&s=${se}&e=${ep}${hi ? "&aud=hi" : ""}`;
+    return `https://www.2embed.cc/embedtv/${tmdbId}&s=${se}&e=${ep}`;
   }
-  return `https://www.2embed.cc/embed/${tmdbId}${hi ? "?aud=hi" : ""}`;
+  return `https://www.2embed.cc/embed/${tmdbId}`;
 }
 
-/** Human-readable label for the active source+language (shown in the player bar). */
-export function streamLabel(source: StreamSource, language: StreamLanguage): string {
-  const s = resolveSource(source, language);
-  const srcName = s === "cinesrc" ? "CineSrc" : s === "twoembed" ? "2Embed" : "VidSrc";
-  return language === "hi" ? `${srcName} · हिंदी` : srcName;
+/** Human-readable label for the active source (shown in the player footer). */
+export function streamLabel(source: StreamSource): string {
+  const s: Exclude<StreamSource, "auto"> = source === "auto" ? "cinesrc" : source;
+  return s === "cinesrc" ? "CineSrc" : s === "twoembed" ? "2Embed (experimental)" : "VidSrc (experimental)";
 }
 
 /**

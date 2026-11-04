@@ -18,7 +18,7 @@ import {
   estimateProgress,
   type ContinueEntry,
 } from "../../lib/ent-store";
-import { getPrefs, setPrefs } from "../../lib/ent-prefs";
+import { getPrefs } from "../../lib/ent-prefs";
 import { pushToast } from "./EntToaster";
 import { getDownloadSettings, downloadOfflinePackage, isDownloaded, removeDownload } from "../../lib/ent-downloads";
 
@@ -56,8 +56,9 @@ export function EntPlayer({ open, payload, onClose, onProgress }: EntPlayerProps
 
   const [season, setSeason] = useState(1);
   const [episode, setEpisode] = useState(1);
-  // v9.1.0 — audio language + stream source (multi-source Hindi-dub support).
-  const [language, setLanguage] = useState<StreamLanguage>("en");
+  // v9.1.1 — stream source. CineSrc is the only verified-playing source; the
+  // others are experimental fallbacks. Audio language is not URL-routed (CineSrc
+  // carries Hindi via its in-player Settings; see the guide toast on open).
   const [source, setSource] = useState<StreamSource>("auto");
   const startedAtRef = useRef<number>(0);
   const seasonRef = useRef(1);
@@ -73,13 +74,21 @@ export function EntPlayer({ open, payload, onClose, onProgress }: EntPlayerProps
     if (!open || !payload) return;
     setSeason(Math.max(1, payload.season ?? 1));
     setEpisode(Math.max(1, payload.episode ?? 1));
-    // v9.1.0 — pick up the Hindi-default hint from the Hindi Dub hub, else the
-    // saved preference. Source stays "auto" so the resolved source follows the
-    // language (Hindi -> 2embed aud=hi, English -> CineSrc).
-    const lang = payload.defaultLanguage ?? getPrefs().preferredLanguage ?? "en";
-    setLanguage(lang);
     setSource("auto");
     startedAtRef.current = Date.now();
+    // v9.1.1 — when opened from the Hindi Dub hub (or with a saved Hindi
+    // preference), show a one-time guide toast. CineSrc plays Hindi-origin
+    // titles in Hindi automatically; for Hollywood dubs, the user picks a
+    // Hindi server in the player's in-player Settings (gear) menu. There is no
+    // URL param to force Hindi (verified), so this guidance is the honest path.
+    const wantHindi = payload.defaultLanguage === "hi" || getPrefs().preferredLanguage === "hi";
+    if (wantHindi) {
+      pushToast(
+        "Hindi Dub — Hindi-origin titles play in Hindi via CineSrc. For Hollywood dubs, tap ⚙ inside the player to pick a Hindi server.",
+        "info",
+        <Icon.Languages size={14} />,
+      );
+    }
   }, [open, payload]);
 
   // Persist progress on close + periodically while open.
@@ -133,20 +142,22 @@ export function EntPlayer({ open, payload, onClose, onProgress }: EntPlayerProps
 
   if (!open || !payload) return null;
 
-  // v9.1.0 — multi-source: streamEmbedUrl routes to CineSrc (English) or
-  // 2embed ?aud=hi (Hindi) based on (source, language). key={src} on the
-  // iframe remounts the embed live when the user switches language/source.
-  const src = streamEmbedUrl(payload.mediaType, payload.id, season, episode, source, language);
+  // v9.1.1 — CineSrc is the only verified-playing source; 2Embed/VidSrc are
+  // experimental fallbacks. key={src} remounts the iframe when the source
+  // changes (and when season/episode changes for TV).
+  const src = streamEmbedUrl(payload.mediaType, payload.id, season, episode, source);
   const seLabel = isTv ? `S${season} · E${episode}` : "Movie";
-  const srcLabel = streamLabel(source, language);
-  const changeLanguage = (lang: StreamLanguage) => {
-    setLanguage(lang);
-    setPrefs({ preferredLanguage: lang });
-    startedAtRef.current = Date.now();
-  };
+  const srcLabel = streamLabel(source);
   const changeSource = (s: StreamSource) => {
     setSource(s);
     startedAtRef.current = Date.now();
+    if (s === "twoembed" || s === "vidsrc") {
+      pushToast(
+        `${s === "twoembed" ? "2Embed" : "VidSrc"} is experimental — it may not play. Switch back to CineSrc if the player stays blank.`,
+        "info",
+        <Icon.Bell size={13} />,
+      );
+    }
   };
   // v9.0.0 — download state for the current episode/movie.
   const curDownloaded = isDownloaded(payload.mediaType, payload.id, isTv ? season : undefined, isTv ? episode : undefined);
@@ -217,21 +228,9 @@ export function EntPlayer({ open, payload, onClose, onProgress }: EntPlayerProps
         </div>
         <div className="ent-player-bar-right">
           <span className="ent-player-pos">{seLabel}</span>
-          {/* v9.1.0 — audio language + stream source selector */}
-          <div className="ent-player-lang" title="Audio language & stream source">
-            <Icon.Languages size={13} />
-            <button
-              className={language === "en" ? "ent-lang-btn on" : "ent-lang-btn"}
-              onClick={() => changeLanguage("en")}
-              aria-label="English audio"
-              title="English audio"
-            >EN</button>
-            <button
-              className={language === "hi" ? "ent-lang-btn on" : "ent-lang-btn"}
-              onClick={() => changeLanguage("hi")}
-              aria-label="Hindi audio"
-              title="Hindi audio (dubbed)"
-            >हिं</button>
+          {/* v9.1.1 — stream source selector (CineSrc is the verified-working default) */}
+          <div className="ent-player-lang" title="Stream source — CineSrc is the verified-working default">
+            <Icon.Globe size={13} />
             <select
               className="ent-src-select"
               value={source}
@@ -239,10 +238,10 @@ export function EntPlayer({ open, payload, onClose, onProgress }: EntPlayerProps
               title="Stream source"
               aria-label="Stream source"
             >
-              <option value="auto">Auto</option>
+              <option value="auto">CineSrc (recommended)</option>
               <option value="cinesrc">CineSrc</option>
-              <option value="twoembed">2Embed</option>
-              <option value="vidsrc">VidSrc</option>
+              <option value="twoembed">2Embed (experimental)</option>
+              <option value="vidsrc">VidSrc (experimental)</option>
             </select>
           </div>
           {/* v9.0.0 — download the current episode/movie */}

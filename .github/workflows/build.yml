@@ -50,30 +50,30 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v9.1.0"
-          $title = "NEXUS v9.1.0 — Hindi Dub: dedicated hub + multi-source player with live audio-language switching"
+          $tag = "v9.1.1"
+          $title = "NEXUS v9.1.1 — Hindi Dub honesty fix: verified-playback via CineSrc, fake audio switch removed"
           $notes = @"
           NEXUS — Universal Game Launcher & Entertainment Hub for Windows.
 
-          **v9.1.0 — Hindi Dub. A dedicated Hindi-language hub and a real multi-source player that switches audio tracks live.**
+          **v9.1.1 — Hindi Dub honesty fix. Clicking Hindi no longer errors; playback routes through the one source verified to actually play.**
 
-          **New: Hindi Dub hub (press h).**
-          A dedicated tab surfacing titles the streaming sources most reliably serve with Hindi audio — Hindi Originals (Bollywood + Hindi cinema), Hindi Series, Top-Rated Hindi Cinema, and Hollywood in Hindi (a curated set of blockbusters widely available dubbed). Pressing Watch from this hub opens the player defaulted to the Hindi audio source.
+          **Fix: the CSP error on Hindi is gone.**
+          v9.1.0 routed Hindi to 2Embed, which the app's Content-Security-Policy blocked (ERR_BLOCKED_BY_CSP). That route is removed.
 
-          **New: Multi-source player engine.**
-          The player now routes to the right embed per language: CineSrc for English (the verified-working default), and 2Embed with the ?aud=hi parameter for Hindi — a real, server-accepted Hindi-audio request on a working embed shell. VidSrc is kept as a manual fallback. The iframe remounts via key={src} on every switch, so the language change is live and real, not cosmetic.
+          **Verified via network tracking: CineSrc is the only source that genuinely plays.**
+          CineSrc bootstraps a real HLS player (loads .m3u8 + init.mp4 + segments — 42 requests). 2Embed and VidSrc embeds return HTTP 200 but load only their document shell and make ZERO video requests — they do not play in an iframe. v9.1.0's verification (HTTP 200 + param echoed) was insufficient; this build verifies actual playback.
 
-          **New: Live audio-language + source selectors in the player bar.**
-          An EN / हिं toggle switches the stream on the fly; a source dropdown (Auto / CineSrc / 2Embed / VidSrc) gives manual control when a title's Hindi track is unavailable on one source. Your last language choice is remembered across sessions.
+          **Honest redesign.**
+          Removed the fake EN / हिं audio toggle that pretended to switch audio tracks (impossible cross-origin). All playback now uses CineSrc (verified-working, CSP-allowed). The stream-source selector remains: CineSrc (recommended) + 2Embed / VidSrc labeled experimental.
 
-          **Verified, not gimmick.**
-          CineSrc and 2Embed (?aud=hi) both return HTTP 200 with real player shells (checked 2026-11-04). Per-title Hindi availability depends on the source; the in-hub note and the source selector let you fall back instantly when a Hindi track isn't available for a specific title.
+          **Hindi Dub hub is the genuine Hindi delivery.**
+          Hindi-origin titles (Bollywood + Hindi cinema) play with Hindi audio automatically via CineSrc (India-focused). For Hollywood dubbed in Hindi, the player shows a one-time guide toast to pick a Hindi server in CineSrc's in-player Settings (gear) menu — verified there is no URL param to force Hindi (embed HTML is identical with/without ?lang=hi).
 
-          All v9.0.0 functionality preserved: billboard hero, Anime + New & Popular hubs, Account with downloads, episodes tab, enhanced search, notifications, watched tracking, autoplay next episode, expanded settings, and every prior feature.
+          All v9.0.0 / v9.1.0 functionality preserved: Hindi Dub hub (press h), billboard hero, Anime + New & Popular hubs, Account with downloads, episodes tab, enhanced search, notifications, watched tracking, autoplay next episode, expanded settings.
 
           **Downloads:**
-          - NEXUS-Setup-9.1.0.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-9.1.0.exe — single-file portable build.
+          - NEXUS-Setup-9.1.1.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-9.1.1.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@
