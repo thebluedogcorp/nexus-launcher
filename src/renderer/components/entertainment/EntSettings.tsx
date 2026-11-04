@@ -191,6 +191,7 @@ const PREF_LABELS: Record<keyof EntPrefs, string> = {
   quietHoursStart: "Quiet hours start",
   quietHoursEnd: "Quiet hours end",
   notificationsEnabled: "Notifications",
+  preferredLanguage: "Preferred audio language",
 };
 
 function ToggleRow({ label, desc, on, onClick }: { label: string; desc: string; on: boolean; onClick: () => void }) {

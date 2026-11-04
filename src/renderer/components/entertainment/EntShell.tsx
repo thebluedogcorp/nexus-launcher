@@ -17,6 +17,7 @@ import { EntCollectionsView } from "./EntCollectionsView";
 import { EntDiscoverView } from "./EntDiscoverView";
 import { EntAnimeView } from "./EntAnimeView";
 import { EntNewPopularView } from "./EntNewPopularView";
+import { EntHindiDubView } from "./EntHindiDubView";
 import { EntAccountView } from "./EntAccountView";
 import { EntPlayer, type WatchPayload } from "./EntPlayer";
 import { EntCommandPalette, type CmdAction } from "./EntCommandPalette";
@@ -30,7 +31,7 @@ import { recordWatchDay, unreadNotificationCount } from "../../lib/ent-userdata"
 import { getLatestVersion } from "../../lib/ent-changelog";
 import type { TmdbItem, TmdbMediaType } from "../../lib/tmdb-types";
 
-type EntView = "home" | "movies" | "tv" | "anime" | "new" | "mylist" | "search" | "detail" | "stats" | "collections" | "discover" | "account";
+type EntView = "home" | "movies" | "tv" | "anime" | "new" | "hindi" | "mylist" | "search" | "detail" | "stats" | "collections" | "discover" | "account";
 
 interface ShellProps {
   onBackToSplash: () => void;
@@ -137,6 +138,7 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
     { id: "tv", label: "Browse TV Shows", icon: <Icon.Tv size={15} />, group: "Navigate", run: () => go("tv") },
     { id: "anime", label: "Anime Hub", hint: "a", icon: <Icon.Sparkles size={15} />, group: "Navigate", run: () => go("anime") },
     { id: "new", label: "New & Popular", hint: "p", icon: <Icon.TrendingUp size={15} />, group: "Navigate", run: () => go("new") },
+    { id: "hindi", label: "Hindi Dub", hint: "h", icon: <Icon.Globe size={15} />, group: "Navigate", run: () => go("hindi") },
     { id: "mylist", label: "Open My List", icon: <Icon.Bookmark size={15} />, group: "Navigate", run: () => go("mylist") },
     { id: "collections", label: "My Collections", icon: <Icon.Library size={15} />, group: "Navigate", run: () => go("collections") },
     { id: "stats", label: "Statistics Dashboard", icon: <Icon.TrendingUp size={15} />, group: "Navigate", run: () => go("stats") },
@@ -215,6 +217,10 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
         // v9.0.0 — New & Popular.
         e.preventDefault();
         go("new");
+      } else if ((e.key === "h" || e.key === "H") && !typing) {
+        // v9.1.0 — Hindi Dub hub.
+        e.preventDefault();
+        go("hindi");
       } else if ((e.key === "u" || e.key === "U") && !typing) {
         // v9.0.0 — Account & Downloads.
         e.preventDefault();
@@ -299,6 +305,7 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
         <div className="ent-side-sep" />
         {sideBtn(view === "anime", "Anime  (press a)", <Icon.Sparkles size={17} />, () => go("anime"))}
         {sideBtn(view === "new", "New & Popular  (press p)", <Icon.TrendingUp size={17} />, () => go("new"))}
+        {sideBtn(view === "hindi", "Hindi Dub  (press h)", <Icon.Globe size={17} />, () => go("hindi"))}
         <div className="ent-side-sep" />
         {/* My List with count badge */}
         <button
@@ -386,6 +393,9 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
             )}
             {view === "new" && (
               <EntNewPopularView onOpen={openDetail} onWatch={watch} inList={inListFn} onToggleList={toggleListFn} />
+            )}
+            {view === "hindi" && (
+              <EntHindiDubView onOpen={openDetail} onWatch={watch} inList={inListFn} onToggleList={toggleListFn} />
             )}
             {view === "account" && (
               <EntAccountView onOpen={openDetail} onDataChanged={() => setListTick(t => t + 1)} />

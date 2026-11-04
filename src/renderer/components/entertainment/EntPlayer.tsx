@@ -7,7 +7,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "../Icons";
 import {
-  cinesrcEmbedUrl,
+  streamEmbedUrl,
+  streamLabel,
+  type StreamLanguage,
+  type StreamSource,
   type TmdbMediaType,
 } from "../../lib/tmdb-types";
 import {
@@ -15,7 +18,7 @@ import {
   estimateProgress,
   type ContinueEntry,
 } from "../../lib/ent-store";
-import { getPrefs } from "../../lib/ent-prefs";
+import { getPrefs, setPrefs } from "../../lib/ent-prefs";
 import { pushToast } from "./EntToaster";
 import { getDownloadSettings, downloadOfflinePackage, isDownloaded, removeDownload } from "../../lib/ent-downloads";
 
@@ -30,6 +33,8 @@ export interface WatchPayload {
   season?: number;
   episode?: number;
   runtimeMin?: number | null;
+  /** v9.1.0 — open the player on this audio language (Hindi Dub hub passes "hi"). */
+  defaultLanguage?: StreamLanguage;
 }
 
 interface EntPlayerProps {
@@ -51,6 +56,9 @@ export function EntPlayer({ open, payload, onClose, onProgress }: EntPlayerProps
 
   const [season, setSeason] = useState(1);
   const [episode, setEpisode] = useState(1);
+  // v9.1.0 — audio language + stream source (multi-source Hindi-dub support).
+  const [language, setLanguage] = useState<StreamLanguage>("en");
+  const [source, setSource] = useState<StreamSource>("auto");
   const startedAtRef = useRef<number>(0);
   const seasonRef = useRef(1);
   const episodeRef = useRef(1);
@@ -65,6 +73,12 @@ export function EntPlayer({ open, payload, onClose, onProgress }: EntPlayerProps
     if (!open || !payload) return;
     setSeason(Math.max(1, payload.season ?? 1));
     setEpisode(Math.max(1, payload.episode ?? 1));
+    // v9.1.0 — pick up the Hindi-default hint from the Hindi Dub hub, else the
+    // saved preference. Source stays "auto" so the resolved source follows the
+    // language (Hindi -> 2embed aud=hi, English -> CineSrc).
+    const lang = payload.defaultLanguage ?? getPrefs().preferredLanguage ?? "en";
+    setLanguage(lang);
+    setSource("auto");
     startedAtRef.current = Date.now();
   }, [open, payload]);
 
@@ -119,8 +133,21 @@ export function EntPlayer({ open, payload, onClose, onProgress }: EntPlayerProps
 
   if (!open || !payload) return null;
 
-  const src = cinesrcEmbedUrl(payload.mediaType, payload.id, season, episode);
+  // v9.1.0 — multi-source: streamEmbedUrl routes to CineSrc (English) or
+  // 2embed ?aud=hi (Hindi) based on (source, language). key={src} on the
+  // iframe remounts the embed live when the user switches language/source.
+  const src = streamEmbedUrl(payload.mediaType, payload.id, season, episode, source, language);
   const seLabel = isTv ? `S${season} · E${episode}` : "Movie";
+  const srcLabel = streamLabel(source, language);
+  const changeLanguage = (lang: StreamLanguage) => {
+    setLanguage(lang);
+    setPrefs({ preferredLanguage: lang });
+    startedAtRef.current = Date.now();
+  };
+  const changeSource = (s: StreamSource) => {
+    setSource(s);
+    startedAtRef.current = Date.now();
+  };
   // v9.0.0 — download state for the current episode/movie.
   const curDownloaded = isDownloaded(payload.mediaType, payload.id, isTv ? season : undefined, isTv ? episode : undefined);
   const downloadNow = async () => {
@@ -190,6 +217,34 @@ export function EntPlayer({ open, payload, onClose, onProgress }: EntPlayerProps
         </div>
         <div className="ent-player-bar-right">
           <span className="ent-player-pos">{seLabel}</span>
+          {/* v9.1.0 — audio language + stream source selector */}
+          <div className="ent-player-lang" title="Audio language & stream source">
+            <Icon.Languages size={13} />
+            <button
+              className={language === "en" ? "ent-lang-btn on" : "ent-lang-btn"}
+              onClick={() => changeLanguage("en")}
+              aria-label="English audio"
+              title="English audio"
+            >EN</button>
+            <button
+              className={language === "hi" ? "ent-lang-btn on" : "ent-lang-btn"}
+              onClick={() => changeLanguage("hi")}
+              aria-label="Hindi audio"
+              title="Hindi audio (dubbed)"
+            >हिं</button>
+            <select
+              className="ent-src-select"
+              value={source}
+              onChange={e => changeSource(e.target.value as StreamSource)}
+              title="Stream source"
+              aria-label="Stream source"
+            >
+              <option value="auto">Auto</option>
+              <option value="cinesrc">CineSrc</option>
+              <option value="twoembed">2Embed</option>
+              <option value="vidsrc">VidSrc</option>
+            </select>
+          </div>
           {/* v9.0.0 — download the current episode/movie */}
           <button
             className={curDownloaded ? "ent-player-dl on" : "ent-player-dl"}
@@ -230,7 +285,7 @@ export function EntPlayer({ open, payload, onClose, onProgress }: EntPlayerProps
       {/* Footer note */}
       <div className="ent-player-foot">
         <span className="ent-player-foot-dot" />
-        Streamed via CineSrc · indexed by TMDB ID · NEXUS does not host or store any video · progress is saved locally.
+        Streamed via {srcLabel} · indexed by TMDB ID · NEXUS does not host or store any video · progress is saved locally.
       </div>
     </div>
   );

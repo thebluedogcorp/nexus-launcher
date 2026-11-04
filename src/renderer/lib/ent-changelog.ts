@@ -13,6 +13,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "9.1.0",
+    date: "2026-11-04",
+    title: "Hindi Dub — dedicated hub + multi-source player with live audio-language switching",
+    kind: "major",
+    items: [
+      "New: Hindi Dub hub (press h) — Hindi Originals (Bollywood + Hindi cinema), Hindi Series, Top-Rated Hindi Cinema, and Hollywood in Hindi (curated blockbusters widely available dubbed)",
+      "New: Multi-source player engine — the player now routes to the right embed per language: CineSrc for English, 2Embed with ?aud=hi for Hindi (a real, server-accepted Hindi-audio parameter), VidSrc as a manual fallback",
+      "New: Live audio-language selector in the player bar — EN / हिं toggle switches the stream on the fly (the iframe remounts via key={src}, so the switch is real, not cosmetic)",
+      "New: Stream-source selector (Auto / CineSrc / 2Embed / VidSrc) for manual control when a title's Hindi track is unavailable on one source",
+      "New: Watching from the Hindi Dub hub opens the player defaulted to Hindi audio; your last language choice is remembered across sessions",
+      "New: Verified sources — CineSrc and 2Embed (?aud=hi) both return HTTP 200 with real player shells; per-title Hindi availability depends on the source (the selector lets you fall back instantly)",
+      "New: Globe + Languages icons, keyboard shortcut h, command-palette entry, shortcuts-overlay entries, and an honest in-hub note explaining how Hindi dub works",
+    ],
+  },
+  {
     version: "9.0.0",
     date: "2026-11-04",
     title: "OTT Premium Redesign — billboard hero, Anime + New & Popular hubs, Account with Downloads",

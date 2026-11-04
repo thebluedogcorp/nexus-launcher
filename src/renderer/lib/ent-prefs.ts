@@ -26,6 +26,8 @@ export interface EntPrefs {
   quietHoursEnd: string;
   /** v8.0.0 — enable in-app notifications (new episodes, streaks). */
   notificationsEnabled: boolean;
+  /** v9.1.0 — preferred audio language for the player ("en" or "hi"). */
+  preferredLanguage: "en" | "hi";
 }
 
 const DEFAULTS: EntPrefs = {
@@ -39,6 +41,7 @@ const DEFAULTS: EntPrefs = {
   quietHoursStart: "22:00",
   quietHoursEnd: "08:00",
   notificationsEnabled: true,
+  preferredLanguage: "en",
 };
 
 function read(): EntPrefs {

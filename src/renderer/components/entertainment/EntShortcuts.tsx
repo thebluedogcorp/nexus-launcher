@@ -30,6 +30,15 @@ const GROUPS: { group: string; items: Shortcut[] }[] = [
     ],
   },
   {
+    group: "Hubs",
+    items: [
+      { keys: ["a"], label: "Anime hub" },
+      { keys: ["p"], label: "New & Popular" },
+      { keys: ["h"], label: "Hindi Dub — opens on Hindi audio" },
+      { keys: ["u"], label: "Account & Downloads" },
+    ],
+  },
+  {
     group: "Discover",
     items: [
       { keys: ["s"], label: "Surprise Me — play a random title" },
@@ -50,6 +59,7 @@ const GROUPS: { group: string; items: Shortcut[] }[] = [
     items: [
       { keys: ["Esc"], label: "Close player (saves progress)" },
       { keys: ["S/E inputs"], label: "Change TV season / episode" },
+      { keys: ["EN / हिं"], label: "Switch audio language (English / Hindi)" },
     ],
   },
 ];

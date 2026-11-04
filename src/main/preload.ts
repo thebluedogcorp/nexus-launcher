@@ -198,6 +198,10 @@ const api = {
   tmdbAnimeTv: (page?: number) => ipcRenderer.invoke("tmdb:animeTv", page) as Promise<unknown>,
   tmdbAnimeTopRated: () => ipcRenderer.invoke("tmdb:animeTopRated") as Promise<unknown>,
   tmdbAnimeMovies: (page?: number) => ipcRenderer.invoke("tmdb:animeMovies", page) as Promise<unknown>,
+  // v9.1.0 — Hindi Dub tab (with_original_language=hi).
+  tmdbHindiMovies: (page?: number) => ipcRenderer.invoke("tmdb:hindiMovies", page) as Promise<unknown>,
+  tmdbHindiTv: (page?: number) => ipcRenderer.invoke("tmdb:hindiTv", page) as Promise<unknown>,
+  tmdbHindiTopRated: () => ipcRenderer.invoke("tmdb:hindiTopRated") as Promise<unknown>,
   // v9.0.0 — downloads (offline packages; real file I/O in main).
   downloadsSavePackage: (location: string, payload: { fileName: string; data: unknown }) =>
     ipcRenderer.invoke("downloads:savePackage", location, payload) as Promise<{ ok: boolean; path?: string; error?: string }>,

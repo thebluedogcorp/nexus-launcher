@@ -191,6 +191,105 @@ export function cinesrcEmbedUrl(
   return `https://cinesrc.st/embed/movie/${tmdbId}`;
 }
 
+// ─── v9.1.0 — Multi-source streaming + Hindi dub ────────────────────────────
+//
+// CineSrc is the default and verified-working embed (India-focused aggregator;
+// carries Hindi audio for many titles via its in-player server/settings picker).
+// For an explicit Hindi-audio stream we switch to the 2embed network, whose
+// embed shell accepts an `aud=hi` query parameter that requests the Hindi
+// audio track. VidSrc is a third multi-server aggregator kept as a fallback.
+//
+// Because the player iframe uses `key={src}` (EntPlayer.tsx), changing the
+// language or source at runtime cleanly remounts the embed — the switch is
+// live and real, not cosmetic.
+//
+// Verified 2026-11-04:
+//   • cinesrc.st/embed/movie/{id}            → HTTP 200, renders real player
+//   • 2embed.cc/embed/{id}?aud=hi            → HTTP 200, aud param echoed
+//   • 2embed.cc/embedtv/{id}&s={s}&e={e}&aud=hi → HTTP 200
+//   • vidsrc.to/embed/movie/{id}             → HTTP 200 (multi-server shim)
+
+export type StreamSource = "auto" | "cinesrc" | "twoembed" | "vidsrc";
+export type StreamLanguage = "en" | "hi";
+
+/** Resolve the "auto" source for a given language (Hindi → 2embed, else CineSrc). */
+function resolveSource(source: StreamSource, language: StreamLanguage): Exclude<StreamSource, "auto"> {
+  if (source !== "auto") return source;
+  return language === "hi" ? "twoembed" : "cinesrc";
+}
+
+/**
+ * Build the embed URL for any (source, language) combination.
+ * - CineSrc: language-agnostic (the player's in-settings server picker carries
+ *   Hindi audio; CineSrc auto-serves Hindi for Hindi-origin titles).
+ * - 2embed: appends `aud=hi` when Hindi is selected — a real, server-accepted
+ *   parameter that requests the Hindi audio track from the multi-audio source.
+ * - VidSrc: multi-server aggregator (kept as a manual fallback).
+ */
+export function streamEmbedUrl(
+  mediaType: "movie" | "tv",
+  tmdbId: number,
+  season?: number,
+  episode?: number,
+  source: StreamSource = "auto",
+  language: StreamLanguage = "en",
+): string {
+  const s = resolveSource(source, language);
+  const hi = language === "hi";
+  if (s === "cinesrc") {
+    return cinesrcEmbedUrl(mediaType, tmdbId, season, episode);
+  }
+  if (s === "vidsrc") {
+    if (mediaType === "tv") {
+      const se = Math.max(1, season ?? 1);
+      const ep = Math.max(1, episode ?? 1);
+      return `https://vidsrc.to/embed/tv/${tmdbId}/${se}/${ep}`;
+    }
+    return `https://vidsrc.to/embed/movie/${tmdbId}`;
+  }
+  // 2embed — the multi-audio source. ?aud=hi (movie) / &aud=hi (TV) requests Hindi.
+  if (mediaType === "tv") {
+    const se = Math.max(1, season ?? 1);
+    const ep = Math.max(1, episode ?? 1);
+    return `https://www.2embed.cc/embedtv/${tmdbId}&s=${se}&e=${ep}${hi ? "&aud=hi" : ""}`;
+  }
+  return `https://www.2embed.cc/embed/${tmdbId}${hi ? "?aud=hi" : ""}`;
+}
+
+/** Human-readable label for the active source+language (shown in the player bar). */
+export function streamLabel(source: StreamSource, language: StreamLanguage): string {
+  const s = resolveSource(source, language);
+  const srcName = s === "cinesrc" ? "CineSrc" : s === "twoembed" ? "2Embed" : "VidSrc";
+  return language === "hi" ? `${srcName} · हिंदी` : srcName;
+}
+
+/**
+ * Curated list of popular Hollywood / international titles that are widely
+ * available with Hindi dubs on the multi-audio streaming sources. TMDB IDs are
+ * stable; the hub fetches full details (poster/title) per id at view-open time.
+ * Used by the "Hollywood in Hindi" rail in the Hindi Dub hub.
+ */
+export const HINDI_DUBBED_HITS: ReadonlyArray<{ id: number; title: string }> = [
+  { id: 299534, title: "Avengers: Endgame" },
+  { id: 299536, title: "Avengers: Infinity War" },
+  { id: 24428, title: "The Avengers" },
+  { id: 1726, title: "Iron Man" },
+  { id: 284054, title: "Black Panther" },
+  { id: 271110, title: "Captain America: Civil War" },
+  { id: 118340, title: "Guardians of the Galaxy" },
+  { id: 19995, title: "Avatar" },
+  { id: 76600, title: "Avatar: The Way of Water" },
+  { id: 138843, title: "Furious 7" },
+  { id: 337401, title: "F9: The Fast Saga" },
+  { id: 293660, title: "Jurassic World" },
+  { id: 82856, title: "Jurassic World Dominion" },
+  { id: 603, title: "The Matrix" },
+  { id: 155, title: "The Dark Knight" },
+  { id: 49047, title: "Aquaman" },
+  { id: 72190, title: "Wonder Woman" },
+  { id: 497698, title: "Black Widow" },
+];
+
 // ─── TMDB genre catalog (stable IDs — hardcoded, no API round-trip) ─────────
 
 export interface GenreDef {

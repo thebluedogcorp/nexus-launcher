@@ -50,33 +50,30 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v9.0.0"
-          $title = "NEXUS v9.0.0 — OTT Premium Redesign: billboard hero, Anime, New & Popular, Account + Downloads"
+          $tag = "v9.1.0"
+          $title = "NEXUS v9.1.0 — Hindi Dub: dedicated hub + multi-source player with live audio-language switching"
           $notes = @"
           NEXUS — Universal Game Launcher & Entertainment Hub for Windows.
 
-          **v9.0.0 — The OTT Premium Redesign. A world-class streaming-platform look and major new sections, inspired by the best of Netflix, Disney+, Prime Video and Apple TV+.**
+          **v9.1.0 — Hindi Dub. A dedicated Hindi-language hub and a real multi-source player that switches audio tracks live.**
 
-          **New: Netflix-style billboard hero.**
-          A completely redesigned featured hero: bold "N SERIES / N FILM" tag, huge cinematic title, green match percentage, maturity badge, HD tag, white Play + translucent More Info buttons (Netflix pattern), circular My List / Trailer actions, a maturity-rating strip on the right edge, and Ken Burns crossfading artwork with deep gradient blends.
+          **New: Hindi Dub hub (press h).**
+          A dedicated tab surfacing titles the streaming sources most reliably serve with Hindi audio — Hindi Originals (Bollywood + Hindi cinema), Hindi Series, Top-Rated Hindi Cinema, and Hollywood in Hindi (a curated set of blockbusters widely available dubbed). Pressing Watch from this hub opens the player defaulted to the Hindi audio source.
 
-          **New: Anime hub (press a).**
-          A dedicated anime tab — Popular Anime Series, All-Time Anime Greats (numbered top-10 row), and Anime Movies (Japanese animation via TMDB), plus a mood strip of anime vibes.
+          **New: Multi-source player engine.**
+          The player now routes to the right embed per language: CineSrc for English (the verified-working default), and 2Embed with the ?aud=hi parameter for Hindi — a real, server-accepted Hindi-audio request on a working embed shell. VidSrc is kept as a manual fallback. The iframe remounts via key={src} on every switch, so the language change is live and real, not cosmetic.
 
-          **New: New & Popular hub (press p).**
-          Everything fresh in one place: Trending Now, New Releases, Top 10 Movies and Top 10 Series Today, and Worth the Wait — Coming Soon.
+          **New: Live audio-language + source selectors in the player bar.**
+          An EN / हिं toggle switches the stream on the fly; a source dropdown (Auto / CineSrc / 2Embed / VidSrc) gives manual control when a title's Hindi track is unavailable on one source. Your last language choice is remembered across sessions.
 
-          **New: Account & Downloads (press u).**
-          An Account section with an editable profile (avatar, member-since) and 8 library stat cards — plus a full downloads manager: an adjustable download location (native Windows folder picker), Auto Download (automatically saves the next episode offline when one finishes), Smart Download (deletes watched episodes to free space), Standard/High/Max quality preference, storage usage, and a downloads list with remove controls. Download buttons appear on detail pages and in the player. Offline packages are real files written to your chosen folder (title info, artwork link, your rating/review/progress).
+          **Verified, not gimmick.**
+          CineSrc and 2Embed (?aud=hi) both return HTTP 200 with real player shells (checked 2026-11-04). Per-title Hindi availability depends on the source; the in-hub note and the source selector let you fall back instantly when a Hindi track isn't available for a specific title.
 
-          **New: Grouped sidebar + expanded home.**
-          The sidebar is now organized into Browse / Hubs / Library / Account groups. The home screen grew to 12 rails — Top 10 Series, Anime Spotlight, Coming Soon, Action & Adventure and Comedies joined the lineup, with staggered loading so the first paint stays instant.
-
-          All v8.x functionality preserved: series Episodes tab, enhanced search with filters and people results, notifications center, watched tracking, autoplay next episode, expanded settings, and every prior feature.
+          All v9.0.0 functionality preserved: billboard hero, Anime + New & Popular hubs, Account with downloads, episodes tab, enhanced search, notifications, watched tracking, autoplay next episode, expanded settings, and every prior feature.
 
           **Downloads:**
-          - NEXUS-Setup-9.0.0.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-9.0.0.exe — single-file portable build.
+          - NEXUS-Setup-9.1.0.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-9.1.0.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@

@@ -154,6 +154,14 @@ STUB = r"""
     tmdbDetails: (id) => pend(mockDetails("movie", id)),
     tmdbDetailsTv: (id) => pend(mockDetails("tv", id)),
     tmdbDetailsAny: (mt, id) => pend(mockDetails(mt, id)),
+    // v9.0.0 — anime hub (mock: reuse the generic mock items).
+    tmdbAnimeTv: () => pend(mockTv),
+    tmdbAnimeTopRated: () => pend(mockTv),
+    tmdbAnimeMovies: () => pend(mockMovies),
+    // v9.1.0 — Hindi Dub hub (mock: reuse the generic mock items so rails populate).
+    tmdbHindiMovies: () => pend(mockMovies),
+    tmdbHindiTv: () => pend(mockTv),
+    tmdbHindiTopRated: () => pend(mockMovies),
     tmdbOpenExternal: () => pend({ ok: true }),
     // Achievements
     getAchievements: () => pend([]),

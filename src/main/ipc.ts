@@ -610,6 +610,19 @@ export function registerIpc(): void {
     const { tmdbAnimeMovies } = await import("./tmdb");
     return await tmdbAnimeMovies(page ?? 1);
   }));
+  // v9.1.0 — Hindi Dub tab (with_original_language=hi).
+  ipcMain.handle("tmdb:hindiMovies", (_e, page?: number) => tmdbWrap(async () => {
+    const { tmdbHindiMovies } = await import("./tmdb");
+    return await tmdbHindiMovies(page ?? 1);
+  }));
+  ipcMain.handle("tmdb:hindiTv", (_e, page?: number) => tmdbWrap(async () => {
+    const { tmdbHindiTv } = await import("./tmdb");
+    return await tmdbHindiTv(page ?? 1);
+  }));
+  ipcMain.handle("tmdb:hindiTopRated", () => tmdbWrap(async () => {
+    const { tmdbHindiTopRated } = await import("./tmdb");
+    return await tmdbHindiTopRated();
+  }));
 
   // ===== v9.0.0 — Downloads (offline packages; real file I/O) =====
   // Offline packages are small JSON files (title info + artwork link + your

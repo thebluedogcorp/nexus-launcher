@@ -585,3 +585,47 @@ export async function tmdbAnimeMovies(page = 1): Promise<TmdbItem[]> {
   });
   return d.results.map(m => normalizeMulti({ ...m, media_type: "movie" }));
 }
+
+// ─── v9.1.0 — Hindi Dub hub ─────────────────────────────────────────────────
+// Hindi-original content (Bollywood + Hindi-language cinema & series) via
+// TMDB's with_original_language=hi filter. These are the titles the streaming
+// sources (CineSrc, 2embed aud=hi) most reliably serve with Hindi audio.
+
+/** Popular Hindi-language movies (Bollywood + Hindi cinema), sorted by popularity. */
+export async function tmdbHindiMovies(page = 1): Promise<TmdbItem[]> {
+  const d = await tmdb<TmdbMultiPage>("/discover/movie", {
+    with_original_language: "hi",
+    sort_by: "popularity.desc",
+    "vote_count.gte": "30",
+    page: String(page),
+  });
+  return d.results
+    .map(m => normalizeMulti({ ...m, media_type: "movie" }))
+    .filter(m => m.posterPath || m.backdropPath);
+}
+
+/** Popular Hindi-language TV series, sorted by popularity. */
+export async function tmdbHindiTv(page = 1): Promise<TmdbItem[]> {
+  const d = await tmdb<TmdbMultiPage>("/discover/tv", {
+    with_original_language: "hi",
+    sort_by: "popularity.desc",
+    "vote_count.gte": "20",
+    page: String(page),
+  });
+  return d.results
+    .map(m => normalizeMulti({ ...m, media_type: "tv" }))
+    .filter(m => m.posterPath || m.backdropPath);
+}
+
+/** All-time top-rated Hindi cinema (vote_average.desc, min 200 votes). */
+export async function tmdbHindiTopRated(): Promise<TmdbItem[]> {
+  const d = await tmdb<TmdbMultiPage>("/discover/movie", {
+    with_original_language: "hi",
+    sort_by: "vote_average.desc",
+    "vote_count.gte": "200",
+    page: "1",
+  });
+  return d.results
+    .map(m => normalizeMulti({ ...m, media_type: "movie" }))
+    .filter(m => m.posterPath || m.backdropPath);
+}

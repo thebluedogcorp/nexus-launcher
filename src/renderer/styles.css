@@ -3978,6 +3978,18 @@ button.tb-logo:active{transform:scale(0.97)}
   letter-spacing:.02em}
 .ent-anime-page .ent-page-head{padding-bottom:6px}
 
+/* ── v9.1.0 — Hindi Dub hub ───────────────────────────────────────────────── */
+.ent-page-title.hindi{
+  background:linear-gradient(92deg,#fb923c 0%,#f43f5e 50%,#fbbf24 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.ent-hindi-page .ent-page-head{padding-bottom:6px}
+.ent-hindi-note{display:flex;align-items:center;gap:10px;margin-bottom:22px;padding:12px 16px;
+  font-size:12.5px;line-height:1.5;color:rgba(255,255,255,.72);
+  background:linear-gradient(90deg,rgba(251,146,60,.10),rgba(244,63,94,.08));
+  border:1px solid rgba(251,146,60,.22);border-radius:12px}
+.ent-hindi-note strong{color:#fb923c;font-weight:700}
+.ent-hindi-note svg{color:#fb923c;flex-shrink:0}
+
 /* ── Account view ─────────────────────────────────────────────────────────── */
 .ent-account-page{max-width:980px}
 .ent-acct-card{display:flex;align-items:center;gap:20px;padding:22px;border-radius:16px;
@@ -4084,6 +4096,23 @@ button.tb-logo:active{transform:scale(0.97)}
   border-radius:8px;cursor:pointer;transition:all .2s}
 .ent-player-dl:hover{background:rgba(244,63,94,.15);color:#fff;border-color:rgba(244,63,94,.4)}
 .ent-player-dl.on{background:rgba(244,63,94,.15);border-color:rgba(244,63,94,.5);color:#f43f5e}
+
+/* ── v9.1.0 — Player: audio language + stream source selector ─────────────── */
+.ent-player-lang{display:flex;align-items:center;gap:6px;padding:4px 8px;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:10px}
+.ent-player-lang>svg{color:rgba(255,255,255,.6);flex-shrink:0}
+.ent-lang-btn{padding:4px 9px;font-size:11px;font-weight:700;letter-spacing:.04em;
+  color:rgba(255,255,255,.55);background:transparent;border:1px solid transparent;
+  border-radius:7px;cursor:pointer;transition:all .18s;min-height:24px}
+.ent-lang-btn:hover{color:#fff;background:rgba(255,255,255,.08)}
+.ent-lang-btn.on{color:#fff;background:linear-gradient(180deg,#fb923c,#f43f5e);
+  border-color:rgba(251,146,60,.5);box-shadow:0 0 12px rgba(244,63,94,.35)}
+.ent-src-select{padding:4px 7px;font-size:11px;font-weight:600;color:rgba(255,255,255,.8);
+  background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.15);border-radius:7px;
+  cursor:pointer;outline:none;transition:border-color .18s;min-height:24px}
+.ent-src-select:hover{border-color:rgba(244,63,94,.45)}
+.ent-src-select:focus{border-color:rgba(244,63,94,.6)}
+.ent-src-select option{background:#15151a;color:#fff}
 
 /* ── Small CTA variants used in account ───────────────────────────────────── */
 .ent-cta.primary.sm{padding:6px 12px;font-size:12px;border-radius:8px}
