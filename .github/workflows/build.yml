@@ -52,7 +52,8 @@ jobs:
           $ErrorActionPreference = "Continue"
           $tag = "v9.0.0"
           $title = "NEXUS v9.0.0 — OTT Premium Redesign: billboard hero, Anime, New & Popular, Account + Downloads"
-          $notes = @"NEXUS — Universal Game Launcher & Entertainment Hub for Windows.
+          $notes = @"
+          NEXUS — Universal Game Launcher & Entertainment Hub for Windows.
 
           **v9.0.0 — The OTT Premium Redesign. A world-class streaming-platform look and major new sections, inspired by the best of Netflix, Disney+, Prime Video and Apple TV+.**
 
