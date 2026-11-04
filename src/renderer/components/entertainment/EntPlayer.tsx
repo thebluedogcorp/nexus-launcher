@@ -15,6 +15,8 @@ import {
   estimateProgress,
   type ContinueEntry,
 } from "../../lib/ent-store";
+import { getPrefs } from "../../lib/ent-prefs";
+import { pushToast } from "./EntToaster";
 
 /** Everything the player needs to open a stream + save progress. */
 export interface WatchPayload {
@@ -51,9 +53,11 @@ export function EntPlayer({ open, payload, onClose, onProgress }: EntPlayerProps
   const startedAtRef = useRef<number>(0);
   const seasonRef = useRef(1);
   const episodeRef = useRef(1);
+  // v8.0.0 — guards auto-next so we only advance once per episode.
+  const advancedRef = useRef(false);
   // Keep refs in sync with state inside an effect (never during render).
   useEffect(() => { seasonRef.current = season; }, [season]);
-  useEffect(() => { episodeRef.current = episode; }, [episode]);
+  useEffect(() => { episodeRef.current = episode; advancedRef.current = false; }, [episode]);
 
   // Reset + start tracking when the player opens.
   useEffect(() => {
@@ -81,6 +85,13 @@ export function EntPlayer({ open, payload, onClose, onProgress }: EntPlayerProps
         progress,
       });
       onProgress?.();
+      // v8.0.0 — auto-advance to the next episode when the current one finishes.
+      if (payload.mediaType === "tv" && progress >= 0.95 && getPrefs().autoplayNext && !advancedRef.current) {
+        advancedRef.current = true;
+        setEpisode(e => Math.min(99, e + 1));
+        startedAtRef.current = Date.now();
+        pushToast("Next episode starting", "info", <Icon.Forward size={14} />);
+      }
     };
     const interval = setInterval(save, SAVE_INTERVAL_MS);
     const onKey = (e: KeyboardEvent) => {

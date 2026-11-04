@@ -14,14 +14,22 @@ import {
   tmdbImg,
   formatRuntime,
   formatRating,
+  formatAirDate,
   asDetails,
   asItems,
+  asSeason,
   type TmdbItem,
   type TmdbMediaType,
   type TmdbMovieDetails,
+  type TmdbSeason,
 } from "../../lib/tmdb-types";
 import { getContinueFor, recordHistory } from "../../lib/ent-store";
-import { getRating, setRating, getReview, setReview, deleteReview, getCollections, addToCollection } from "../../lib/ent-userdata";
+import {
+  getRating, setRating, getReview, setReview, deleteReview, getCollections, addToCollection,
+  isWatched, setWatched, isHidden, setHidden,
+  isEpisodeWatched, setEpisodeWatched, countSeasonWatched,
+} from "../../lib/ent-userdata";
+import { imgSize } from "../../lib/ent-prefs";
 
 interface DetailProps {
   mediaType: TmdbMediaType;
@@ -34,7 +42,7 @@ interface DetailProps {
   onHistoryChange?: () => void;
 }
 
-type Tab = "overview" | "cast" | "watch" | "facts" | "review";
+type Tab = "overview" | "episodes" | "cast" | "watch" | "facts" | "review";
 
 export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, inList, onToggleList, onHistoryChange }: DetailProps) {
   const [detail, setDetail] = useState<TmdbMovieDetails | null>(null);
@@ -48,6 +56,13 @@ export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, in
   const [reviewText, setReviewText] = useState("");
   const [reviewSaved, setReviewSaved] = useState(false);
   const [collections, setCollections] = useState(getCollections());
+  // v8.0.0 — Episodes tab (TV only): season browser + episode list.
+  const [seasonData, setSeasonData] = useState<TmdbSeason | null>(null);
+  const [selSeason, setSelSeason] = useState(1);
+  const [seasonLoading, setSeasonLoading] = useState(false);
+  // v8.0.0 — watched + hidden title state + per-episode watched refresh tick.
+  const [watchedTick, setWatchedTick] = useState(0);
+  const [hiddenTick, setHiddenTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,7 +71,8 @@ export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, in
     setDetail(null);
     setRecs([]);
     setTrailerOpen(false);
-    setTab("overview");
+    setTab(mediaType === "tv" ? "episodes" : "overview");
+    setSelSeason(1);
     (async () => {
       const [d, r] = await Promise.all([
         window.nexus.tmdbDetailsAny(mediaType, id),
@@ -89,11 +105,30 @@ export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, in
     return () => { cancelled = true; };
   }, [mediaType, id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // v8.0.0 — fetch season episodes when the Episodes tab is open for a TV title.
+  useEffect(() => {
+    if (mediaType !== "tv" || !detail || tab !== "episodes") return;
+    let cancelled = false;
+    setSeasonLoading(true);
+    (async () => {
+      const r = await window.nexus.tmdbSeasonEpisodes(id, selSeason);
+      if (cancelled) return;
+      setSeasonData(asSeason(r));
+      setSeasonLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [mediaType, id, detail, tab, selSeason]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const isTv = mediaType === "tv";
   const typeLabel = isTv ? "Series" : "Film";
   const title = detail?.title ?? "";
-  const backdrop = detail ? (tmdbImg(detail.backdropPath, "w1280") ?? tmdbImg(detail.posterPath, "w780")) : undefined;
-  const poster = detail ? tmdbImg(detail.posterPath, "w500") : undefined;
+  const backdrop = detail ? (tmdbImg(detail.backdropPath, imgSize("w1280")) ?? tmdbImg(detail.posterPath, imgSize("w780"))) : undefined;
+  const poster = detail ? tmdbImg(detail.posterPath, imgSize("w500")) : undefined;
+  // v8.0.0 — title-level watched / hidden state (re-read on tick after mutation).
+  const _wt = watchedTick; void _wt;
+  const _ht = hiddenTick; void _ht;
+  const titleWatched = detail ? isWatched(mediaType, id) : false;
+  const titleHidden = detail ? isHidden(mediaType, id) : false;
   const trailerKey = detail?.trailerKey ?? null;
   const listed = inList(mediaType, id);
   const resume = getContinueFor(mediaType, id);
@@ -262,6 +297,29 @@ export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, in
               </select>
             </div>
           )}
+          {/* v8.0.0 — Mark watched + Hide from recommendations */}
+          <button
+            className={titleWatched ? "ent-cta ghost lg on" : "ent-cta ghost lg"}
+            onClick={() => {
+              setWatched(mediaType, id, !titleWatched);
+              setWatchedTick(t => t + 1);
+              pushToast(titleWatched ? "Marked as not watched" : "Marked as watched", "success", <Icon.Eye size={14} />);
+            }}
+            title={titleWatched ? "Mark as not watched" : "Mark as watched"}
+          >
+            <Icon.Eye size={15} /> {titleWatched ? "Watched" : "Mark Watched"}
+          </button>
+          <button
+            className={titleHidden ? "ent-cta ghost lg warn" : "ent-cta ghost lg"}
+            onClick={() => {
+              setHidden(mediaType, id, !titleHidden);
+              setHiddenTick(t => t + 1);
+              pushToast(titleHidden ? "Shown in recommendations again" : "Hidden from recommendations", "info", <Icon.EyeOff size={14} />);
+            }}
+            title={titleHidden ? "Show in recommendations" : "Hide from recommendations"}
+          >
+            <Icon.EyeOff size={15} /> {titleHidden ? "Hidden" : "Hide"}
+          </button>
           {/* Resume progress bar */}
           {resume && (
             <div className="ent-dp-actionbar-resume">
@@ -297,6 +355,9 @@ export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, in
                 {/* Tabs */}
                 <div className="ent-dp-tabs" role="tablist">
                   <button role="tab" aria-selected={tab === "overview"} className={tab === "overview" ? "ent-dp-tab on" : "ent-dp-tab"} onClick={() => setTab("overview")}>Overview</button>
+                  {isTv && (
+                    <button role="tab" aria-selected={tab === "episodes"} className={tab === "episodes" ? "ent-dp-tab on" : "ent-dp-tab"} onClick={() => setTab("episodes")}>Episodes</button>
+                  )}
                   <button role="tab" aria-selected={tab === "cast"} className={tab === "cast" ? "ent-dp-tab on" : "ent-dp-tab"} onClick={() => setTab("cast")}>Cast &amp; Crew</button>
                   {detail.providers && detail.providers.length > 0 && (
                     <button role="tab" aria-selected={tab === "watch"} className={tab === "watch" ? "ent-dp-tab on" : "ent-dp-tab"} onClick={() => setTab("watch")}>Where to Watch</button>
@@ -323,6 +384,84 @@ export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, in
                         {isTv && detail.numberOfEpisodes ? <Fact label="Episodes" value={String(detail.numberOfEpisodes)} /> : null}
                         {detail.cast[0] && <Fact label="Starring" value={detail.cast.slice(0, 3).map(c => c.name).join(", ")} />}
                       </div>
+                    </div>
+                  )}
+
+                  {tab === "episodes" && isTv && (
+                    <div className="ent-dp-tabpane">
+                      <div className="ent-dp-eps-head">
+                        <div className="ent-dp-eps-season">
+                          <label className="ent-dp-eps-season-l">Season</label>
+                          <select
+                            value={selSeason}
+                            onChange={e => setSelSeason(Number(e.target.value))}
+                            className="ent-dp-eps-select"
+                          >
+                            {Array.from({ length: Math.max(1, detail.numberOfSeasons ?? 1) }, (_, i) => i + 1).map(s => (
+                              <option key={s} value={s}>Season {s}</option>
+                            ))}
+                          </select>
+                        </div>
+                        {seasonData && seasonData.episodes.length > 0 && (
+                          <div className="ent-dp-eps-progress">
+                            <Icon.Eye size={13} />
+                            <span>{countSeasonWatched(mediaType, id, selSeason, seasonData.episodes.length)} / {seasonData.episodes.length} watched</span>
+                          </div>
+                        )}
+                      </div>
+                      {seasonData?.overview && <p className="ent-dp-eps-overview">{seasonData.overview}</p>}
+                      {seasonLoading ? (
+                        <div className="ent-dp-loading"><Icon.Spinner size={22} /><p>Loading episodes…</p></div>
+                      ) : seasonData && seasonData.episodes.length > 0 ? (
+                        <div className="ent-dp-eps">
+                          {seasonData.episodes.map(ep => {
+                            const epW = isEpisodeWatched(mediaType, id, selSeason, ep.episodeNumber);
+                            const still = tmdbImg(ep.stillPath, imgSize("w342")) ?? poster;
+                            return (
+                              <div key={ep.id} className={epW ? "ent-dp-ep watched" : "ent-dp-ep"}>
+                                <button
+                                  className="ent-dp-ep-thumb"
+                                  onClick={() => onWatch(watchPayload(selSeason, ep.episodeNumber))}
+                                  title="Play this episode"
+                                  aria-label={`Play ${ep.name}`}
+                                >
+                                  {still ? <img src={still} alt={ep.name} loading="lazy" /> : <div className="ent-dp-ep-ph"><Icon.Film size={20} /></div>}
+                                  <span className="ent-dp-ep-play"><Icon.Play size={20} /></span>
+                                  <span className="ent-dp-ep-num">E{ep.episodeNumber}</span>
+                                </button>
+                                <div className="ent-dp-ep-body">
+                                  <div className="ent-dp-ep-top">
+                                    <span className="ent-dp-ep-title">{ep.name}</span>
+                                    {ep.rating > 0 && <span className="ent-dp-ep-rating"><Icon.Star size={11} filled /> {ep.rating.toFixed(1)}</span>}
+                                  </div>
+                                  {ep.overview && <p className="ent-dp-ep-ov">{ep.overview}</p>}
+                                  <div className="ent-dp-ep-meta">
+                                    {ep.runtime ? <span><Icon.Clock size={11} /> {formatRuntime(ep.runtime)}</span> : null}
+                                    {ep.airDate ? <span><Icon.Calendar size={11} /> {formatAirDate(ep.airDate)}</span> : null}
+                                  </div>
+                                  <div className="ent-dp-ep-actions">
+                                    <button className="ent-cta ghost sm" onClick={() => onWatch(watchPayload(selSeason, ep.episodeNumber))}>
+                                      <Icon.Play size={13} /> Play
+                                    </button>
+                                    <button
+                                      className={epW ? "ent-dp-ep-watch on" : "ent-dp-ep-watch"}
+                                      onClick={() => {
+                                        setEpisodeWatched(mediaType, id, selSeason, ep.episodeNumber, !epW);
+                                        setWatchedTick(t => t + 1);
+                                      }}
+                                      title={epW ? "Mark as not watched" : "Mark as watched"}
+                                    >
+                                      <Icon.Eye size={13} /> {epW ? "Watched" : "Mark watched"}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="ent-dp-tabpane-empty"><Icon.Tv size={26} /><p>No episode data for this season.</p></div>
+                      )}
                     </div>
                   )}
 

@@ -580,6 +580,23 @@ export function registerIpc(): void {
     const { tmdbRecommendations } = await import("./tmdb");
     return await tmdbRecommendations(mediaType, id);
   }));
+  // v8.0.0 — season episodes, upcoming, filtered discover, person search.
+  ipcMain.handle("tmdb:seasonEpisodes", (_e, tvId: number, seasonNumber: number) => tmdbWrap(async () => {
+    const { tmdbSeasonEpisodes } = await import("./tmdb");
+    return await tmdbSeasonEpisodes(tvId, seasonNumber);
+  }));
+  ipcMain.handle("tmdb:upcoming", (_e, page?: number) => tmdbWrap(async () => {
+    const { tmdbUpcoming } = await import("./tmdb");
+    return await tmdbUpcoming(page ?? 1);
+  }));
+  ipcMain.handle("tmdb:discover", (_e, filters: unknown, page?: number) => tmdbWrap(async () => {
+    const { tmdbDiscover } = await import("./tmdb");
+    return await tmdbDiscover(filters as Parameters<typeof tmdbDiscover>[0], page ?? 1);
+  }));
+  ipcMain.handle("tmdb:searchPeople", (_e, query: string) => tmdbWrap(async () => {
+    const { tmdbSearchPeople } = await import("./tmdb");
+    return await tmdbSearchPeople(query);
+  }));
 
   // ===== Achievements =====
   ipcMain.handle("achievements:list", () => getAchievements());

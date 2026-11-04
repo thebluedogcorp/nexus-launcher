@@ -50,27 +50,36 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v7.3.0"
-          $title = "NEXUS v7.3.0 — What's New panel, filmic grain, autonomous update pipeline"
+          $tag = "v8.0.0"
+          $title = "NEXUS v8.0.0 — OTT Completeness: episodes, enhanced search, notifications, watched tracking"
           $notes = @"
           NEXUS — Universal Game Launcher & Entertainment Hub for Windows.
 
-          **v7.3.0 — See every update inside the app. A What's New changelog panel, a filmic grain overlay, and an autonomous update pipeline.**
+          **v8.0.0 — The OTT Completeness Update. Brings NEXUS TV to the standard of leading global streaming platforms.**
 
-          **New: What's New panel (press `n`).**
-          A changelog modal that shows every version's changes with the latest featured in a highlighted card (version number, kind badge Major/Feature/Polish, date, and check-marked item list). Historical versions appear as compact entries with expand-to-full. Opened via the new sparkle button at the bottom of the sidebar (with a pulsing rose notification dot) or the `n` keyboard shortcut. This makes the autonomous update pipeline visible — every scheduled update that ships will appear here.
+          **New: Series Episodes tab.**
+          Every TV detail page now has an Episodes tab with a season selector and a full episode list — each episode shows a still thumbnail, title, overview, runtime, air date, rating, a one-click Play button, and a per-episode watched check. A season progress counter shows how many episodes you've watched. The default tab for TV titles is now Episodes.
 
-          **New: Filmic grain + vignette overlay.**
-          The entire Entertainment section now has an ultra-subtle animated film grain + radial vignette overlay (8s shimmer loop, mix-blend-mode overlay) — giving the UI a cinematic, filmic quality like a high-end Blu-ray menu. Respects prefers-reduced-motion (disables instantly).
+          **New: Enhanced universal search.**
+          A filter panel (toggle with the sliders icon) with media type (All / Movies / TV), genre multi-select, year range (from / to), minimum rating, and sort order (Relevance / Popularity / Rating / Newest / A→Z). Instant suggestions dropdown appears as you type. Search history with clear controls is shown when idle. A People row surfaces cast and crew results with their known-for titles.
 
-          **New: Changelog data system.**
-          A structured `ent-changelog.ts` with typed entries (version / date / title / items / kind) covering the full history from v6.0.0 to v7.3.0. Future updates append entries here — they appear in the What's New panel automatically.
+          **New: In-app Notifications center.**
+          A bell in the sidebar (press b) opens a notifications panel with an unread badge. It auto-seeds new-episode alerts for saved and unfinished TV titles, plus watch-streak milestones. Quiet hours are respected (configurable in Settings).
 
-          All v7.2.0 functionality preserved: Statistics Dashboard, Collections, Discover, user ratings, reviews, tabbed detail panel, redesigned detail page, keep-alive home, Ken Burns hero, Because You Watched rail, settings panel, My List badge, Surprise/Settings shortcuts, toast notifications, Surprise Me, command palette (Ctrl+K), hero manual arrows + Up Next, NEW badges, card sheen, hover preview popovers, Top 10 rail, arrow-key nav, scroll-to-top FAB, keyboard shortcuts overlay, Recently Viewed rail, full CineSrc streaming playback, TMDB IPC in main process, mode switching, library, collections, platform detection, launching, playtime, achievements, overlay, console/desktop mode, themes, 4 first-party plugins.
+          **New: Mark Watched + Hide from Recommendations.**
+          Every detail page has Mark Watched / Unwatched and Hide / Show buttons. Watched titles get a check overlay; hidden titles are filtered out of recommendations.
+
+          **New: Autoplay next episode.**
+          The player automatically advances to the next episode when one finishes (estimated from wall-clock progress). Toggle in Settings → Playback.
+
+          **New: Expanded Settings.**
+          Playback section adds autoplay-next, data saver (smaller image sizes), and watched-badges toggles. A new Parental Controls section lets you filter by content rating (Off / PG / PG-13 / R). A new Notifications section controls in-app notifications and quiet-hours window.
+
+          All v7.x functionality preserved: What's New panel, filmic grain, Statistics Dashboard, Collections, Discover, user ratings, reviews, tabbed detail panel, redesigned detail page, keep-alive home, Ken Burns hero, Because You Watched rail, full CineSrc streaming playback, command palette, keyboard shortcuts, Top 10 rail, hover previews, and every prior feature.
 
           **Downloads:**
-          - NEXUS-Setup-7.3.0.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-7.3.0.exe — single-file portable build.
+          - NEXUS-Setup-8.0.0.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-8.0.0.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@

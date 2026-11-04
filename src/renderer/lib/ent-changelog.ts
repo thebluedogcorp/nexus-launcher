@@ -13,6 +13,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "8.0.0",
+    date: "2026-11-04",
+    title: "OTT Completeness Update — episodes, enhanced search, notifications, watched tracking",
+    kind: "major",
+    items: [
+      "New: Episodes tab on series detail pages — season selector + full episode list with stills, overviews, runtimes, air dates, ratings, per-episode watched tracking, and one-click play",
+      "New: Enhanced universal search — filter panel (media type, genre multi-select, year range, min rating, sort order), instant suggestions dropdown, search history with clear, and a People row (cast/crew results with known-for titles)",
+      "New: In-app Notifications center — bell in the sidebar (press b) with unread badge; auto-seeds new-episode alerts for saved/unfinished TV titles and watch-streak milestones; quiet-hours aware",
+      "New: Mark as Watched / Unwatched on every title + per-episode watched checks with season progress counter",
+      "New: Hide from Recommendations — bury titles you don't want surfaced",
+      "New: Autoplay next episode — the player auto-advances to the next episode when one finishes (toggle in Settings)",
+      "New: Expanded Settings — Playback (autoplay-next, data saver, watched badges), Parental Controls (content rating filter), Notifications (enable + quiet-hours window)",
+      "New: Data-saver mode — uses smaller image sizes to reduce bandwidth",
+      "New: 13 new icons (Bell, Eye, EyeOff, Filter, Sliders, Mic, History, Users, Share, Lock, Volume, Forward, CalendarCheck)",
+    ],
+  },
+  {
     version: "7.3.0",
     date: "2026-11-04",
     title: "What's New panel + filmic grain + update pipeline",

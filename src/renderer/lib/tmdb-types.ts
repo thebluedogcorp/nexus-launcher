@@ -65,6 +65,56 @@ export interface TmdbError {
   error: string;
 }
 
+// ─── v8.0.0 — Episode / Season (series detail "Episodes" tab) ───────────────
+
+export interface TmdbEpisode {
+  id: number;
+  episodeNumber: number;
+  seasonNumber: number;
+  name: string;
+  overview: string;
+  stillPath: string | null;
+  runtime: number | null;
+  airDate: string | null;
+  rating: number;
+}
+
+export interface TmdbSeason {
+  seasonNumber: number;
+  name: string;
+  overview: string;
+  posterPath: string | null;
+  episodes: TmdbEpisode[];
+}
+
+export interface TmdbPerson {
+  id: number;
+  name: string;
+  profilePath: string | null;
+  knownFor: string;
+  knownForIds: Array<{ mediaType: TmdbMediaType; id: number; title: string; posterPath: string | null }>;
+}
+
+/** Narrow + cast a tmdb:seasonEpisodes IPC result (or null). */
+export function asSeason(r: unknown): TmdbSeason | null {
+  if (isTmdbError(r) || typeof r !== "object" || r === null) return null;
+  return r as TmdbSeason;
+}
+
+/** Narrow + cast a tmdb:searchPeople IPC result (or []). */
+export function asPeople(r: unknown): TmdbPerson[] {
+  if (isTmdbError(r) || !Array.isArray(r)) return [];
+  return r as TmdbPerson[];
+}
+
+/** Format an episode air date (YYYY-MM-DD) into a readable form. */
+export function formatAirDate(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso + "T00:00:00");
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" });
+}
+
 /** TMDB image URL helper. path is the TMDB poster/backdrop/profile path. */
 export function tmdbImg(
   path: string | null | undefined,

@@ -189,6 +189,11 @@ const api = {
   tmdbDetailsAny: (mediaType: "movie" | "tv", id: number) => ipcRenderer.invoke("tmdb:detailsAny", mediaType, id) as Promise<unknown>,
   tmdbByGenreTv: (genreId: number, page?: number) => ipcRenderer.invoke("tmdb:byGenreTv", genreId, page) as Promise<unknown>,
   tmdbRecommendations: (mediaType: "movie" | "tv", id: number) => ipcRenderer.invoke("tmdb:recommendations", mediaType, id) as Promise<unknown>,
+  // v8.0.0 — season episodes, upcoming, filtered discover, person search.
+  tmdbSeasonEpisodes: (tvId: number, seasonNumber: number) => ipcRenderer.invoke("tmdb:seasonEpisodes", tvId, seasonNumber) as Promise<unknown>,
+  tmdbUpcoming: (page?: number) => ipcRenderer.invoke("tmdb:upcoming", page) as Promise<unknown>,
+  tmdbDiscover: (filters: unknown, page?: number) => ipcRenderer.invoke("tmdb:discover", filters, page) as Promise<unknown>,
+  tmdbSearchPeople: (query: string) => ipcRenderer.invoke("tmdb:searchPeople", query) as Promise<unknown>,
   tmdbOpenExternal: (url: string) => ipcRenderer.invoke("shell:openExternal", url) as Promise<{ ok: boolean; message?: string }>,
   // Achievements
   getAchievements: () => ipcRenderer.invoke("achievements:list") as Promise<Array<{ id: string; name: string; description: string; icon: string; unlockedAt: string | null; progress: number; maxProgress: number }>>,

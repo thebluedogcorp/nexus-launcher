@@ -183,3 +183,164 @@ export function recordWatchDay(): { current: number; longest: number } {
   try { localStorage.setItem(STREAK_KEY, JSON.stringify(next)); } catch { /* non-fatal */ }
   return { current, longest };
 }
+
+// ─── v8.0.0 — Watched set (mark titles as watched/unwatched) ────────────────
+const WATCHED_KEY = "nx-ent-watched";
+
+export function isWatched(mediaType: TmdbMediaType, id: number): boolean {
+  try {
+    const all = JSON.parse(localStorage.getItem(WATCHED_KEY) || "{}") as Record<string, true>;
+    return !!all[`${mediaType}-${id}`];
+  } catch { return false; }
+}
+
+export function setWatched(mediaType: TmdbMediaType, id: number, watched: boolean): void {
+  try {
+    const all = JSON.parse(localStorage.getItem(WATCHED_KEY) || "{}") as Record<string, true>;
+    const key = `${mediaType}-${id}`;
+    if (watched) all[key] = true;
+    else delete all[key];
+    localStorage.setItem(WATCHED_KEY, JSON.stringify(all));
+  } catch { /* non-fatal */ }
+}
+
+export function getWatchedKeys(): Array<{ mediaType: TmdbMediaType; id: number }> {
+  try {
+    const all = JSON.parse(localStorage.getItem(WATCHED_KEY) || "{}") as Record<string, true>;
+    return Object.keys(all).map(k => {
+      const [mediaType, id] = k.split("-") as [TmdbMediaType, string];
+      return { mediaType, id: Number(id) };
+    });
+  } catch { return []; }
+}
+
+// ─── v8.0.0 — Hidden titles (hide from recommendations) ─────────────────────
+const HIDDEN_KEY = "nx-ent-hidden";
+
+export function isHidden(mediaType: TmdbMediaType, id: number): boolean {
+  try {
+    const all = JSON.parse(localStorage.getItem(HIDDEN_KEY) || "{}") as Record<string, true>;
+    return !!all[`${mediaType}-${id}`];
+  } catch { return false; }
+}
+
+export function setHidden(mediaType: TmdbMediaType, id: number, hidden: boolean): void {
+  try {
+    const all = JSON.parse(localStorage.getItem(HIDDEN_KEY) || "{}") as Record<string, true>;
+    const key = `${mediaType}-${id}`;
+    if (hidden) all[key] = true;
+    else delete all[key];
+    localStorage.setItem(HIDDEN_KEY, JSON.stringify(all));
+  } catch { /* non-fatal */ }
+}
+
+/** Filter a list of items, dropping hidden + (optionally) watched titles. */
+export function filterHidden<T extends { mediaType: TmdbMediaType; id: number }>(
+  items: T[],
+  opts: { dropWatched?: boolean } = {},
+): T[] {
+  return items.filter(i => !isHidden(i.mediaType, i.id) && (!opts.dropWatched || !isWatched(i.mediaType, i.id)));
+}
+
+// ─── v8.0.0 — Search history (recent queries) ───────────────────────────────
+const SEARCH_HISTORY_KEY = "nx-ent-search-history";
+const MAX_HISTORY = 8;
+
+export function getSearchHistory(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY) || "[]") as string[];
+  } catch { return []; }
+}
+
+export function addSearchHistory(query: string): void {
+  const q = query.trim();
+  if (!q) return;
+  const all = getSearchHistory().filter(x => x.toLowerCase() !== q.toLowerCase());
+  all.unshift(q);
+  try { localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(all.slice(0, MAX_HISTORY))); } catch { /* non-fatal */ }
+}
+
+export function clearSearchHistory(): void {
+  try { localStorage.removeItem(SEARCH_HISTORY_KEY); } catch { /* non-fatal */ }
+}
+
+// ─── v8.0.0 — In-app Notifications store ────────────────────────────────────
+const NOTIFICATIONS_KEY = "nx-ent-notifications";
+const MAX_NOTIFS = 50;
+
+export interface EntNotification {
+  id: string;
+  kind: "new-episode" | "streak" | "recommendation" | "info";
+  title: string;
+  body: string;
+  /** Optional deep link: which title to open. */
+  target?: { mediaType: TmdbMediaType; id: number };
+  createdAt: number;
+  read: boolean;
+}
+
+export function getNotifications(): EntNotification[] {
+  try {
+    return (JSON.parse(localStorage.getItem(NOTIFICATIONS_KEY) || "[]") as EntNotification[])
+      .sort((a, b) => b.createdAt - a.createdAt);
+  } catch { return []; }
+}
+
+export function addNotification(n: Omit<EntNotification, "id" | "createdAt" | "read">): void {
+  const all = getNotifications();
+  // Dedupe by title within the last 24h.
+  const dayAgo = Date.now() - 86400000;
+  if (all.some(x => x.title === n.title && x.createdAt > dayAgo)) return;
+  all.unshift({ ...n, id: `ntf-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, createdAt: Date.now(), read: false });
+  try { localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(all.slice(0, MAX_NOTIFS))); } catch { /* non-fatal */ }
+}
+
+export function markNotificationRead(id: string): void {
+  const all = getNotifications();
+  const n = all.find(x => x.id === id);
+  if (n) { n.read = true; try { localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(all)); } catch { /* non-fatal */ } }
+}
+
+export function markAllNotificationsRead(): void {
+  const all = getNotifications().map(n => ({ ...n, read: true }));
+  try { localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(all)); } catch { /* non-fatal */ }
+}
+
+export function clearNotifications(): void {
+  try { localStorage.removeItem(NOTIFICATIONS_KEY); } catch { /* non-fatal */ }
+}
+
+export function unreadNotificationCount(): number {
+  return getNotifications().filter(n => !n.read).length;
+}
+
+// ─── v8.0.0 — Per-episode watched tracking (series Episodes tab) ────────────
+const EP_WATCHED_KEY = "nx-ent-ep-watched";
+
+export function epKey(mediaType: TmdbMediaType, id: number, season: number, episode: number): string {
+  return `${mediaType}-${id}-S${season}-E${episode}`;
+}
+
+export function isEpisodeWatched(mediaType: TmdbMediaType, id: number, season: number, episode: number): boolean {
+  try {
+    const all = JSON.parse(localStorage.getItem(EP_WATCHED_KEY) || "{}") as Record<string, true>;
+    return !!all[epKey(mediaType, id, season, episode)];
+  } catch { return false; }
+}
+
+export function setEpisodeWatched(mediaType: TmdbMediaType, id: number, season: number, episode: number, watched: boolean): void {
+  try {
+    const all = JSON.parse(localStorage.getItem(EP_WATCHED_KEY) || "{}") as Record<string, true>;
+    const k = epKey(mediaType, id, season, episode);
+    if (watched) all[k] = true;
+    else delete all[k];
+    localStorage.setItem(EP_WATCHED_KEY, JSON.stringify(all));
+  } catch { /* non-fatal */ }
+}
+
+/** Count how many episodes of a given season are marked watched. */
+export function countSeasonWatched(mediaType: TmdbMediaType, id: number, season: number, episodeCount: number): number {
+  let n = 0;
+  for (let e = 1; e <= episodeCount; e++) if (isEpisodeWatched(mediaType, id, season, e)) n++;
+  return n;
+}

@@ -21,8 +21,9 @@ import { EntShortcuts } from "./EntShortcuts";
 import { EntToaster, pushToast } from "./EntToaster";
 import { EntSettings } from "./EntSettings";
 import { EntWhatsNew } from "./EntWhatsNew";
+import { EntNotifications } from "./EntNotifications";
 import { inList as listHas, toggleList as toggleStore, recordHistory, getList } from "../../lib/ent-store";
-import { recordWatchDay } from "../../lib/ent-userdata";
+import { recordWatchDay, unreadNotificationCount } from "../../lib/ent-userdata";
 import { getLatestVersion } from "../../lib/ent-changelog";
 import type { TmdbItem, TmdbMediaType } from "../../lib/tmdb-types";
 
@@ -48,6 +49,8 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
   const [scOpen, setScOpen] = useState(false);
   const [setOpen, setSetOpen] = useState(false);
   const [wnOpen, setWnOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifCount, setNotifCount] = useState(() => unreadNotificationCount());
   const [cmdTitles, setCmdTitles] = useState<TmdbItem[]>([]);
   const [historyTick, setHistoryTick] = useState(0);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -194,6 +197,10 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
         // What's New — changelog of every update (v7.3.0).
         e.preventDefault();
         setWnOpen(o => !o);
+      } else if ((e.key === "b" || e.key === "B") && !typing) {
+        // v8.0.0 — Notifications center.
+        e.preventDefault();
+        setNotifOpen(o => !o);
       } else if ((e.key === "s" || e.key === "S") && !typing) {
         // Surprise Me — dispatch a global event EntHome listens for.
         e.preventDefault();
@@ -292,6 +299,18 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
         {sideBtn(false, "Switch to Games mode", <Icon.Gamepad size={17} />, onSwitchToGames)}
         {sideBtn(false, "Mode selector", <Icon.Grid size={17} />, onBackToSplash)}
         {sideBtn(false, "Keyboard shortcuts  (press ?)", <Icon.Keyboard size={17} />, () => setScOpen(true))}
+        {/* v8.0.0 — Notifications bell with unread badge */}
+        <button
+          className={notifOpen ? "ent-side-btn on" : "ent-side-btn"}
+          onClick={() => setNotifOpen(true)}
+          title="Notifications  (press b)"
+          aria-label="Notifications  (press b)"
+          data-label="Notifications  (b)"
+        >
+          <Icon.Bell size={17} />
+          <span className="ent-side-bar" />
+          {notifCount > 0 && <span className="ent-side-badge notif">{notifCount > 9 ? "9+" : notifCount}</span>}
+        </button>
         {sideBtn(false, "Settings", <Icon.Settings size={17} />, () => setSetOpen(true))}
         {/* What's New — changelog with notification dot on updates */}
         <button
@@ -421,6 +440,14 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
 
       {/* ── What's New changelog (n key / sparkle icon) ── */}
       <EntWhatsNew open={wnOpen} onClose={() => setWnOpen(false)} />
+
+      {/* ── Notifications center (b key / bell icon) ── */}
+      <EntNotifications
+        open={notifOpen}
+        onClose={() => setNotifOpen(false)}
+        onOpen={openDetail}
+        onCountChange={setNotifCount}
+      />
 
       {/* ── Settings panel (comma key / gear icon) ── */}
       <EntSettings

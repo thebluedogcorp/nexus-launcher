@@ -25,6 +25,8 @@ const GROUPS: { group: string; items: Shortcut[] }[] = [
       { keys: ["Esc"], label: "Back / close overlay" },
       { keys: ["?"], label: "Show this shortcuts overlay" },
       { keys: [","], label: "Open Settings" },
+      { keys: ["b"], label: "Open Notifications" },
+      { keys: ["n"], label: "Open What's New" },
     ],
   },
   {

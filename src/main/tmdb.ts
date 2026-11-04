@@ -390,3 +390,162 @@ export async function tmdbDetailsTv(id: number): Promise<TmdbMovieDetails> {
 export async function tmdbDetailsAny(mediaType: "movie" | "tv", id: number): Promise<TmdbMovieDetails> {
   return mediaType === "tv" ? tmdbDetailsTv(id) : tmdbDetails(id);
 }
+
+// ─── v8.0.0 — Season episodes (series detail "Episodes" tab) ────────────────
+
+export interface TmdbEpisode {
+  id: number;
+  episodeNumber: number;
+  seasonNumber: number;
+  name: string;
+  overview: string;
+  stillPath: string | null;
+  runtime: number | null;
+  airDate: string | null;
+  rating: number;
+}
+
+export interface TmdbSeason {
+  seasonNumber: number;
+  name: string;
+  overview: string;
+  posterPath: string | null;
+  episodes: TmdbEpisode[];
+}
+
+/** Fetch the full episode list for a TV season. v8.0.0. */
+export async function tmdbSeasonEpisodes(tvId: number, seasonNumber: number): Promise<TmdbSeason> {
+  interface RawSeason {
+    id: number;
+    name: string;
+    overview: string;
+    poster_path: string | null;
+    season_number: number;
+    air_date: string | null;
+    episodes: Array<{
+      id: number;
+      name: string;
+      overview: string;
+      episode_number: number;
+      season_number: number;
+      still_path: string | null;
+      runtime: number | null;
+      air_date: string | null;
+      vote_average: number;
+    }>;
+  }
+  const s = Math.max(0, seasonNumber);
+  const m = await tmdb<RawSeason>(`/tv/${tvId}/season/${s}`);
+  return {
+    seasonNumber: m.season_number ?? s,
+    name: m.name ?? `Season ${s}`,
+    overview: m.overview ?? "",
+    posterPath: m.poster_path ?? null,
+    episodes: (m.episodes ?? []).map(e => ({
+      id: e.id,
+      episodeNumber: e.episode_number,
+      seasonNumber: e.season_number,
+      name: e.name || `Episode ${e.episode_number}`,
+      overview: e.overview ?? "",
+      stillPath: e.still_path ?? null,
+      runtime: e.runtime ?? null,
+      airDate: e.air_date ?? null,
+      rating: Math.round((e.vote_average ?? 0) * 10) / 10,
+    })),
+  };
+}
+
+// ─── v8.0.0 — Upcoming movies (home "Coming Soon" rail) ─────────────────────
+
+export async function tmdbUpcoming(page = 1): Promise<TmdbMovie[]> {
+  const d = await tmdb<TmdbPage>("/movie/upcoming", { page: String(page) });
+  return d.results.filter(m => m.title).map(normalize);
+}
+
+// ─── v8.0.0 — Discover with filters (enhanced search) ───────────────────────
+
+export interface DiscoverFilters {
+  mediaType: "movie" | "tv";
+  genreIds?: number[];
+  yearFrom?: number | null;
+  yearTo?: number | null;
+  minRating?: number | null;
+  sortBy?: "popularity.desc" | "vote_average.desc" | "primary_release_date.desc" | "release_date.desc" | "original_title.asc";
+}
+
+/**
+ * Filtered discovery across movies or TV. Supports multiple genres, year range,
+ * minimum vote-average, and sort order. v8.0.0 powers the enhanced search.
+ */
+export async function tmdbDiscover(filters: DiscoverFilters, page = 1): Promise<TmdbItem[]> {
+  const params: Record<string, string> = {
+    sort_by: filters.sortBy ?? "popularity.desc",
+    "vote_count.gte": filters.minRating ? "300" : "150",
+    page: String(page),
+  };
+  if (filters.genreIds && filters.genreIds.length > 0) {
+    params.with_genres = filters.genreIds.join(",");
+  }
+  if (filters.minRating) {
+    params["vote_average.gte"] = String(filters.minRating);
+  }
+  const path = filters.mediaType === "tv" ? "/discover/tv" : "/discover/movie";
+  if (filters.mediaType === "movie") {
+    if (filters.yearFrom) params["primary_release_date.gte"] = `${filters.yearFrom}-01-01`;
+    if (filters.yearTo) params["primary_release_date.lte"] = `${filters.yearTo}-12-31`;
+  } else {
+    if (filters.yearFrom) params["first_air_date.gte"] = `${filters.yearFrom}-01-01`;
+    if (filters.yearTo) params["first_air_date.lte"] = `${filters.yearTo}-12-31`;
+  }
+  const d = await tmdb<TmdbMultiPage>(path, params);
+  return d.results
+    .map(m => normalizeMulti({ ...m, media_type: filters.mediaType }))
+    .filter(m => m.posterPath || m.backdropPath);
+}
+
+// ─── v8.0.0 — Person search (cast/crew in universal search) ─────────────────
+
+export interface TmdbPerson {
+  id: number;
+  name: string;
+  profilePath: string | null;
+  knownFor: string;
+  knownForIds: Array<{ mediaType: "movie" | "tv"; id: number; title: string; posterPath: string | null }>;
+}
+
+/** Multi-search returning person results too (the search view shows a People row). v8.0.0. */
+export async function tmdbSearchPeople(query: string): Promise<TmdbPerson[]> {
+  if (!query.trim()) return [];
+  interface RawPerson {
+    id: number;
+    name: string;
+    profile_path: string | null;
+    known_for_department: string;
+    known_for?: Array<{
+      id: number;
+      media_type?: string;
+      title?: string;
+      name?: string;
+      poster_path?: string | null;
+    }>;
+  }
+  const d = await tmdb<{ results: Array<RawPerson & { media_type?: string }> }>("/search/multi", { query: query.trim() });
+  return (d.results ?? [])
+    .filter(m => m.media_type === "person")
+    .slice(0, 12)
+    .map(p => ({
+      id: p.id,
+      name: p.name,
+      profilePath: p.profile_path ?? null,
+      knownFor: p.known_for_department || "Acting",
+      knownForIds: (p.known_for ?? [])
+        .filter(k => k.media_type === "movie" || k.media_type === "tv")
+        .slice(0, 6)
+        .map(k => ({
+          mediaType: (k.media_type === "tv" ? "tv" : "movie") as "movie" | "tv",
+          id: k.id,
+          title: k.title ?? k.name ?? "Untitled",
+          posterPath: k.poster_path ?? null,
+        })),
+    }));
+}
