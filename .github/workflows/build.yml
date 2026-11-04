@@ -50,58 +50,27 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v7.2.0"
-          $title = "NEXUS v7.2.0 — 20+ major features: Stats, Collections, Discover, ratings, reviews, bug fixes"
+          $tag = "v7.3.0"
+          $title = "NEXUS v7.3.0 — What's New panel, filmic grain, autonomous update pipeline"
           $notes = @"
           NEXUS — Universal Game Launcher & Entertainment Hub for Windows.
 
-          **v7.2.0 — Massive feature expansion + critical bug fixes. 20+ major new features across the Entertainment tab, a fixed trailer player, a fixed info-panel overlap, and a single search button.**
+          **v7.3.0 — See every update inside the app. A What's New changelog panel, a filmic grain overlay, and an autonomous update pipeline.**
 
-          **Bug fixes (user-reported):**
-          - **YouTube trailer "Video Player Configuration Error"** — switched from youtube-nocookie.com (which fails for many videos) to youtube.com/embed with color=white + proper referrer policy. Trailers now play reliably.
-          - **Info panel overlapped the poster** — the tabbed panel had margin-top:-40px (pulled up over the hero). Changed to +24px so it sits cleanly below the action bar.
-          - **Two search buttons** — removed the duplicate command-palette trigger from the sidebar. Now there's exactly one Search nav button (Ctrl+K still opens the palette).
+          **New: What's New panel (press `n`).**
+          A changelog modal that shows every version's changes with the latest featured in a highlighted card (version number, kind badge Major/Feature/Polish, date, and check-marked item list). Historical versions appear as compact entries with expand-to-full. Opened via the new sparkle button at the bottom of the sidebar (with a pulsing rose notification dot) or the `n` keyboard shortcut. This makes the autonomous update pipeline visible — every scheduled update that ships will appear here.
 
-          **20+ major new features:**
+          **New: Filmic grain + vignette overlay.**
+          The entire Entertainment section now has an ultra-subtle animated film grain + radial vignette overlay (8s shimmer loop, mix-blend-mode overlay) — giving the UI a cinematic, filmic quality like a high-end Blu-ray menu. Respects prefers-reduced-motion (disables instantly).
 
-          *New views (3):*
-          1. **Statistics Dashboard** — watch streak (current + longest), 6 stat cards (My List / In Progress / Recently Viewed / Rated / Reviews / Collections), average rating, rated-titles chips.
-          2. **Collections** — user-created playlists of titles. Create, browse, add/remove titles from any detail page, delete collections. Poster-stack thumbnails on collection cards.
-          3. **Discover** — curated discovery page with Daily Pick (deterministic per day), mood-based recommendations (Thrilling / Heartwarming / Mind-bending / Epic / Dark), and a Discovery Shuffle rail.
+          **New: Changelog data system.**
+          A structured `ent-changelog.ts` with typed entries (version / date / title / items / kind) covering the full history from v6.0.0 to v7.3.0. Future updates append entries here — they appear in the What's New panel automatically.
 
-          *Detail page additions (5):*
-          4. **User star rating** — 10-star rating widget in the action bar; click any star to rate 1-10, click again to clear. Persists locally + fires a toast.
-          5. **My Review tab** — a 5th tab with a textarea for personal notes/reviews per title. Save/delete, persisted locally.
-          6. **Add to Collection dropdown** — on every detail page, add the current title to any existing collection via a dropdown.
-          7. **Homepage link** — external link to the title's official homepage (if TMDB has one).
-          8. **Deeper Facts tab** — 11 metadata fields including IMDb ID, top cast, all genres.
-
-          *New stores (4):*
-          9. **User ratings store** — getRating/setRating/getAllRatings (1-10 per title).
-          10. **Reviews store** — getReview/setReview/deleteReview/getAllReviews.
-          11. **Collections store** — getCollections/createCollection/deleteCollection/addToCollection/removeFromCollection.
-          12. **Watch streak store** — getStreak/recordWatchDay (tracks consecutive days with watch activity).
-
-          *Home + cross-cutting (8+):*
-          13. **Watch streak tracking** — every time you press Watch, the streak increments (consecutive days).
-          14. **Discover sidebar nav** — new Discover button in the sidebar.
-          15. **Collections sidebar nav** — new Collections button.
-          16. **Statistics sidebar nav** — new Statistics button.
-          17. **Command palette expanded** — 10 quick actions (was 7) including Discover, Collections, Statistics.
-          18. **Keep-alive home** retained — no refetch flash when returning home.
-          19. **Ken Burns hero zoom** retained — cinematic slow zoom.
-          20. **Because You Watched rail** retained — smart recs from history.
-
-          *Theme + cohesion:*
-          - Sleeker dark theme: deeper black backgrounds (#050507), darker sidebar gradient, darker glass panels.
-          - Bolder rail titles (800 weight, tighter tracking) + page titles (900 weight).
-          - All new views use the unified ent-page shell + page-head pattern for consistency.
-
-          All v7.1.0 functionality preserved: redesigned detail page, tabbed panel, rating ring, action bar, ambient backdrop, settings panel, My List badge, Surprise/Settings shortcuts, toast notifications, Surprise Me, command palette (Ctrl+K), hero manual arrows + Up Next, NEW badges, card sheen, hover preview popovers, Top 10 rail, arrow-key nav, scroll-to-top FAB, keyboard shortcuts overlay, Recently Viewed rail, full CineSrc streaming playback, TMDB IPC in main process, mode switching, library, collections, platform detection, launching, playtime, achievements, overlay, console/desktop mode, themes, 4 first-party plugins.
+          All v7.2.0 functionality preserved: Statistics Dashboard, Collections, Discover, user ratings, reviews, tabbed detail panel, redesigned detail page, keep-alive home, Ken Burns hero, Because You Watched rail, settings panel, My List badge, Surprise/Settings shortcuts, toast notifications, Surprise Me, command palette (Ctrl+K), hero manual arrows + Up Next, NEW badges, card sheen, hover preview popovers, Top 10 rail, arrow-key nav, scroll-to-top FAB, keyboard shortcuts overlay, Recently Viewed rail, full CineSrc streaming playback, TMDB IPC in main process, mode switching, library, collections, platform detection, launching, playtime, achievements, overlay, console/desktop mode, themes, 4 first-party plugins.
 
           **Downloads:**
-          - NEXUS-Setup-7.2.0.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-7.2.0.exe — single-file portable build.
+          - NEXUS-Setup-7.3.0.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-7.3.0.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@

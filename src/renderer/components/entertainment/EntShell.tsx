@@ -20,8 +20,10 @@ import { EntCommandPalette, type CmdAction } from "./EntCommandPalette";
 import { EntShortcuts } from "./EntShortcuts";
 import { EntToaster, pushToast } from "./EntToaster";
 import { EntSettings } from "./EntSettings";
+import { EntWhatsNew } from "./EntWhatsNew";
 import { inList as listHas, toggleList as toggleStore, recordHistory, getList } from "../../lib/ent-store";
 import { recordWatchDay } from "../../lib/ent-userdata";
+import { getLatestVersion } from "../../lib/ent-changelog";
 import type { TmdbItem, TmdbMediaType } from "../../lib/tmdb-types";
 
 type EntView = "home" | "movies" | "tv" | "mylist" | "search" | "detail" | "stats" | "collections" | "discover";
@@ -45,6 +47,7 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
   const [cmdOpen, setCmdOpen] = useState(false);
   const [scOpen, setScOpen] = useState(false);
   const [setOpen, setSetOpen] = useState(false);
+  const [wnOpen, setWnOpen] = useState(false);
   const [cmdTitles, setCmdTitles] = useState<TmdbItem[]>([]);
   const [historyTick, setHistoryTick] = useState(0);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -187,6 +190,10 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
         else if (view !== "home") go("home");
       } else if ((e.key === "g" || e.key === "G") && !typing) {
         onSwitchToGames();
+      } else if ((e.key === "n" || e.key === "N") && !typing) {
+        // What's New — changelog of every update (v7.3.0).
+        e.preventDefault();
+        setWnOpen(o => !o);
       } else if ((e.key === "s" || e.key === "S") && !typing) {
         // Surprise Me — dispatch a global event EntHome listens for.
         e.preventDefault();
@@ -286,6 +293,18 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
         {sideBtn(false, "Mode selector", <Icon.Grid size={17} />, onBackToSplash)}
         {sideBtn(false, "Keyboard shortcuts  (press ?)", <Icon.Keyboard size={17} />, () => setScOpen(true))}
         {sideBtn(false, "Settings", <Icon.Settings size={17} />, () => setSetOpen(true))}
+        {/* What's New — changelog with notification dot on updates */}
+        <button
+          className="ent-side-btn ent-side-wn"
+          onClick={() => setWnOpen(true)}
+          title="What's New  (press n)"
+          aria-label="What's New  (press n)"
+          data-label="What's New  (n)"
+        >
+          <Icon.Sparkles size={17} />
+          <span className="ent-side-bar" />
+          <span className="ent-wn-dot" title={`New in ${getLatestVersion().version}`} />
+        </button>
       </aside>
 
       {/* ── Content ── */}
@@ -399,6 +418,9 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
 
       {/* ── Keyboard shortcuts overlay (? key) ── */}
       <EntShortcuts open={scOpen} onClose={() => setScOpen(false)} />
+
+      {/* ── What's New changelog (n key / sparkle icon) ── */}
+      <EntWhatsNew open={wnOpen} onClose={() => setWnOpen(false)} />
 
       {/* ── Settings panel (comma key / gear icon) ── */}
       <EntSettings
