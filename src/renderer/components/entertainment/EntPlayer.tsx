@@ -17,6 +17,7 @@ import {
 } from "../../lib/ent-store";
 import { getPrefs } from "../../lib/ent-prefs";
 import { pushToast } from "./EntToaster";
+import { getDownloadSettings, downloadOfflinePackage, isDownloaded, removeDownload } from "../../lib/ent-downloads";
 
 /** Everything the player needs to open a stream + save progress. */
 export interface WatchPayload {
@@ -91,6 +92,16 @@ export function EntPlayer({ open, payload, onClose, onProgress }: EntPlayerProps
         setEpisode(e => Math.min(99, e + 1));
         startedAtRef.current = Date.now();
         pushToast("Next episode starting", "info", <Icon.Forward size={14} />);
+        // v9.0.0 — Auto Download: package the next episode for offline.
+        void downloadOfflinePackage({
+          mediaType: "tv",
+          id: payload.id,
+          title: payload.title,
+          posterPath: payload.posterPath ?? null,
+          backdropPath: payload.backdropPath ?? null,
+          season: seasonRef.current,
+          episode: Math.min(99, episodeRef.current + 1),
+        });
       }
     };
     const interval = setInterval(save, SAVE_INTERVAL_MS);
@@ -110,6 +121,25 @@ export function EntPlayer({ open, payload, onClose, onProgress }: EntPlayerProps
 
   const src = cinesrcEmbedUrl(payload.mediaType, payload.id, season, episode);
   const seLabel = isTv ? `S${season} · E${episode}` : "Movie";
+  // v9.0.0 — download state for the current episode/movie.
+  const curDownloaded = isDownloaded(payload.mediaType, payload.id, isTv ? season : undefined, isTv ? episode : undefined);
+  const downloadNow = async () => {
+    if (!getDownloadSettings().location) {
+      pushToast("Set a download location in Account first", "error", <Icon.Folder size={13} />);
+      return;
+    }
+    const entry = await downloadOfflinePackage({
+      mediaType: payload.mediaType,
+      id: payload.id,
+      title: payload.title,
+      posterPath: payload.posterPath ?? null,
+      backdropPath: payload.backdropPath ?? null,
+      season: isTv ? season : undefined,
+      episode: isTv ? episode : undefined,
+    });
+    if (entry) pushToast(`Downloaded ${seLabel}`, "success", <Icon.Download size={14} />);
+    else pushToast("Download failed — check Account settings", "error", <Icon.Close size={13} />);
+  };
 
   return (
     <div className="ent-player-overlay" role="dialog" aria-modal="true" aria-label={`Playing ${payload.title}`}>
@@ -160,6 +190,17 @@ export function EntPlayer({ open, payload, onClose, onProgress }: EntPlayerProps
         </div>
         <div className="ent-player-bar-right">
           <span className="ent-player-pos">{seLabel}</span>
+          {/* v9.0.0 — download the current episode/movie */}
+          <button
+            className={curDownloaded ? "ent-player-dl on" : "ent-player-dl"}
+            onClick={() => {
+              if (curDownloaded) { removeDownload(payload.mediaType, payload.id, isTv ? season : undefined, isTv ? episode : undefined); pushToast("Download removed", "info", <Icon.Trash size={13} />); }
+              else void downloadNow();
+            }}
+            title={curDownloaded ? "Remove offline package" : "Save offline package"}
+          >
+            {curDownloaded ? <Icon.CheckCircle size={13} /> : <Icon.Download size={13} />} {curDownloaded ? "Saved" : "Download"}
+          </button>
           <a
             className="ent-player-link"
             href={src} target="_blank" rel="noopener noreferrer"

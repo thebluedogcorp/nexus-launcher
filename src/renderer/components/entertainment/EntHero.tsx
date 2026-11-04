@@ -1,12 +1,12 @@
-// v6.0.0 — EntHero: Apple TV+ style cinematic hero (reference image 2).
-// Full-bleed art bleeding right, deep left gradient blend, huge condensed
-// uppercase Oswald title, kicker chip, meta + genre badges, 2-line synopsis,
-// Watch Now / Watch Trailer / More Info / My List CTAs, pagination dots,
-// auto-advance 8s. v6.6.0 — Watch Trailer button + modal.
+// v9.0.0 — EntHero: Netflix-style billboard hero.
+// Full-bleed crossfading art with Ken Burns drift, layered gradient blends,
+// "N SERIES / N FILM" tag, green match %, maturity badge, Netflix-style
+// maturity strip on the right edge, white Play + translucent More Info CTAs,
+// pagination dots, hover arrows, Up Next chip, and the trailer modal.
 
 import { useEffect, useState } from "react";
 import { Icon } from "../Icons";
-import { tmdbImg, formatRating, MOVIE_GENRES, TV_GENRES, type TmdbItem, type TmdbMediaType } from "../../lib/tmdb-types";
+import { tmdbImg, type TmdbItem, type TmdbMediaType } from "../../lib/tmdb-types";
 import { EntTrailerModal } from "./EntTrailerModal";
 
 interface HeroProps {
@@ -20,12 +20,11 @@ interface HeroProps {
 
 const HERO_COUNT = 6;
 
-function genreNames(item: TmdbItem): string[] {
-  const catalog = item.mediaType === "tv" ? TV_GENRES : MOVIE_GENRES;
-  return (item.genreIds ?? [])
-    .map(gid => catalog.find(g => g.id === gid)?.name)
-    .filter((n): n is string => !!n)
-    .slice(0, 3);
+/** Deterministic maturity rating from rating + type (heuristic). */
+function maturity(mt: TmdbMediaType, rating: number): string {
+  if (rating >= 8.4) return mt === "tv" ? "TV-MA" : "R";
+  if (rating >= 7) return mt === "tv" ? "TV-14" : "PG-13";
+  return mt === "tv" ? "TV-PG" : "PG";
 }
 
 export function EntHero({ items, loading, onOpen, onWatch, inList, onToggleList }: HeroProps) {
@@ -35,7 +34,7 @@ export function EntHero({ items, loading, onOpen, onWatch, inList, onToggleList 
 
   useEffect(() => {
     if (heroes.length <= 1) return;
-    const t = setInterval(() => setIdx(i => (i + 1) % heroes.length), 8000);
+    const t = setInterval(() => setIdx(i => (i + 1) % heroes.length), 9000);
     return () => clearInterval(t);
   }, [heroes.length]);
 
@@ -56,12 +55,12 @@ export function EntHero({ items, loading, onOpen, onWatch, inList, onToggleList 
 
   const cur = heroes[idx];
   const mt = cur.mediaType;
-  const genres = genreNames(cur);
   const listed = inList(mt, cur.id);
+  const match = Math.min(99, Math.round(cur.rating * 10));
 
   return (
     <div className="ent-hero">
-      {/* Crossfading art layers */}
+      {/* Crossfading art layers with Ken Burns drift */}
       <div className="ent-hero-media">
         {heroes.map((h, i) => (
           <img
@@ -75,45 +74,59 @@ export function EntHero({ items, loading, onOpen, onWatch, inList, onToggleList 
       <div className="ent-hero-fade" />
 
       <div className="ent-hero-inner">
-        <div className="ent-hero-kicker">
-          <span className="ent-kicker-brand">NEXUS TV</span>
-          <span className="ent-kicker-sep" />
-          <span>{mt === "tv" ? "Series" : "Film"}</span>
+        {/* N-tag + type */}
+        <div className="ent-hero-brandline">
+          <span className="ent-hero-ntag">N</span>
+          <span className="ent-hero-typetag">{mt === "tv" ? "SERIES" : "FILM"}</span>
         </div>
 
         <h1 className="ent-hero-title">{cur.title}</h1>
 
+        {/* Meta row: match, year, maturity, rating */}
         <div className="ent-hero-meta">
-          {cur.rating > 0 && (
-            <span className="ent-hm"><Icon.Star size={11} filled /> {formatRating(cur.rating)}</span>
-          )}
+          <span className="ent-hero-match">{match}% Match</span>
           {cur.year && <span className="ent-hm">{cur.year}</span>}
-          {genres.slice(0, 2).map(g => <span className="ent-hm badge" key={g}>{g}</span>)}
+          <span className="ent-hero-maturity">{maturity(mt, cur.rating)}</span>
+          <span className="ent-hm">HD</span>
+          {cur.rating > 0 && (
+            <span className="ent-hm score"><Icon.Star size={11} filled /> {cur.rating.toFixed(1)}</span>
+          )}
         </div>
 
         <p className="ent-hero-desc">{cur.overview}</p>
 
         <div className="ent-hero-cta">
-          <button className="ent-cta primary" onClick={() => onWatch(mt, cur.id, cur.title, cur.backdropPath, cur.posterPath)}>
-            <Icon.Play size={16} /> Watch Now
+          <button className="ent-hero-play" onClick={() => onWatch(mt, cur.id, cur.title, cur.backdropPath, cur.posterPath)}>
+            <Icon.Play size={18} /> Play
           </button>
-          <button className="ent-cta ghost" onClick={() => setTrailerFor({ mt, id: cur.id, title: cur.title })}>
-            <Icon.Film size={15} /> Watch Trailer
-          </button>
-          <button className="ent-cta ghost" onClick={() => onOpen(mt, cur.id)}>
-            <Icon.Info size={15} /> More Info
+          <button className="ent-hero-info" onClick={() => onOpen(mt, cur.id)}>
+            <Icon.Info size={17} /> More Info
           </button>
           <button
-            className={listed ? "ent-cta ghost listed" : "ent-cta ghost"}
+            className={listed ? "ent-hero-iconbtn on" : "ent-hero-iconbtn"}
             onClick={() => onToggleList(cur)}
             title={listed ? "Remove from My List" : "Add to My List"}
+            aria-label={listed ? "Remove from My List" : "Add to My List"}
           >
-            <Icon.Bookmark size={15} filled={listed} /> {listed ? "In My List" : "My List"}
+            <Icon.Bookmark size={17} filled={listed} />
+          </button>
+          <button
+            className="ent-hero-iconbtn"
+            onClick={() => setTrailerFor({ mt, id: cur.id, title: cur.title })}
+            title="Watch Trailer"
+            aria-label="Watch Trailer"
+          >
+            <Icon.Film size={17} />
           </button>
         </div>
       </div>
 
-      {/* Pagination dots (image 2) */}
+      {/* Maturity strip (Netflix right-edge bar) */}
+      <div className="ent-hero-strip">
+        <span>{maturity(mt, cur.rating)}</span>
+      </div>
+
+      {/* Pagination dots */}
       {heroes.length > 1 && (
         <div className="ent-hero-dots">
           {heroes.map((h, i) => (
@@ -127,7 +140,7 @@ export function EntHero({ items, loading, onOpen, onWatch, inList, onToggleList 
         </div>
       )}
 
-      {/* Manual prev/next arrows (v6.2.0) */}
+      {/* Manual prev/next arrows */}
       {heroes.length > 1 && (
         <>
           <button
@@ -144,7 +157,6 @@ export function EntHero({ items, loading, onOpen, onWatch, inList, onToggleList 
           >
             <Icon.Chevron size={22} />
           </button>
-          {/* Up-next preview chip */}
           <div className="ent-hero-next" aria-hidden="true">
             <span className="ent-hero-next-label">Up Next</span>
             <span className="ent-hero-next-title">{heroes[(idx + 1) % heroes.length].title}</span>
@@ -152,7 +164,6 @@ export function EntHero({ items, loading, onOpen, onWatch, inList, onToggleList 
         </>
       )}
 
-      {/* Watch Trailer modal (v6.6.0) */}
       <EntTrailerModal
         open={trailerFor !== null}
         mediaType={trailerFor?.mt ?? "movie"}

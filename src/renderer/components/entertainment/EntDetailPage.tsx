@@ -30,6 +30,7 @@ import {
   isEpisodeWatched, setEpisodeWatched, countSeasonWatched,
 } from "../../lib/ent-userdata";
 import { imgSize } from "../../lib/ent-prefs";
+import { getDownloadSettings, downloadOfflinePackage, removeDownload, isDownloaded, smartDownloadCleanup } from "../../lib/ent-downloads";
 
 interface DetailProps {
   mediaType: TmdbMediaType;
@@ -63,6 +64,8 @@ export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, in
   // v8.0.0 — watched + hidden title state + per-episode watched refresh tick.
   const [watchedTick, setWatchedTick] = useState(0);
   const [hiddenTick, setHiddenTick] = useState(0);
+  // v9.0.0 — downloads.
+  const [dlTick, setDlTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -133,6 +136,30 @@ export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, in
   const listed = inList(mediaType, id);
   const resume = getContinueFor(mediaType, id);
   const ratingPct = detail ? Math.round(detail.rating * 10) : 0;
+  // v9.0.0 — download state for this title (or the resumed episode).
+  const _dt = dlTick; void _dt;
+  const dlSeason = isTv ? resume?.season : undefined;
+  const dlEpisode = isTv ? resume?.episode : undefined;
+  const downloaded = isDownloaded(mediaType, id, dlSeason, dlEpisode);
+  const doDownload = async () => {
+    if (!getDownloadSettings().location) {
+      pushToast("Choose a download location in Account first", "error", <Icon.Folder size={13} />);
+      return;
+    }
+    const entry = await downloadOfflinePackage({
+      mediaType, id, title,
+      posterPath: detail?.posterPath ?? null,
+      backdropPath: detail?.backdropPath ?? null,
+      overview: detail?.overview ?? "",
+      year: detail?.year ?? "",
+      rating: detail?.rating ?? 0,
+      season: dlSeason,
+      episode: dlEpisode,
+    });
+    if (entry) pushToast(`Downloaded “${title}” — see Account`, "success", <Icon.Download size={14} />);
+    else pushToast("Download failed — check the location in Account", "error", <Icon.Close size={13} />);
+    setDlTick(t => t + 1);
+  };
 
   const watchPayload = (season?: number, episode?: number): WatchPayload => ({
     mediaType, id, title,
@@ -320,6 +347,17 @@ export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, in
           >
             <Icon.EyeOff size={15} /> {titleHidden ? "Hidden" : "Hide"}
           </button>
+          {/* v9.0.0 — Download (offline package) */}
+          <button
+            className={downloaded ? "ent-cta ghost lg on" : "ent-cta ghost lg"}
+            onClick={() => {
+              if (downloaded) { removeDownload(mediaType, id, dlSeason, dlEpisode); setDlTick(t => t + 1); pushToast("Download removed", "info", <Icon.Trash size={13} />); }
+              else void doDownload();
+            }}
+            title={downloaded ? "Remove offline package" : "Save offline package to your download folder"}
+          >
+            {downloaded ? <Icon.CheckCircle size={15} /> : <Icon.Download size={15} />} {downloaded ? "Downloaded" : "Download"}
+          </button>
           {/* Resume progress bar */}
           {resume && (
             <div className="ent-dp-actionbar-resume">
@@ -447,6 +485,7 @@ export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, in
                                       className={epW ? "ent-dp-ep-watch on" : "ent-dp-ep-watch"}
                                       onClick={() => {
                                         setEpisodeWatched(mediaType, id, selSeason, ep.episodeNumber, !epW);
+                                        if (!epW) smartDownloadCleanup(mediaType, id, selSeason, ep.episodeNumber);
                                         setWatchedTick(t => t + 1);
                                       }}
                                       title={epW ? "Mark as not watched" : "Mark as watched"}

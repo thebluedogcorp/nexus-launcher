@@ -597,6 +597,58 @@ export function registerIpc(): void {
     const { tmdbSearchPeople } = await import("./tmdb");
     return await tmdbSearchPeople(query);
   }));
+  // v9.0.0 — anime tab.
+  ipcMain.handle("tmdb:animeTv", (_e, page?: number) => tmdbWrap(async () => {
+    const { tmdbAnimeTv } = await import("./tmdb");
+    return await tmdbAnimeTv(page ?? 1);
+  }));
+  ipcMain.handle("tmdb:animeTopRated", () => tmdbWrap(async () => {
+    const { tmdbAnimeTopRated } = await import("./tmdb");
+    return await tmdbAnimeTopRated();
+  }));
+  ipcMain.handle("tmdb:animeMovies", (_e, page?: number) => tmdbWrap(async () => {
+    const { tmdbAnimeMovies } = await import("./tmdb");
+    return await tmdbAnimeMovies(page ?? 1);
+  }));
+
+  // ===== v9.0.0 — Downloads (offline packages; real file I/O) =====
+  // Offline packages are small JSON files (title info + artwork link + your
+  // progress/rating) written to the user-chosen folder. CineSrc streams are
+  // embeds without direct video URLs, so packages are metadata-only by design.
+  const dlWrap = async <T,>(fn: () => Promise<T>): Promise<T | { error: string }> => {
+    try { return await fn(); }
+    catch (e) { return { error: e instanceof Error ? e.message : String(e) }; }
+  };
+  ipcMain.handle("downloads:savePackage", (_e, location: string, payload: unknown) => dlWrap(async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const p = payload as { fileName: string; data: unknown };
+    const dir = path.join(location, "NEXUS TV Downloads");
+    await fs.promises.mkdir(dir, { recursive: true });
+    const safe = p.fileName.replace(/[<>:"/\\|?*]+/g, "_").slice(0, 120);
+    const file = path.join(dir, `${safe}.nexus.json`);
+    await fs.promises.writeFile(file, JSON.stringify(p.data, null, 2), "utf-8");
+    return { ok: true, path: file };
+  }));
+  ipcMain.handle("downloads:removePackage", (_e, filePath: string) => dlWrap(async () => {
+    const fs = await import("fs");
+    await fs.promises.rm(filePath, { force: true });
+    return { ok: true };
+  }));
+  ipcMain.handle("downloads:listPackages", (_e, location: string) => dlWrap(async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const dir = path.join(location, "NEXUS TV Downloads");
+    try {
+      await fs.promises.access(dir);
+    } catch {
+      return { ok: true, files: [] as string[] };
+    }
+    const files = (await fs.promises.readdir(dir))
+      .filter(f => f.endsWith(".nexus.json"))
+      .map(f => path.join(dir, f));
+    return { ok: true, files };
+  }));
 
   // ===== Achievements =====
   ipcMain.handle("achievements:list", () => getAchievements());

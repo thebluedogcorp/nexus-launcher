@@ -549,3 +549,39 @@ export async function tmdbSearchPeople(query: string): Promise<TmdbPerson[]> {
         })),
     }));
 }
+
+// ─── v9.0.0 — Anime (dedicated tab; TMDB keyword 210024 = "anime") ──────────
+
+/** Popular anime series (TMDB keyword "anime" on TV, sorted by popularity). */
+export async function tmdbAnimeTv(page = 1): Promise<TmdbItem[]> {
+  const d = await tmdb<TmdbMultiPage>("/discover/tv", {
+    with_keywords: "210024",
+    sort_by: "popularity.desc",
+    "vote_count.gte": "20",
+    page: String(page),
+  });
+  return d.results.map(m => normalizeMulti({ ...m, media_type: "tv" }));
+}
+
+/** Top-rated anime series. */
+export async function tmdbAnimeTopRated(): Promise<TmdbItem[]> {
+  const d = await tmdb<TmdbMultiPage>("/discover/tv", {
+    with_keywords: "210024",
+    sort_by: "vote_average.desc",
+    "vote_count.gte": "200",
+    page: "1",
+  });
+  return d.results.map(m => normalizeMulti({ ...m, media_type: "tv" }));
+}
+
+/** Anime movies (Japanese animation: genre 16 + original language ja). */
+export async function tmdbAnimeMovies(page = 1): Promise<TmdbItem[]> {
+  const d = await tmdb<TmdbMultiPage>("/discover/movie", {
+    with_genres: "16",
+    with_original_language: "ja",
+    sort_by: "popularity.desc",
+    "vote_count.gte": "50",
+    page: String(page),
+  });
+  return d.results.map(m => normalizeMulti({ ...m, media_type: "movie" }));
+}

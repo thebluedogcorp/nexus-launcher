@@ -194,6 +194,17 @@ const api = {
   tmdbUpcoming: (page?: number) => ipcRenderer.invoke("tmdb:upcoming", page) as Promise<unknown>,
   tmdbDiscover: (filters: unknown, page?: number) => ipcRenderer.invoke("tmdb:discover", filters, page) as Promise<unknown>,
   tmdbSearchPeople: (query: string) => ipcRenderer.invoke("tmdb:searchPeople", query) as Promise<unknown>,
+  // v9.0.0 — anime tab.
+  tmdbAnimeTv: (page?: number) => ipcRenderer.invoke("tmdb:animeTv", page) as Promise<unknown>,
+  tmdbAnimeTopRated: () => ipcRenderer.invoke("tmdb:animeTopRated") as Promise<unknown>,
+  tmdbAnimeMovies: (page?: number) => ipcRenderer.invoke("tmdb:animeMovies", page) as Promise<unknown>,
+  // v9.0.0 — downloads (offline packages; real file I/O in main).
+  downloadsSavePackage: (location: string, payload: { fileName: string; data: unknown }) =>
+    ipcRenderer.invoke("downloads:savePackage", location, payload) as Promise<{ ok: boolean; path?: string; error?: string }>,
+  downloadsRemovePackage: (filePath: string) =>
+    ipcRenderer.invoke("downloads:removePackage", filePath) as Promise<{ ok: boolean; error?: string }>,
+  downloadsListPackages: (location: string) =>
+    ipcRenderer.invoke("downloads:listPackages", location) as Promise<{ ok: boolean; files: string[]; error?: string }>,
   tmdbOpenExternal: (url: string) => ipcRenderer.invoke("shell:openExternal", url) as Promise<{ ok: boolean; message?: string }>,
   // Achievements
   getAchievements: () => ipcRenderer.invoke("achievements:list") as Promise<Array<{ id: string; name: string; description: string; icon: string; unlockedAt: string | null; progress: number; maxProgress: number }>>,

@@ -13,6 +13,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "9.0.0",
+    date: "2026-11-04",
+    title: "OTT Premium Redesign — billboard hero, Anime + New & Popular hubs, Account with Downloads",
+    kind: "major",
+    items: [
+      "New: Netflix-style billboard hero — N SERIES/FILM tag, green match %, maturity badge + right-edge rating strip, white Play + More Info CTAs, Ken Burns crossfade",
+      "New: Anime hub (press a) — Popular Anime Series, All-Time Anime Greats, Anime Movies (Japanese animation via TMDB)",
+      "New: New & Popular hub (press p) — Trending Now, New Releases, Top 10 Movies + Series, Worth the Wait",
+      "New: Account & Downloads (press u) — editable profile with avatar and member-since, 8 stat cards, full downloads manager",
+      "New: Downloads — adjustable download location (native folder picker), Auto Download (packages next episode when one finishes), Smart Download (removes watched episodes' packages), quality preference (Standard/High/Max), storage usage, and a downloads list with remove controls",
+      "New: Download buttons on detail pages and in the player — save offline packages (title info, artwork, your rating/review/progress) to your chosen folder",
+      "New: Grouped sidebar with separators — Browse / Hubs / Library / Account sections",
+      "New: Home expanded to 12 rails — added Top 10 Series, Anime Spotlight, Coming Soon, Action & Adventure, Comedies (staggered loading keeps first paint instant)",
+      "Polish: editorial rail titles, refined card and chip styling, responsive hero typography",
+    ],
+  },
+  {
     version: "8.0.0",
     date: "2026-11-04",
     title: "OTT Completeness Update — episodes, enhanced search, notifications, watched tracking",

@@ -15,6 +15,9 @@ import { EntDetailPage } from "./EntDetailPage";
 import { EntStatsView } from "./EntStatsView";
 import { EntCollectionsView } from "./EntCollectionsView";
 import { EntDiscoverView } from "./EntDiscoverView";
+import { EntAnimeView } from "./EntAnimeView";
+import { EntNewPopularView } from "./EntNewPopularView";
+import { EntAccountView } from "./EntAccountView";
 import { EntPlayer, type WatchPayload } from "./EntPlayer";
 import { EntCommandPalette, type CmdAction } from "./EntCommandPalette";
 import { EntShortcuts } from "./EntShortcuts";
@@ -27,7 +30,7 @@ import { recordWatchDay, unreadNotificationCount } from "../../lib/ent-userdata"
 import { getLatestVersion } from "../../lib/ent-changelog";
 import type { TmdbItem, TmdbMediaType } from "../../lib/tmdb-types";
 
-type EntView = "home" | "movies" | "tv" | "mylist" | "search" | "detail" | "stats" | "collections" | "discover";
+type EntView = "home" | "movies" | "tv" | "anime" | "new" | "mylist" | "search" | "detail" | "stats" | "collections" | "discover" | "account";
 
 interface ShellProps {
   onBackToSplash: () => void;
@@ -132,9 +135,12 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
     { id: "discover", label: "Discover — Daily Pick + Moods", icon: <Icon.Sparkles size={15} />, group: "Navigate", run: () => go("discover") },
     { id: "movies", label: "Browse Movies", icon: <Icon.Film size={15} />, group: "Navigate", run: () => go("movies") },
     { id: "tv", label: "Browse TV Shows", icon: <Icon.Tv size={15} />, group: "Navigate", run: () => go("tv") },
+    { id: "anime", label: "Anime Hub", hint: "a", icon: <Icon.Sparkles size={15} />, group: "Navigate", run: () => go("anime") },
+    { id: "new", label: "New & Popular", hint: "p", icon: <Icon.TrendingUp size={15} />, group: "Navigate", run: () => go("new") },
     { id: "mylist", label: "Open My List", icon: <Icon.Bookmark size={15} />, group: "Navigate", run: () => go("mylist") },
     { id: "collections", label: "My Collections", icon: <Icon.Library size={15} />, group: "Navigate", run: () => go("collections") },
     { id: "stats", label: "Statistics Dashboard", icon: <Icon.TrendingUp size={15} />, group: "Navigate", run: () => go("stats") },
+    { id: "account", label: "Account & Downloads", hint: "u", icon: <Icon.Users size={15} />, group: "Navigate", run: () => go("account") },
     { id: "search", label: "Search", hint: "/", icon: <Icon.Search size={15} />, group: "Navigate", run: () => { setView("search"); setSearchSignal(s => s + 1); } },
     { id: "games", label: "Switch to Games mode", hint: "g", icon: <Icon.Gamepad size={15} />, group: "Mode", run: onSwitchToGames },
     { id: "splash", label: "Mode selector", icon: <Icon.Grid size={15} />, group: "Mode", run: onBackToSplash },
@@ -201,6 +207,18 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
         // v8.0.0 — Notifications center.
         e.preventDefault();
         setNotifOpen(o => !o);
+      } else if ((e.key === "a" || e.key === "A") && !typing) {
+        // v9.0.0 — Anime hub.
+        e.preventDefault();
+        go("anime");
+      } else if ((e.key === "p" || e.key === "P") && !typing) {
+        // v9.0.0 — New & Popular.
+        e.preventDefault();
+        go("new");
+      } else if ((e.key === "u" || e.key === "U") && !typing) {
+        // v9.0.0 — Account & Downloads.
+        e.preventDefault();
+        go("account");
       } else if ((e.key === "s" || e.key === "S") && !typing) {
         // Surprise Me — dispatch a global event EntHome listens for.
         e.preventDefault();
@@ -276,8 +294,12 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
 
         {sideBtn(view === "search", "Search  (press /)", <Icon.Search size={17} />, () => { setView("search"); setSearchSignal(s => s + 1); })}
         {sideBtn(view === "home", "Home", <Icon.Home size={17} />, () => go("home"))}
-        {sideBtn(view === "movies", "Movies", <Icon.Film size={17} />, () => go("movies"))}
         {sideBtn(view === "tv", "TV Shows", <Icon.Tv size={17} />, () => go("tv"))}
+        {sideBtn(view === "movies", "Movies", <Icon.Film size={17} />, () => go("movies"))}
+        <div className="ent-side-sep" />
+        {sideBtn(view === "anime", "Anime  (press a)", <Icon.Sparkles size={17} />, () => go("anime"))}
+        {sideBtn(view === "new", "New & Popular  (press p)", <Icon.TrendingUp size={17} />, () => go("new"))}
+        <div className="ent-side-sep" />
         {/* My List with count badge */}
         <button
           className={view === "mylist" ? "ent-side-btn on" : "ent-side-btn"}
@@ -290,12 +312,15 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
           <span className="ent-side-bar" />
           {listCount > 0 && <span className="ent-side-badge">{listCount}</span>}
         </button>
-        {sideBtn(view === "discover", "Discover", <Icon.Sparkles size={17} />, () => go("discover"))}
+        <div className="ent-side-sep" />
+        {sideBtn(view === "discover", "Discover", <Icon.Wand size={17} />, () => go("discover"))}
         {sideBtn(view === "collections", "Collections", <Icon.Library size={17} />, () => go("collections"))}
         {sideBtn(view === "stats", "Statistics", <Icon.TrendingUp size={17} />, () => go("stats"))}
 
         <div className="ent-side-spacer" />
 
+        {sideBtn(view === "account", "Account & Downloads  (press u)", <Icon.Users size={17} />, () => go("account"))}
+        <div className="ent-side-sep" />
         {sideBtn(false, "Switch to Games mode", <Icon.Gamepad size={17} />, onSwitchToGames)}
         {sideBtn(false, "Mode selector", <Icon.Grid size={17} />, onBackToSplash)}
         {sideBtn(false, "Keyboard shortcuts  (press ?)", <Icon.Keyboard size={17} />, () => setScOpen(true))}
@@ -355,6 +380,15 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
             )}
             {view === "tv" && (
               <EntBrowse mediaType="tv" initialGenre={browseGenre?.mediaType === "tv" ? browseGenre.genreId : null} onOpen={openDetail} inList={inListFn} onWatch={watchFromCard} onToggleList={toggleListFn} onGenreCleared={() => setBrowseGenre(null)} />
+            )}
+            {view === "anime" && (
+              <EntAnimeView onOpen={openDetail} onWatch={watch} inList={inListFn} onToggleList={toggleListFn} />
+            )}
+            {view === "new" && (
+              <EntNewPopularView onOpen={openDetail} onWatch={watch} inList={inListFn} onToggleList={toggleListFn} />
+            )}
+            {view === "account" && (
+              <EntAccountView onOpen={openDetail} onDataChanged={() => setListTick(t => t + 1)} />
             )}
             {view === "mylist" && (
               <EntMyList

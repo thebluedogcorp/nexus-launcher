@@ -50,36 +50,32 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v8.0.0"
-          $title = "NEXUS v8.0.0 — OTT Completeness: episodes, enhanced search, notifications, watched tracking"
-          $notes = @"
-          NEXUS — Universal Game Launcher & Entertainment Hub for Windows.
+          $tag = "v9.0.0"
+          $title = "NEXUS v9.0.0 — OTT Premium Redesign: billboard hero, Anime, New & Popular, Account + Downloads"
+          $notes = @"NEXUS — Universal Game Launcher & Entertainment Hub for Windows.
 
-          **v8.0.0 — The OTT Completeness Update. Brings NEXUS TV to the standard of leading global streaming platforms.**
+          **v9.0.0 — The OTT Premium Redesign. A world-class streaming-platform look and major new sections, inspired by the best of Netflix, Disney+, Prime Video and Apple TV+.**
 
-          **New: Series Episodes tab.**
-          Every TV detail page now has an Episodes tab with a season selector and a full episode list — each episode shows a still thumbnail, title, overview, runtime, air date, rating, a one-click Play button, and a per-episode watched check. A season progress counter shows how many episodes you've watched. The default tab for TV titles is now Episodes.
+          **New: Netflix-style billboard hero.**
+          A completely redesigned featured hero: bold "N SERIES / N FILM" tag, huge cinematic title, green match percentage, maturity badge, HD tag, white Play + translucent More Info buttons (Netflix pattern), circular My List / Trailer actions, a maturity-rating strip on the right edge, and Ken Burns crossfading artwork with deep gradient blends.
 
-          **New: Enhanced universal search.**
-          A filter panel (toggle with the sliders icon) with media type (All / Movies / TV), genre multi-select, year range (from / to), minimum rating, and sort order (Relevance / Popularity / Rating / Newest / A→Z). Instant suggestions dropdown appears as you type. Search history with clear controls is shown when idle. A People row surfaces cast and crew results with their known-for titles.
+          **New: Anime hub (press a).**
+          A dedicated anime tab — Popular Anime Series, All-Time Anime Greats (numbered top-10 row), and Anime Movies (Japanese animation via TMDB), plus a mood strip of anime vibes.
 
-          **New: In-app Notifications center.**
-          A bell in the sidebar (press b) opens a notifications panel with an unread badge. It auto-seeds new-episode alerts for saved and unfinished TV titles, plus watch-streak milestones. Quiet hours are respected (configurable in Settings).
+          **New: New & Popular hub (press p).**
+          Everything fresh in one place: Trending Now, New Releases, Top 10 Movies and Top 10 Series Today, and Worth the Wait — Coming Soon.
 
-          **New: Mark Watched + Hide from Recommendations.**
-          Every detail page has Mark Watched / Unwatched and Hide / Show buttons. Watched titles get a check overlay; hidden titles are filtered out of recommendations.
+          **New: Account & Downloads (press u).**
+          An Account section with an editable profile (avatar, member-since) and 8 library stat cards — plus a full downloads manager: an adjustable download location (native Windows folder picker), Auto Download (automatically saves the next episode offline when one finishes), Smart Download (deletes watched episodes to free space), Standard/High/Max quality preference, storage usage, and a downloads list with remove controls. Download buttons appear on detail pages and in the player. Offline packages are real files written to your chosen folder (title info, artwork link, your rating/review/progress).
 
-          **New: Autoplay next episode.**
-          The player automatically advances to the next episode when one finishes (estimated from wall-clock progress). Toggle in Settings → Playback.
+          **New: Grouped sidebar + expanded home.**
+          The sidebar is now organized into Browse / Hubs / Library / Account groups. The home screen grew to 12 rails — Top 10 Series, Anime Spotlight, Coming Soon, Action & Adventure and Comedies joined the lineup, with staggered loading so the first paint stays instant.
 
-          **New: Expanded Settings.**
-          Playback section adds autoplay-next, data saver (smaller image sizes), and watched-badges toggles. A new Parental Controls section lets you filter by content rating (Off / PG / PG-13 / R). A new Notifications section controls in-app notifications and quiet-hours window.
-
-          All v7.x functionality preserved: What's New panel, filmic grain, Statistics Dashboard, Collections, Discover, user ratings, reviews, tabbed detail panel, redesigned detail page, keep-alive home, Ken Burns hero, Because You Watched rail, full CineSrc streaming playback, command palette, keyboard shortcuts, Top 10 rail, hover previews, and every prior feature.
+          All v8.x functionality preserved: series Episodes tab, enhanced search with filters and people results, notifications center, watched tracking, autoplay next episode, expanded settings, and every prior feature.
 
           **Downloads:**
-          - NEXUS-Setup-8.0.0.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-8.0.0.exe — single-file portable build.
+          - NEXUS-Setup-9.0.0.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-9.0.0.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@

@@ -344,3 +344,27 @@ export function countSeasonWatched(mediaType: TmdbMediaType, id: number, season:
   for (let e = 1; e <= episodeCount; e++) if (isEpisodeWatched(mediaType, id, season, e)) n++;
   return n;
 }
+
+// ─── v9.0.0 — Profile (display name + member since) ─────────────────────────
+const PROFILE_KEY = "nx-ent-profile";
+
+export interface EntProfile {
+  name: string;
+  memberSince: number;
+}
+
+export function getProfile(): EntProfile {
+  try {
+    const p = JSON.parse(localStorage.getItem(PROFILE_KEY) || "null") as EntProfile | null;
+    if (p?.name) return p;
+  } catch { /* fallthrough */ }
+  // First run — stamp the member-since date.
+  const fresh: EntProfile = { name: "Viewer", memberSince: Date.now() };
+  try { localStorage.setItem(PROFILE_KEY, JSON.stringify(fresh)); } catch { /* non-fatal */ }
+  return fresh;
+}
+
+export function setProfileName(name: string): void {
+  const p = getProfile();
+  try { localStorage.setItem(PROFILE_KEY, JSON.stringify({ ...p, name: name.trim().slice(0, 24) || "Viewer" })); } catch { /* non-fatal */ }
+}

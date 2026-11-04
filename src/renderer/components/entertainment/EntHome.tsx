@@ -37,7 +37,7 @@ export function EntHome({ progressTick, historyTick, onOpen, onWatch, inList, on
       mediaType: item.mediaType ?? "movie",
     } as TmdbItem);
   };
-  // Browse data
+  // Browse data (wave 1 — hero + core rails)
   const [trending, setTrending] = useState<TmdbItem[]>([]);
   const [nowPlaying, setNowPlaying] = useState<TmdbMovie[]>([]);
   const [popular, setPopular] = useState<TmdbMovie[]>([]);
@@ -45,6 +45,14 @@ export function EntHome({ progressTick, historyTick, onOpen, onWatch, inList, on
   const [topRated, setTopRated] = useState<TmdbMovie[]>([]);
   const [topRatedTv, setTopRatedTv] = useState<TmdbItem[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Wave 2 (staggered ~1s after mount to respect rate limits):
+  // anime spotlight, upcoming, and two genre rails. v9.0.0.
+  const [anime, setAnime] = useState<TmdbItem[]>([]);
+  const [upcoming, setUpcoming] = useState<TmdbMovie[]>([]);
+  const [action, setAction] = useState<TmdbMovie[]>([]);
+  const [comedy, setComedy] = useState<TmdbMovie[]>([]);
+  const [wave2, setWave2] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,6 +75,28 @@ export function EntHome({ progressTick, historyTick, onOpen, onWatch, inList, on
       setLoading(false);
     })();
     return () => { cancelled = true; };
+  }, []);
+
+  // Wave 2 fetch — staggered so the first paint stays instant.
+  useEffect(() => {
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const [an, up, ac, co] = await Promise.all([
+          window.nexus.tmdbAnimeTv(1),
+          window.nexus.tmdbUpcoming(1),
+          window.nexus.tmdbByGenre(28, 1),
+          window.nexus.tmdbByGenre(35, 1),
+        ]);
+        if (cancelled) return;
+        setAnime(asItems(an));
+        setUpcoming(asMovies(up));
+        setAction(asMovies(ac));
+        setComedy(asMovies(co));
+        setWave2(true);
+      } catch { /* non-fatal */ }
+    }, 1000);
+    return () => { cancelled = true; clearTimeout(t); };
   }, []);
 
   // Continue Watching entries (re-read whenever the player saves progress).
@@ -273,11 +303,28 @@ export function EntHome({ progressTick, historyTick, onOpen, onWatch, inList, on
           inList={inList}
         />
 
+        {/* Top 10 Series (v9.0.0) */}
+        <Top10Rail
+          title="Top 10 Series Today"
+          items={topRatedTv}
+          forceMediaType="tv"
+          loading={loading}
+          onOpen={onOpen}
+          onWatch={watchFromCard}
+          onToggleList={toggleAny}
+          inList={inList}
+        />
+
         <Rail title="Trending This Week" items={trending} loading={loading} onOpen={onOpen} onWatch={watchFromCard} onToggleList={toggleAny} inList={inList} enableHover />
         <Rail title="Now Playing in Theaters" items={nowPlaying} forceMediaType="movie" loading={loading} onOpen={onOpen} onWatch={watchFromCard} onToggleList={toggleAny} inList={inList} enableHover />
         <Rail title="Popular Movies" items={popular} forceMediaType="movie" loading={loading} onOpen={onOpen} onWatch={watchFromCard} onToggleList={toggleAny} inList={inList} enableHover />
         <Rail title="Popular Series" items={popularTv} forceMediaType="tv" loading={loading} onOpen={onOpen} onWatch={watchFromCard} onToggleList={toggleAny} inList={inList} enableHover />
-        <Rail title="Top Rated Series" items={topRatedTv} forceMediaType="tv" loading={loading} onOpen={onOpen} onWatch={watchFromCard} onToggleList={toggleAny} inList={inList} enableHover />
+
+        {/* Wave 2 rails (v9.0.0 — more content, staggered fetch) */}
+        <Rail title="Anime Spotlight" items={anime} forceMediaType="tv" loading={!wave2} onOpen={onOpen} onWatch={watchFromCard} onToggleList={toggleAny} inList={inList} enableHover />
+        <Rail title="Worth the Wait — Coming Soon" items={upcoming} forceMediaType="movie" loading={!wave2} onOpen={onOpen} onWatch={watchFromCard} onToggleList={toggleAny} inList={inList} enableHover />
+        <Rail title="Action &amp; Adventure" items={action} forceMediaType="movie" loading={!wave2} onOpen={onOpen} onWatch={watchFromCard} onToggleList={toggleAny} inList={inList} enableHover />
+        <Rail title="Comedies to Keep You Laughing" items={comedy} forceMediaType="movie" loading={!wave2} onOpen={onOpen} onWatch={watchFromCard} onToggleList={toggleAny} inList={inList} enableHover />
 
         {/* Brand strip */}
         <div className="ent-brandstrip">
