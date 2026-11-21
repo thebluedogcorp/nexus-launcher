@@ -50,46 +50,46 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v9.5.0"
-          $title = "NEXUS v9.5.0 — Real local media server + libraries + TMDB identification"
+          $tag = "v10.0.0"
+          $title = "NEXUS v10.0.0 — Working media server: MKV/HEVC playback, LAN QR fix, library-edit"
           $notes = @"
           NEXUS — Universal Game Launcher & Media Server for Windows.
 
-          **v9.5.0 — the Media Server mode is now a real personal media platform.**
+          **v10.0.0 — the media server actually works now.** This release fixes every issue reported against v9.5.0 (server showed nothing, phone couldn't connect, QR didn't open, MKV wouldn't play) and was verified end-to-end with REAL .mkv files + a REAL HTTP server + REAL ffmpeg in a Node integration harness (206 Range streaming, fMP4 remux, auth-code enforcement, multi-IP detection, live library patching — all assertion-tested).
 
-          **Real local media server (the headline).**
-          A real Node HTTP server binds to your LAN (0.0.0.0:port) and serves a browseable web UI + a library API + range-streamed playback at /stream/:id (HTTP 206, Content-Range, Accept-Ranges — seeking works). Start/stop/restart/status reflect the actual server process. The QR code encodes the real http://<lan-ip>:<port> URL and only renders when the server is genuinely running. Port-conflict detection. Other devices on your network scan the QR and browse/play your library from a browser.
+          **MKV / HEVC now play in-browser + in-app (the headline).**
+          A new SMART `/play/:id` endpoint auto-selects the playback strategy from FFprobe-probed codecs:
+          • Direct Play — browser-native container + codec (MP4/WebM/MOV with H.264/AAC) → raw 206 Range stream, seekable.
+          • Remux — MKV (or other non-native container) with supported codecs → ffmpeg `-c copy` remuxes to fragmented MP4, piped to the player. Lossless + fast.
+          • Transcode — unsupported codec (HEVC/H.265, VC-1, MPEG-2, FLAC/AC3) → ffmpeg re-encodes to H.264+AAC fMP4.
+          The in-app player uses the same smart `nexus-media://media/<id>/play` protocol, so MKV plays inside NEXUS too — no more "open file path in your system player" dead-end.
 
-          **Multiple media libraries.**
-          Create Movies, TV Shows, Anime, Documentaries, Personal, or Custom libraries. Per-library folders via the native folder picker. Create / rename / delete / rescan.
+          **FFprobe probing at scan time.**
+          Every scanned file is probed (container, video codec, audio codec, resolution, audio channels, subtitle count, duration, bitrate) and persisted. The UI shows codec/resolution badges + the resolved strategy on each item.
 
-          **Real scanning + indexing.**
-          Per-library async scan with live progress. S01E01 / 1x01 filename parsing groups TV episodes under shows with season/episode numbers. Dedup + stale-file reconciliation (moved/renamed/deleted files cleaned up on rescan).
+          **LAN connectivity + QR fixed (the "phone can't reach PC" fix).**
+          • `detectLanIps()` now returns EVERY non-internal IPv4, sorted by reachability (RFC1918 first), so an Ethernet-connected PC's address is surfaced alongside Wi-Fi/virtual ones. The server dashboard shows one QR per candidate URL — scan each until your phone connects.
+          • The QR now encodes `http://<ip>:<port>/?code=<code>` when an auth code is set, so scanned devices don't get 401'd on every API call (this was the "QR doesn't open" bug).
+          • A connection-help panel lists every URL + explicit Windows Defender Firewall guidance for the port.
 
-          **TMDB metadata (server-side key).**
-          Automatic identification: filename → TMDB search → confidence-based match. Manual identify: search → pick the right title → apply. Movie + TV details (overview, poster, backdrop, genres, runtime, rating, cast, seasons/episodes). The TMDB API key stays in the main process — never sent to the renderer or LAN clients.
+          **Server config library selection fixed (the "server shows nothing" fix).**
+          • "New Server" now defaults to exposing ALL libraries (the previous empty default was the #1 real-world cause of a blank server).
+          • Inline library toggles on each server row let you add/remove a library on an existing config without delete + recreate (uses the new `updateServerConfig`).
+          • A clear warning appears when zero libraries are exposed.
 
-          **Playback + resume.**
-          In-app HTML5 player with range streaming + Continue Watching (resume from saved position).
+          **Server lifecycle + health.**
+          New `/api/health` endpoint (port, all LAN IPs, exposed-library count, auth-required flag, version) + `/api/probe/:id` (probe + strategy). Status reflects the real `http.Server.listening` state. Port-conflict → `port-in-use` error string.
 
-          **Onboarding + dashboard + detail pages.**
-          Guided first-run setup (pick folder → name library → scan → identify → server). Dashboard rails: Continue Watching, Recently Added, Movies, TV Shows, per-library. Media detail pages with backdrop, poster, metadata, Play, and Identify. TV: season selector + episode list.
+          **UI polish.**
+          Cinematic card hover (poster zoom + scrim + accent ring), taller detail backdrop with gradient scrim + poster shadow + refined typography, responsive multi-URL server dashboard.
 
-          **Server dashboard.**
-          Create server configs (name, port, exposed libraries, optional auth code). Real status indicator, real URL + QR, library summary, port-conflict feedback.
-
-          **Entertainment settings + theming.**
-          Media Libraries / Media Server / Playback / Appearance / Metadata. Theming wired (presets + live preview + persistence), scoped to entertainment — Gaming stays visually unchanged.
-
-          **Still clean — no piracy.** The server streams ONLY files from your configured libraries, looked up by id from the local DB. No third-party stream hosts. Gaming fully untouched.
-
-          **Deferred (future release):** FFmpeg transcoding (direct play only this release — MKV/AVI that browsers can't play show their file path for a system player), subtitle/audio-track selection, deep per-token theme customizer (presets + apply work now).
+          **Still clean — no piracy.** Only files from your configured libraries, looked up by id from the local DB. Gaming fully untouched.
 
           **Downloads:**
-          - NEXUS-Setup-9.5.0.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-9.5.0.exe — single-file portable build.
+          - NEXUS-Setup-10.0.0.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-10.0.0.exe — single-file portable build.
 
-          Minimum: Windows 10 64-bit.
+          Minimum: Windows 10 64-bit. FFmpeg/FFprobe are bundled with the app.
           "@
 
           # Create or update the release (idempotent). Use globs so the

@@ -264,7 +264,21 @@ export interface MediaItem {
   tvShowId: number | null;         // for episodes — references another media row
   season: number | null;
   episode: number | null;
+  // v10.0.0 — FFprobe-derived technical metadata (nullable; backfilled by the
+  // scanner on first probe, refreshed on re-scan). Used to pick the playback
+  // strategy (Direct Play / remux / transcode) and shown in the item detail UI.
+  videoCodec: string | null;
+  audioCodec: string | null;
+  width: number | null;
+  height: number | null;
+  audioChannels: number | null;
+  subtitleStreams: number | null;
+  bitRate: number | null;
+  probeError: string | null;
 }
+
+/** v10.0.0 — How the server should deliver a media item to a client. */
+export type MediaPlaybackStrategy = "direct" | "remux" | "transcode";
 
 export interface MediaScanSummary {
   scanned: number;
@@ -336,6 +350,15 @@ export interface MediaServerStatus {
   url: string | null;     // http://<lanIp>:<port> — null when not running
   port: number | null;
   lanIp: string | null;
+  // v10.0.0 — ALL LAN candidate URLs (one per non-internal IPv4 the host has).
+  // On a PC with Ethernet + Wi-Fi + virtual adapters, only some of these are
+  // reachable from a given phone. The UI shows each with its own QR so the
+  // user can pick the one their device can route to.
+  urls: string[];
+  lanIps: string[];
+  // v10.0.0 — the auth-code-augmented QR URL (includes ?code= when an auth
+  // code is set) so a scanned phone doesn't get 401'd on every API call.
+  qrUrls: string[];
   startedAt: string | null;
   error: string | null;
 }

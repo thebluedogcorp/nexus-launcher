@@ -58,8 +58,9 @@ import {
   listServerConfigs,
   createServerConfig,
   deleteServerConfig,
+  updateServerConfig,
 } from "./db";
-import { scanMediaLibrary, mediaStreamUrl, scanLibrary } from "./media";
+import { scanMediaLibrary, mediaStreamUrl, mediaPlayUrl, scanLibrary } from "./media";
 import {
   startMediaServer,
   stopMediaServer,
@@ -309,6 +310,10 @@ export function registerIpc(): void {
   // <video> element uses as its src. The protocol handler supports HTTP Range
   // requests so seeking works.
   ipcMain.handle("media:streamUrl", (_e, id: number) => mediaStreamUrl(id));
+  // v10.0.0 — SMART play URL (nexus-media://media/<id>/play) which auto-
+  // selects Direct Play / remux / transcode. The renderer's <video> src should
+  // use this so MKV/HEVC files actually play in the in-app Chromium player.
+  ipcMain.handle("media:playUrl", (_e, id: number) => mediaPlayUrl(id));
 
   // ===== E1 — Libraries + per-library scanning + TMDB identification + progress + servers =====
   // Libraries (CRUD + paths). Categories: movies | tv | anime | documentaries | personal | custom.
@@ -350,6 +355,13 @@ export function registerIpc(): void {
   ipcMain.handle("servers:list", () => listServerConfigs());
   ipcMain.handle("servers:create", (_e, name: string, port: number, libraryIds: number[], authCode?: string | null) =>
     createServerConfig(name, port, libraryIds, authCode ?? null),
+  );
+  // v10.0.0 — patch an existing server config (name/port/libraryIds/authCode).
+  // Lets the user fix a config whose libraryIds didn't include the right
+  // library (the most common cause of "server shows nothing") without delete +
+  // recreate. If running, the caller stops+restarts to pick up the new libs.
+  ipcMain.handle("servers:update", (_e, id: number, patch: { name?: string; port?: number; libraryIds?: number[]; authCode?: string | null }) =>
+    updateServerConfig(id, patch),
   );
   ipcMain.handle("servers:delete", (_e, id: number) => { deleteServerConfig(id); return true; });
   ipcMain.handle("servers:start", async (_e, id: number) => startMediaServer(id));

@@ -22,6 +22,7 @@
 import { protocol, BrowserWindow } from "electron";
 import { promises as fs } from "node:fs";
 import { createReadStream } from "node:fs";
+import { spawn } from "node:child_process";
 import path from "node:path";
 import { Readable } from "node:stream";
 import type { MediaScanSummary, MediaScanProgress } from "@shared/types";
@@ -32,7 +33,15 @@ import {
   getMedia,
   listLibraryPaths,
   findOrCreateTvShow,
+  findMediaByPath,
+  upsertMediaProbe,
 } from "./db";
+import { probeFile, playbackStrategyFor, ffmpegStreamArgs } from "./ffprobe";
+
+// Re-export so the IPC layer + media-server can resolve a playback strategy
+// without importing ffprobe.ts directly (keeps the electron boundary clean).
+export { playbackStrategyFor };
+export type { MediaProbeInfo, PlaybackStrategy } from "./ffprobe";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Extension metadata — ported from the Next.js reference (src/lib/media.ts).
@@ -264,6 +273,11 @@ export async function scanLibrary(libraryId: number): Promise<MediaScanSummary> 
   let added = 0;
   let updated = 0;
   const keepFilePaths: string[] = [];
+  // v10.0.0 — collect upserted ids so we can probe them AFTER the filesystem
+  // loop (probing serially inside the loop would serialize ffprobe across the
+  // whole library; probing in a bounded-concurrency batch after upsert is both
+  // faster and keeps a probe failure from aborting the scan).
+  const toProbe: Array<{ id: number; filePath: string }> = [];
 
   for (const root of roots) {
     const found = await scanDirectory(root);
@@ -309,6 +323,12 @@ export async function scanLibrary(libraryId: number): Promise<MediaScanSummary> 
         if (inserted) added++;
         else updated++;
       }
+      // v10.0.0 — resolve the row id (upsertMediaFile returns boolean, not id)
+      // so the probe batch can backfill codec/resolution metadata after the
+      // filesystem loop. Synthetic TV show rows (no real file) are skipped by
+      // findMediaByPath returning the episode row, which is what we want.
+      const row = findMediaByPath(f.filePath);
+      if (row) toProbe.push({ id: row.id, filePath: f.filePath });
       if (i % 5 === 0 || i === found.length) {
         emitScanProgress({
           libraryId,
@@ -323,8 +343,50 @@ export async function scanLibrary(libraryId: number): Promise<MediaScanSummary> 
   // Reconcile: remove this library's rows whose files no longer exist in the
   // scanned set. SCOPED to this library — other libraries are untouched.
   const removed = removeStaleMediaForLibrary(libraryId, keepFilePaths);
+
+  // v10.0.0 — Probe files in a bounded-concurrency batch (4 at a time) and
+  // persist the results. A probe failure sets probeError on the row but never
+  // throws — playback falls back to a safe default (remux).
+  await probeBatch(toProbe, 4, (p) => {
+    emitScanProgress({ libraryId, discovered: scanned, indexed: scanned, current: p });
+  });
+
   emitScanProgress({ libraryId, discovered: scanned, indexed: scanned, current: null });
   return { scanned, added, updated, removed };
+}
+
+/** Probe a batch of files with bounded concurrency. Each probe is independent;
+ *  a failure is persisted as probeError on that row (the scan continues). */
+async function probeBatch(
+  items: Array<{ id: number; filePath: string }>,
+  concurrency: number,
+  onProgress: (current: string) => void,
+): Promise<void> {
+  if (items.length === 0) return;
+  let cursor = 0;
+  async function worker(): Promise<void> {
+    while (cursor < items.length) {
+      const idx = cursor++;
+      const { id, filePath } = items[idx];
+      try {
+        onProgress(filePath);
+        const probe = await probeFile(filePath);
+        upsertMediaProbe(id, probe);
+      } catch {
+        // probeFile itself catches and returns probeError; this is a belt-and-
+        // suspenders guard so a truly unexpected throw can't abort the scan.
+        upsertMediaProbe(id, {
+          container: null, videoCodec: null, audioCodec: null,
+          width: null, height: null, audioChannels: null,
+          subtitleStreams: 0, durationSec: null, bitRate: null,
+          probeError: "unexpected probe error",
+        });
+      }
+    }
+  }
+  const workers: Promise<void>[] = [];
+  for (let w = 0; w < Math.min(concurrency, items.length); w++) workers.push(worker());
+  await Promise.all(workers);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -348,28 +410,38 @@ export async function scanLibrary(libraryId: number): Promise<MediaScanSummary> 
 
 export const MEDIA_SCHEME = "nexus-media";
 
-/** Renderer-facing helper — the stable URL the in-app player uses as `src`. */
+/** Renderer-facing helper — the stable URL the in-app player uses as `src`.
+ *  Uses `/play` (the SMART endpoint) so MKV/HEVC files actually play in the
+ *  Chromium <video> element via ffmpeg remux/transcode, instead of the raw
+ *  `/stream` path that only works for browser-native containers. */
+export function mediaPlayUrl(id: number): string {
+  return `${MEDIA_SCHEME}://media/${id}/play`;
+}
+
+/** Legacy raw-stream URL (kept for callers that want the un-remuxed bytes —
+ *  e.g. a browser-native MP4 where Direct Play with Range seek is preferred). */
 export function mediaStreamUrl(id: number): string {
   return `${MEDIA_SCHEME}://media/${id}/stream`;
 }
 
-/** Parse `nexus-media://media/<id>/stream` → id, or null if malformed. */
-function parseMediaId(url: string): number | null {
-  // The URL is standard/privileged, so it parses like a normal URL.
-  // `url` is the full `nexus-media://media/<id>/stream` string.
+/** Parse `nexus-media://media/<id>/<action>` where action is `stream` or `play`.
+ *  Returns null if malformed. */
+function parseMediaRequest(url: string): { id: number; action: "stream" | "play"; startSec: number | null } | null {
   let parsed: URL;
   try {
     parsed = new URL(url);
   } catch {
     return null;
   }
-  // pathname for `nexus-media://media/12/stream` is `/media/12/stream`.
   const parts = parsed.pathname.split("/").filter(Boolean);
-  // Expected: ["media", "<id>", "stream"]
+  // Expected: ["media", "<id>", "stream" | "play"]
   if (parts.length < 2 || parts[0] !== "media") return null;
   const idNum = Number(parts[1]);
   if (!Number.isFinite(idNum) || idNum <= 0) return null;
-  return idNum;
+  const action: "stream" | "play" = parts[2] === "play" ? "play" : "stream";
+  const startQ = parsed.searchParams.get("start");
+  const startSec = startQ != null && Number.isFinite(Number(startQ)) ? Math.max(0, Number(startQ)) : null;
+  return { id: idNum, action, startSec };
 }
 
 /**
@@ -416,16 +488,31 @@ function nodeStreamToWebResponse(start: number, end: number, filePath: string): 
   return Readable.toWeb(nodeStream) as unknown as ReadableStream<Uint8Array>;
 }
 
-/** Register the `nexus-media://` protocol handler. MUST be called after app ready. */
+/** Register the `nexus-media://` protocol handler. MUST be called after app ready.
+ *
+ *  v10.0.0 — handles TWO action paths:
+ *    • `/media/<id>/stream` — raw file bytes with 206 Range (Direct Play for
+ *      browser-native containers: MP4/WebM with H.264/AAC). Seekable.
+ *    • `/media/<id>/play`   — SMART endpoint. If the item is Direct-Playable
+ *      (probed codecs browser-supported), delegates to the raw streamer.
+ *      Otherwise spawns ffmpeg to remux (copy codecs → fMP4) or transcode
+ *      (H.264+AAC re-encode → fMP4) and pipes stdout into the Response body.
+ *      `?start=<seconds>` seeks the input so the player can restart at an
+ *      offset when the user seeks. This makes MKV/HEVC actually play in-app. */
 export function registerMediaProtocol(): void {
   protocol.handle(MEDIA_SCHEME, async (req) => {
-    const id = parseMediaId(req.url);
-    if (id === null) {
+    const parsed = parseMediaRequest(req.url);
+    if (!parsed) {
       return new Response("Bad media URL", { status: 400 });
     }
+    const { id, action, startSec } = parsed;
     const item = getMedia(id);
     if (!item) {
       return new Response("Media item not found", { status: 404 });
+    }
+    // Synthetic TV show rows aren't streamable.
+    if (item.container === "tv" && item.fileSize === 0 && !item.dir) {
+      return new Response("Not a file (TV show grouping row)", { status: 404 });
     }
     let size: number;
     try {
@@ -439,8 +526,39 @@ export function registerMediaProtocol(): void {
     }
 
     const { mime } = extInfo(item.fileExt);
-    // req is a Fetch API Request; req.headers is a Headers instance. The
-    // Range header is what the HTML5 <video> element sends when seeking.
+
+    // SMART endpoint: decide whether to delegate to raw stream (Direct Play)
+    // or pipe through ffmpeg (remux/transcode).
+    if (action === "play") {
+      const strategy = playbackStrategyFor({
+        container: item.container,
+        videoCodec: item.videoCodec,
+        audioCodec: item.audioCodec,
+      });
+      if (strategy === "direct") {
+        // Fall through to the raw Range-capable streamer below.
+      } else {
+        // Spawn ffmpeg → fragmented MP4 piped into a web ReadableStream.
+        const args = ffmpegStreamArgs(item.filePath, strategy, startSec);
+        const ff = spawn("ffmpeg", args, { stdio: ["ignore", "pipe", "ignore"] });
+        const webStream = Readable.toWeb(ff.stdout) as unknown as ReadableStream<Uint8Array>;
+        // If the renderer aborts the fetch (seek restart, tab close), kill
+        // ffmpeg so we don't leak a transcode process.
+        req.signal?.addEventListener("abort", () => {
+          try { ff.kill("SIGKILL"); } catch { /* already dead */ }
+        });
+        return new Response(webStream, {
+          status: 200,
+          headers: {
+            "Content-Type": "video/mp4",
+            "Cache-Control": "no-store",
+            "X-NEXUS-Strategy": strategy,
+          },
+        });
+      }
+    }
+
+    // Raw stream (Direct Play) — 206 Range for seek, 200 for full file.
     const rangeHeader = req.headers?.get("range") ?? null;
     const range = parseRange(rangeHeader, size);
 
@@ -448,8 +566,6 @@ export function registerMediaProtocol(): void {
       const { start, end } = range;
       const contentLength = end - start + 1;
       const body = nodeStreamToWebResponse(start, end, item.filePath);
-      // 206 Partial Content — the chromium media stack uses this + the
-      // Content-Range header to satisfy seek requests.
       return new Response(body, {
         status: 206,
         headers: {

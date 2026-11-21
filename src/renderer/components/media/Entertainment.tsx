@@ -55,6 +55,7 @@ import {
   listServerConfigs,
   createServerConfig,
   deleteServerConfig,
+  updateServerConfig,
   startMediaServer,
   stopMediaServer,
   getMediaServerStatus,
@@ -884,9 +885,22 @@ function ServerDashboard({ libraries }: { libraries: MediaLibrary[] }) {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [refresh]);
 
+  // v10.0.0 — "New Server" defaults to exposing ALL libraries. The previous
+  // behavior (empty selection) was the #1 real-world cause of "server shows
+  // nothing": the user created a config, didn't tick the library, and the API
+  // returned []. Now the safe default is "expose everything I have".
+  const openCreate = useCallback(() => {
+    setSelectedLibs(new Set(libraries.map((l) => l.id)));
+    setCreating(true);
+    setError(null);
+  }, [libraries]);
+
   const handleCreate = useCallback(async () => {
     setError(null);
-    if (selectedLibs.size === 0) { setError("Pick at least one library to expose."); return; }
+    if (libraries.length > 0 && selectedLibs.size === 0) {
+      setError("Pick at least one library to expose (or leave all selected for a quick start).");
+      return;
+    }
     try {
       await createServerConfig(name.trim() || "Media Server", port, Array.from(selectedLibs), authCode.trim() || null);
       setName("Home Server"); setPort(8181); setSelectedLibs(new Set()); setAuthCode(""); setCreating(false);
@@ -894,7 +908,7 @@ function ServerDashboard({ libraries }: { libraries: MediaLibrary[] }) {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
-  }, [name, port, selectedLibs, authCode, refresh]);
+  }, [name, port, selectedLibs, authCode, refresh, libraries.length]);
 
   const handleStart = useCallback(async (id: number) => {
     setBusy(id); setError(null);
@@ -913,11 +927,28 @@ function ServerDashboard({ libraries }: { libraries: MediaLibrary[] }) {
     } finally { setBusy(null); }
   }, [refresh]);
 
+  // v10.0.0 — toggle a library on/off for an EXISTING config without delete +
+  // recreate. Fixes the "I created the server before adding the library" case.
+  const handleToggleLibOnConfig = useCallback(async (cfg: MediaServerConfig, libId: number) => {
+    const next = new Set(cfg.libraryIds);
+    if (next.has(libId)) next.delete(libId); else next.add(libId);
+    const wasRunning = statuses.get(cfg.id)?.running ?? false;
+    setBusy(cfg.id);
+    try {
+      if (wasRunning) await stopMediaServer(cfg.id);
+      await updateServerConfig(cfg.id, { libraryIds: Array.from(next) });
+      if (wasRunning) await startMediaServer(cfg.id);
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally { setBusy(null); }
+  }, [statuses, refresh]);
+
   return (
     <div className="nx-ent-servers">
       <div className="nx-ent-toolbar">
         <h2>Media Servers</h2>
-        <button className="nx-media-btn primary" onClick={() => setCreating(!creating)}>
+        <button className="nx-media-btn primary" onClick={openCreate}>
           <Icon.Plus size={14} /><span>New Server</span>
         </button>
       </div>
@@ -931,7 +962,10 @@ function ServerDashboard({ libraries }: { libraries: MediaLibrary[] }) {
           <input type="number" min={1024} max={65535} value={port} onChange={(e) => setPort(Number(e.target.value))} />
           <label>Access code (optional)</label>
           <input value={authCode} onChange={(e) => setAuthCode(e.target.value)} placeholder="Leave blank for no auth" />
-          <label>Libraries to expose</label>
+          {authCode.trim() && (
+            <p className="nx-ent-hint">The QR will include <code>?code={authCode.trim()}</code> so scanned devices don&apos;t get blocked.</p>
+          )}
+          <label>Libraries to expose <small>(all selected by default)</small></label>
           <div className="nx-ent-lib-checks">
             {libraries.length === 0 && <p>No libraries yet — create one first.</p>}
             {libraries.map((l) => (
@@ -947,7 +981,7 @@ function ServerDashboard({ libraries }: { libraries: MediaLibrary[] }) {
                     });
                   }}
                 />
-                <span>{l.name} <small>({CATEGORY_LABELS[l.category]})</small></span>
+                <span>{l.name} <small>({CATEGORY_LABELS[l.category]}) · {l.itemCount} items</small></span>
               </label>
             ))}
           </div>
@@ -962,20 +996,21 @@ function ServerDashboard({ libraries }: { libraries: MediaLibrary[] }) {
           <div className="ent-empty"><Icon.Share size={32} /><p>No server configs yet.</p><span>Create one to start streaming to your LAN.</span></div>
         )}
         {configs.map((c) => {
-          const st = statuses.get(c.id) ?? { running: false, url: null, port: null, lanIp: null, startedAt: null, error: null };
+          const st = statuses.get(c.id) ?? { running: false, url: null, port: null, lanIp: null, urls: [], lanIps: [], qrUrls: [], startedAt: null, error: null };
           return (
             <ServerRow
               key={c.id}
               config={c}
               status={st}
               busy={busy === c.id}
+              libraries={libraries}
               onStart={() => void handleStart(c.id)}
               onStop={() => void handleStop(c.id)}
               onDelete={async () => {
                 if (!confirm(`Delete server "${c.name}"?`)) return;
                 await deleteServerConfig(c.id); await refresh();
               }}
-              libraries={libraries}
+              onToggleLib={(libId) => void handleToggleLibOnConfig(c, libId)}
             />
           );
         })}
@@ -992,6 +1027,7 @@ function ServerRow({
   onStop,
   onDelete,
   libraries,
+  onToggleLib,
 }: {
   config: MediaServerConfig;
   status: MediaServerStatus;
@@ -1000,11 +1036,14 @@ function ServerRow({
   onStop: () => void;
   onDelete: () => void;
   libraries: MediaLibrary[];
+  onToggleLib: (libId: number) => void;
 }) {
-  const exposedNames = config.libraryIds
-    .map((id) => libraries.find((l) => l.id === id)?.name ?? `#${id}`)
-    .join(", ");
-  const url = status.url ?? `http://<lan-ip>:${config.port}`;
+  const exposedIds = new Set(config.libraryIds);
+  // v10.0.0 — show ALL candidate URLs (one per LAN IP). On a PC with Ethernet
+  // + Wi-Fi + virtual adapters, only some are reachable from a given phone;
+  // surfacing every one lets the user pick the working address.
+  const urls = status.running && status.urls.length ? status.urls : (status.url ? [status.url] : [`http://<lan-ip>:${config.port}`]);
+  const qrUrls = status.running && status.qrUrls.length ? status.qrUrls : urls;
   return (
     <div className={`nx-ent-server-row${status.running ? " running" : ""}`}>
       <div className="nx-ent-server-head">
@@ -1024,39 +1063,69 @@ function ServerRow({
         </div>
       </div>
       <div className="nx-ent-server-body">
-        <div className="nx-ent-server-url-col">
-          {/* REAL URL — only render the QR when the server is actually running. */}
-          {status.running ? (
-            <div className="nx-ent-server-qr">
-              <QRCodeSVG value={url} size={140} level="M" />
-              <p className="nx-ent-server-qr-cap">Scan to open on a LAN device</p>
+        {/* v10.0.0 — one QR per candidate URL. Previously only the first IP was
+            shown, which on an Ethernet+Wi-Fi PC was often the wrong adapter. */}
+        <div className="nx-ent-server-urls-grid">
+          {urls.map((u, i) => (
+            <div key={u} className="nx-ent-server-url-card">
+              {status.running ? (
+                <div className="nx-ent-server-qr">
+                  <QRCodeSVG value={qrUrls[i] ?? u} size={128} level="M" />
+                  <p className="nx-ent-server-qr-cap">{status.lanIps[i] ?? "LAN"} · scan to open</p>
+                </div>
+              ) : (
+                <div className="nx-ent-server-qr nx-ent-server-qr-off">
+                  <Icon.Lock size={30} />
+                  <p>Stopped</p>
+                </div>
+              )}
+              <div className="nx-ent-server-url-info">
+                <code className="nx-ent-server-url">{qrUrls[i] ?? u}</code>
+                <div className="nx-ent-server-url-actions">
+                  <button className="nx-media-btn sm" onClick={() => { try { navigator.clipboard.writeText(qrUrls[i] ?? u); } catch { /* ignore */ } }}>
+                    <Icon.Tag size={11} /><span>Copy</span>
+                  </button>
+                  {status.running && (
+                    <button className="nx-media-btn sm" onClick={() => void window.nexus.openExternal(qrUrls[i] ?? u)}>
+                      <Icon.ExternalLink size={11} /><span>Open</span>
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
-          ) : (
-            <div className="nx-ent-server-qr nx-ent-server-qr-off">
-              <Icon.Lock size={36} />
-              <p>Server stopped</p>
-              <p className="nx-ent-server-qr-cap">Start it to generate the QR.</p>
-            </div>
-          )}
-          <div className="nx-ent-server-url-info">
-            <label>URL</label>
-            <code className="nx-ent-server-url">{url}</code>
-            <button className="nx-media-btn" onClick={() => { try { navigator.clipboard.writeText(url); } catch { /* ignore */ } }}>
-              <Icon.Tag size={12} /><span>Copy</span>
-            </button>
-            {status.running && (
-              <button className="nx-media-btn" onClick={() => void window.nexus.openExternal(url)}>
-                <Icon.ExternalLink size={12} /><span>Open</span>
-              </button>
-            )}
-          </div>
+          ))}
         </div>
         <div className="nx-ent-server-meta">
-          <p><b>Libraries exposed:</b> {exposedNames || "(none)"}</p>
-          {config.authCode && <p><b>Access code:</b> <code>{config.authCode}</code></p>}
+          {/* v10.0.0 — inline library toggles. The user can add/remove a library
+              on an existing config without delete+recreate. This directly fixes
+              the "I created the server but forgot to select the library" case. */}
+          <div className="nx-ent-server-lib-toggles">
+            <p><b>Libraries:</b></p>
+            {libraries.length === 0 && <p className="nx-ent-hint">No libraries exist yet — create one in the Libraries tab.</p>}
+            {libraries.map((l) => (
+              <label key={l.id} className={`nx-ent-lib-toggle${exposedIds.has(l.id) ? " on" : ""}`}>
+                <input
+                  type="checkbox"
+                  checked={exposedIds.has(l.id)}
+                  onChange={() => onToggleLib(l.id)}
+                  disabled={busy}
+                />
+                <span>{l.name} <small>{l.itemCount}</small></span>
+              </label>
+            ))}
+            {libraries.length > 0 && exposedIds.size === 0 && (
+              <p className="nx-ent-error">No libraries exposed — the server will show nothing! Tick one above.</p>
+            )}
+          </div>
+          {config.authCode && (
+            <p><b>Access code:</b> <code>{config.authCode}</code> <small>(included in every QR URL)</small></p>
+          )}
           {status.error && <p className="nx-ent-error"><b>Error:</b> {status.error}</p>}
           {status.startedAt && <p><b>Started:</b> {new Date(status.startedAt).toLocaleTimeString()}</p>}
           {!status.running && !status.error && <p className="nx-ent-server-stopped">Stopped.</p>}
+          {status.running && (
+            <p className="nx-ent-hint">Can&apos;t connect from your phone? Try each URL above. If none work, allow port {config.port} through Windows Defender Firewall.</p>
+          )}
         </div>
       </div>
     </div>

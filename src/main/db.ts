@@ -302,6 +302,16 @@ function migrate(conn: import("better-sqlite3").Database) {
   addColumnIfMissing(conn, "media", "tvShowId",   "INTEGER");
   addColumnIfMissing(conn, "media", "season",     "INTEGER");
   addColumnIfMissing(conn, "media", "episode",    "INTEGER");
+  // v10.0.0 — FFprobe-derived technical metadata. All nullable so existing
+  // rows keep working until the next scan probes + backfills them.
+  addColumnIfMissing(conn, "media", "videoCodec",      "TEXT");
+  addColumnIfMissing(conn, "media", "audioCodec",      "TEXT");
+  addColumnIfMissing(conn, "media", "width",           "INTEGER");
+  addColumnIfMissing(conn, "media", "height",          "INTEGER");
+  addColumnIfMissing(conn, "media", "audioChannels",   "INTEGER");
+  addColumnIfMissing(conn, "media", "subtitleStreams", "INTEGER");
+  addColumnIfMissing(conn, "media", "bitRate",         "INTEGER");
+  addColumnIfMissing(conn, "media", "probeError",      "TEXT");
   // Indexes for the new columns (no-op if already present).
   try { conn.exec("CREATE INDEX IF NOT EXISTS idx_media_libraryId ON media(libraryId);"); } catch { /* ignore */ }
   try { conn.exec("CREATE INDEX IF NOT EXISTS idx_media_tvShowId ON media(tvShowId);"); } catch { /* ignore */ }
@@ -1673,13 +1683,23 @@ interface MediaRow {
   tvShowId?: number | null;
   season?: number | null;
   episode?: number | null;
+  // v10.0.0 — FFprobe fields.
+  videoCodec?: string | null;
+  audioCodec?: string | null;
+  width?: number | null;
+  height?: number | null;
+  audioChannels?: number | null;
+  subtitleStreams?: number | null;
+  bitRate?: number | null;
+  probeError?: string | null;
 }
 
-/** Canonical media SELECT column list (E1 expanded). */
+/** Canonical media SELECT column list (E1 + v10 expanded). */
 const MEDIA_SELECT_COLS =
   "id, title, filePath, fileSize, fileExt, container, dir, durationSec, scannedAt, " +
   "libraryId, tmdbId, mediaType, year, overview, posterPath, backdropPath, genres, " +
-  "runtimeMin, rating, matchedAt, locked, tvShowId, season, episode";
+  "runtimeMin, rating, matchedAt, locked, tvShowId, season, episode, " +
+  "videoCodec, audioCodec, width, height, audioChannels, subtitleStreams, bitRate, probeError";
 
 function rowToMedia(r: MediaRow): MediaItem {
   return {
@@ -1707,6 +1727,14 @@ function rowToMedia(r: MediaRow): MediaItem {
     tvShowId: r.tvShowId ?? null,
     season: r.season ?? null,
     episode: r.episode ?? null,
+    videoCodec: r.videoCodec ?? null,
+    audioCodec: r.audioCodec ?? null,
+    width: r.width ?? null,
+    height: r.height ?? null,
+    audioChannels: r.audioChannels ?? null,
+    subtitleStreams: r.subtitleStreams ?? null,
+    bitRate: r.bitRate ?? null,
+    probeError: r.probeError ?? null,
   };
 }
 
@@ -1919,6 +1947,43 @@ export function upsertMediaMetadata(id: number, patch: {
   params.push(id);
   conn.prepare(`UPDATE media SET ${sets.join(", ")} WHERE id = ?`).run(...params);
   return getMedia(id);
+}
+
+/** v10.0.0 — Persist FFprobe-derived technical metadata for a media row.
+ *  Called by the scanner after upserting the file. Overwrites all probe fields
+ *  (a re-probe on re-scan is always authoritative). Sets durationSec too (the
+ *  media table has a durationSec column from v9.3.0 that was never populated;
+ *  now it is). */
+export function upsertMediaProbe(id: number, probe: {
+  container: string | null;
+  videoCodec: string | null;
+  audioCodec: string | null;
+  width: number | null;
+  height: number | null;
+  audioChannels: number | null;
+  subtitleStreams: number | null;
+  durationSec: number | null;
+  bitRate: number | null;
+  probeError: string | null;
+}): void {
+  const conn = db();
+  conn.prepare(
+    "UPDATE media SET " +
+    "videoCodec = ?, audioCodec = ?, width = ?, height = ?, audioChannels = ?, " +
+    "subtitleStreams = ?, bitRate = ?, durationSec = COALESCE(?, durationSec), probeError = ? " +
+    "WHERE id = ?",
+  ).run(
+    probe.videoCodec ?? null,
+    probe.audioCodec ?? null,
+    probe.width ?? null,
+    probe.height ?? null,
+    probe.audioChannels ?? null,
+    probe.subtitleStreams ?? null,
+    probe.bitRate ?? null,
+    probe.durationSec ?? null,
+    probe.probeError ?? null,
+    id,
+  );
 }
 
 // ── E1 — Per-library queries + TV episode grouping ──────────────────────────
@@ -2233,6 +2298,48 @@ export function createServerConfig(
 
 export function deleteServerConfig(id: number): void {
   db().prepare("DELETE FROM media_servers WHERE id = ?").run(id);
+}
+
+/** v10.0.0 — Patch an existing server config (name / port / libraryIds /
+ *  authCode). Only the supplied fields are updated. Lets the user fix a config
+ *  whose libraryIds didn't include the right library (the most common real-world
+ *  cause of "server shows nothing") without deleting + recreating. If the server
+ *  is currently running, the caller should stop+restart it to pick up the new
+ *  libraries. */
+export function updateServerConfig(
+  id: number,
+  patch: {
+    name?: string;
+    port?: number;
+    libraryIds?: number[];
+    authCode?: string | null;
+  },
+): MediaServerConfig | null {
+  const conn = db();
+  const existing = getServerConfig(id);
+  if (!existing) return null;
+  const sets: string[] = [];
+  const params: (string | number | null)[] = [];
+  if (patch.name !== undefined) {
+    const cleanName = patch.name.trim() || "Media Server";
+    sets.push("name = ?"); params.push(cleanName);
+  }
+  if (patch.port !== undefined) {
+    const safePort = Math.max(1, Math.min(65535, Math.floor(patch.port)));
+    sets.push("port = ?"); params.push(safePort);
+  }
+  if (patch.libraryIds !== undefined) {
+    const idsStr = (patch.libraryIds ?? []).filter((n) => Number.isFinite(n) && n > 0).join(",");
+    sets.push("libraryIds = ?"); params.push(idsStr);
+  }
+  if (patch.authCode !== undefined) {
+    const clean = patch.authCode && patch.authCode.trim() ? patch.authCode.trim() : null;
+    sets.push("authCode = ?"); params.push(clean);
+  }
+  if (sets.length === 0) return existing;
+  params.push(id);
+  conn.prepare(`UPDATE media_servers SET ${sets.join(", ")} WHERE id = ?`).run(...params);
+  return getServerConfig(id);
 }
 
 export function getServerConfig(id: number): MediaServerConfig | null {

@@ -272,6 +272,11 @@ const api = {
   // <video> uses as its src. The protocol serves ONLY the user's own files.
   mediaStreamUrl: (id: number) =>
     ipcRenderer.invoke("media:streamUrl", id) as Promise<string>,
+  // v10.0.0 — SMART play URL (nexus-media://media/<id>/play). Auto-selects
+  // Direct Play / remux / transcode so MKV/HEVC play in the in-app Chromium
+  // player. The renderer's <video> src should use this.
+  mediaPlayUrl: (id: number) =>
+    ipcRenderer.invoke("media:playUrl", id) as Promise<string>,
 
   // ===== E1 — Libraries + per-library scanning + TMDB identification + progress + servers =====
   // Live scan progress events broadcast by scanLibrary().
@@ -332,6 +337,9 @@ const api = {
   serversList: () => ipcRenderer.invoke("servers:list") as Promise<MediaServerConfig[]>,
   serversCreate: (name: string, port: number, libraryIds: number[], authCode?: string | null) =>
     ipcRenderer.invoke("servers:create", name, port, libraryIds, authCode ?? null) as Promise<MediaServerConfig>,
+  // v10.0.0 — patch name/port/libraryIds/authCode on an existing config.
+  serversUpdate: (id: number, patch: { name?: string; port?: number; libraryIds?: number[]; authCode?: string | null }) =>
+    ipcRenderer.invoke("servers:update", id, patch) as Promise<MediaServerConfig | null>,
   serversDelete: (id: number) => ipcRenderer.invoke("servers:delete", id) as Promise<boolean>,
   serversStart: (id: number) =>
     ipcRenderer.invoke("servers:start", id) as Promise<MediaServerStartResult>,

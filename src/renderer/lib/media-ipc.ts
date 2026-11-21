@@ -61,6 +61,13 @@ export async function streamUrlFor(id: number): Promise<string> {
   return window.nexus.mediaStreamUrl(id);
 }
 
+/** v10.0.0 — SMART play URL (`nexus-media://media/<id>/play`). Auto-selects
+ *  Direct Play / remux / transcode so MKV/HEVC files actually play in the
+ *  in-app Chromium player. Use this for the renderer <video> `src`. */
+export async function playUrlFor(id: number): Promise<string> {
+  return window.nexus.mediaPlayUrl(id);
+}
+
 // ── E1 — Libraries ───────────────────────────────────────────────────────
 
 export function listLibraries(): Promise<MediaLibrary[]> {
@@ -143,6 +150,15 @@ export function createServerConfig(name: string, port: number, libraryIds: numbe
 }
 export function deleteServerConfig(id: number): Promise<boolean> {
   return window.nexus.serversDelete(id);
+}
+/** v10.0.0 — patch an existing server config (name/port/libraryIds/authCode)
+ *  without delete + recreate. Lets the user fix a config that wasn't exposing
+ *  the right library. */
+export function updateServerConfig(
+  id: number,
+  patch: { name?: string; port?: number; libraryIds?: number[]; authCode?: string | null },
+): Promise<MediaServerConfig | null> {
+  return window.nexus.serversUpdate(id, patch);
 }
 export function startMediaServer(id: number): Promise<MediaServerStartResult> {
   return window.nexus.serversStart(id);
