@@ -13,6 +13,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "9.2.0",
+    date: "2026-11-06",
+    title: "Removed third-party stream embedding — Entertainment is now browse-only",
+    kind: "major",
+    items: [
+      "Removed: third-party stream embedding (CineSrc / 2Embed / VidSrc) — NEXUS no longer embeds any pirated stream sources",
+      "Removed: offline package downloads of pirated content — the Downloads manager is stubbed (no packages written to disk)",
+      "Removed: stream-source selector, hindi-audio toast, open-in-browser link, and wall-clock progress tracking from the player",
+      "Removed: 'Watch Now' / episode 'Play' triggers on detail pages; the player overlay now shows a 'Streaming removed' notice",
+      "Kept: TMDB metadata browsing (movies, TV, anime, Hindi-language cinema, search, discover, recommendations) is fully functional",
+      "Kept: YouTube trailer playback (legitimate) — the Watch Trailer button on detail pages still works",
+      "Coming in v9.3.0: a local media server so you can stream your own video files from disk",
+    ],
+  },
+  {
     version: "9.1.1",
     date: "2026-11-05",
     title: "Hindi Dub honesty fix — verified-playback via CineSrc, fake audio switch removed",

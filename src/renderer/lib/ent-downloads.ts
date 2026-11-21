@@ -1,17 +1,22 @@
-// v9.0.0 — Downloads system for NEXUS TV.
-// Manages offline packages: user-chosen download location, quality preference,
-// auto-download + smart-download toggles, and the downloads list. Offline
-// packages are small JSON files (title info + artwork link + your progress)
-// written to disk by the main process — CineSrc streams are embeds without
-// direct video URLs, so packages are metadata-only by design (honest, no fake
-// video downloads).
+// v9.2.0 — Downloads system stubbed out.
+//
+// Previously this module wrote "offline packages" (JSON metadata files) to
+// disk for titles the user was streaming via CineSrc. With third-party stream
+// embedding removed (Entertainment is now browse-only: TMDB metadata + YouTube
+// trailers), there is nothing to package for offline viewing.
+//
+// The exported functions are kept as no-op stubs returning sensible empty /
+// false values so existing import sites (EntAccountView's Downloads manager
+// UI, EntDetailPage's download buttons, EntPlayer's auto-download hook) do not
+// break the build. A local media server (stream your own files) arrives in
+// v9.3.0 and will replace this stub with real local-file management.
+//
+// All settings + entries persistence has been removed; the stubs read/write
+// nothing to localStorage and never touch the filesystem via IPC.
 
 import type { TmdbMediaType } from "./tmdb-types";
-import { getRating, getReview, isEpisodeWatched } from "./ent-userdata";
-import { getContinueFor } from "./ent-store";
 
-// ─── Settings ───────────────────────────────────────────────────────────────
-const SETTINGS_KEY = "nx-ent-dl-settings";
+// ─── Settings (stubbed) ─────────────────────────────────────────────────────
 
 export type DownloadQuality = "standard" | "high" | "max";
 
@@ -22,32 +27,26 @@ export interface DownloadSettings {
   smartDownload: boolean;
 }
 
-const DEFAULT_SETTINGS: DownloadSettings = {
+const STUB_SETTINGS: DownloadSettings = {
   location: "",
   quality: "high",
   autoDownload: false,
   smartDownload: false,
 };
 
+/** Always returns the default stub settings. Downloads are removed in v9.2.0. */
 export function getDownloadSettings(): DownloadSettings {
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    if (!raw) return DEFAULT_SETTINGS;
-    return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<DownloadSettings>) };
-  } catch { return DEFAULT_SETTINGS; }
+  return { ...STUB_SETTINGS };
 }
 
-export function setDownloadSettings(patch: Partial<DownloadSettings>): void {
-  try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...getDownloadSettings(), ...patch }));
-  } catch { /* non-fatal */ }
+/** No-op — downloads were removed in v9.2.0; settings are not persisted. */
+export function setDownloadSettings(_patch: Partial<DownloadSettings>): void {
+  /* no-op */
 }
 
-/** Rough per-title package size estimate (KB) by quality — offline packages. */
-export function packageSizeKB(quality: DownloadQuality): number {
-  // Artwork reference + metadata + your notes. Higher quality embeds larger
-  // artwork references + episode data.
-  return quality === "standard" ? 24 : quality === "high" ? 48 : 96;
+/** Returns 0 — packages are no longer written. */
+export function packageSizeKB(_quality: DownloadQuality): number {
+  return 0;
 }
 
 export function formatSize(kb: number): string {
@@ -55,15 +54,13 @@ export function formatSize(kb: number): string {
   return `${(kb / 1024).toFixed(1)} MB`;
 }
 
-// ─── Download entries (tracked locally; files on disk in the chosen folder) ─
-const ENTRIES_KEY = "nx-ent-downloads";
+// ─── Download entries (stubbed) ─────────────────────────────────────────────
 
 export interface DownloadEntry {
   mediaType: TmdbMediaType;
   id: number;
   title: string;
   posterPath: string | null;
-  /** TV only. */
   season?: number;
   episode?: number;
   quality: DownloadQuality;
@@ -73,49 +70,32 @@ export interface DownloadEntry {
   downloadedAt: number;
 }
 
+/** Always returns [] — no packages are tracked. */
 export function getDownloads(): DownloadEntry[] {
-  try {
-    return (JSON.parse(localStorage.getItem(ENTRIES_KEY) || "[]") as DownloadEntry[])
-      .sort((a, b) => b.downloadedAt - a.downloadedAt);
-  } catch { return []; }
+  return [];
 }
 
-export function isDownloaded(mediaType: TmdbMediaType, id: number, season?: number, episode?: number): boolean {
-  return getDownloads().some(d =>
-    d.mediaType === mediaType && d.id === id &&
-    (d.season ?? 0) === (season ?? 0) && (d.episode ?? 0) === (episode ?? 0),
-  );
+/** Always returns false — nothing is downloaded. */
+export function isDownloaded(_mediaType: TmdbMediaType, _id: number, _season?: number, _episode?: number): boolean {
+  return false;
 }
 
-function saveEntries(list: DownloadEntry[]): void {
-  try { localStorage.setItem(ENTRIES_KEY, JSON.stringify(list.slice(0, 200))); } catch { /* non-fatal */ }
+/** No-op — nothing to remove. */
+export function removeDownload(_mediaType: TmdbMediaType, _id: number, _season?: number, _episode?: number): void {
+  /* no-op */
 }
 
-export function removeDownload(mediaType: TmdbMediaType, id: number, season?: number, episode?: number): void {
-  const all = getDownloads();
-  const entry = all.find(d =>
-    d.mediaType === mediaType && d.id === id &&
-    (d.season ?? 0) === (season ?? 0) && (d.episode ?? 0) === (episode ?? 0),
-  );
-  if (!entry) return;
-  // Delete the file on disk (best-effort).
-  if (entry.filePath) void window.nexus?.downloadsRemovePackage?.(entry.filePath);
-  saveEntries(all.filter(d => d !== entry));
-}
-
+/** No-op — nothing to clear. */
 export function clearAllDownloads(): void {
-  for (const d of getDownloads()) {
-    if (d.filePath) void window.nexus?.downloadsRemovePackage?.(d.filePath);
-  }
-  saveEntries([]);
+  /* no-op */
 }
 
 /**
- * Download an offline package for a title (or a specific TV episode) to the
- * chosen location. Returns the new entry, or null when no location is set or
- * the write failed.
+ * Always returns null — no packages are written to disk.
+ * Previously this wrote an offline JSON package for a streaming title; with
+ * stream embedding removed there is nothing to package.
  */
-export async function downloadOfflinePackage(input: {
+export async function downloadOfflinePackage(_input: {
   mediaType: TmdbMediaType;
   id: number;
   title: string;
@@ -127,71 +107,13 @@ export async function downloadOfflinePackage(input: {
   season?: number;
   episode?: number;
 }): Promise<DownloadEntry | null> {
-  const s = getDownloadSettings();
-  if (!s.location) return null;
-
-  const isEp = input.mediaType === "tv" && input.season !== undefined && input.episode !== undefined;
-  const suffix = isEp ? ` S${input.season}E${input.episode}` : "";
-  const fileName = `${input.title}${suffix}`;
-  const sizeKB = packageSizeKB(s.quality);
-
-  const data = {
-    kind: "nexus-offline-package",
-    version: 1,
-    savedAt: new Date().toISOString(),
-    title: {
-      mediaType: input.mediaType,
-      id: input.id,
-      name: input.title,
-      year: input.year ?? "",
-      rating: input.rating ?? 0,
-      overview: input.overview ?? "",
-      season: input.season ?? null,
-      episode: input.episode ?? null,
-      posterUrl: input.posterPath ? `https://image.tmdb.org/t/p/w500${input.posterPath}` : null,
-      backdropUrl: input.backdropPath ? `https://image.tmdb.org/t/p/w1280${input.backdropPath}` : null,
-      tmdbUrl: `https://www.themoviedb.org/${input.mediaType}/${input.id}`,
-    },
-    yourData: {
-      rating: getRating(input.mediaType, input.id) || null,
-      review: getReview(input.mediaType, input.id)?.text ?? null,
-      continue: getContinueFor(input.mediaType, input.id),
-      episodeWatched: isEp ? isEpisodeWatched(input.mediaType, input.id, input.season!, input.episode!) : null,
-    },
-  };
-
-  const r = await window.nexus.downloadsSavePackage(s.location, { fileName, data });
-  if (!r || !("ok" in r) || !r.ok || !r.path) return null;
-
-  const entry: DownloadEntry = {
-    mediaType: input.mediaType,
-    id: input.id,
-    title: input.title,
-    posterPath: input.posterPath ?? null,
-    season: input.season,
-    episode: input.episode,
-    quality: s.quality,
-    sizeKB,
-    fileName,
-    filePath: r.path,
-    downloadedAt: Date.now(),
-  };
-  const all = getDownloads().filter(d =>
-    !(d.mediaType === entry.mediaType && d.id === entry.id &&
-      (d.season ?? 0) === (entry.season ?? 0) && (d.episode ?? 0) === (entry.episode ?? 0)),
-  );
-  all.unshift(entry);
-  saveEntries(all);
-  return entry;
+  return null;
 }
 
-// ─── Auto / smart download hooks ────────────────────────────────────────────
+// ─── Auto / smart download hooks (stubbed) ──────────────────────────────────
 
-/**
- * Auto-download: when enabled, called after an episode finishes — packages the
- * next episode so it's ready offline.
- */
-export async function autoDownloadNextEpisode(payload: {
+/** No-op — auto-download is removed. */
+export async function autoDownloadNextEpisode(_payload: {
   mediaType: "tv";
   id: number;
   title: string;
@@ -200,25 +122,10 @@ export async function autoDownloadNextEpisode(payload: {
   nextSeason: number;
   nextEpisode: number;
 }): Promise<void> {
-  const s = getDownloadSettings();
-  if (!s.autoDownload || !s.location) return;
-  await downloadOfflinePackage({
-    mediaType: "tv",
-    id: payload.id,
-    title: payload.title,
-    posterPath: payload.posterPath,
-    backdropPath: payload.backdropPath,
-    season: payload.nextSeason,
-    episode: payload.nextEpisode,
-  });
+  /* no-op */
 }
 
-/**
- * Smart download: when enabled, called when an episode is marked watched —
- * removes its offline package to free up space.
- */
-export function smartDownloadCleanup(mediaType: TmdbMediaType, id: number, season?: number, episode?: number): void {
-  const s = getDownloadSettings();
-  if (!s.smartDownload) return;
-  removeDownload(mediaType, id, season, episode);
+/** No-op — smart-download cleanup is removed. */
+export function smartDownloadCleanup(_mediaType: TmdbMediaType, _id: number, _season?: number, _episode?: number): void {
+  /* no-op */
 }

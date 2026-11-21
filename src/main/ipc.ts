@@ -624,10 +624,13 @@ export function registerIpc(): void {
     return await tmdbHindiTopRated();
   }));
 
-  // ===== v9.0.0 — Downloads (offline packages; real file I/O) =====
-  // Offline packages are small JSON files (title info + artwork link + your
-  // progress/rating) written to the user-chosen folder. CineSrc streams are
-  // embeds without direct video URLs, so packages are metadata-only by design.
+  // ===== v9.0.0 — Downloads IPC (kept for backward compat; stubbed in v9.2.0) =====
+  // The renderer-side ent-downloads module was stubbed out in v9.2.0 when
+  // third-party stream embedding was removed — there are no offline packages
+  // to write. These handlers remain so any stray IPC call resolves cleanly;
+  // they still perform the filesystem operations if invoked, but the
+  // renderer no longer calls them. A local media server (v9.3.0) will
+  // replace this with real local-file management.
   const dlWrap = async <T,>(fn: () => Promise<T>): Promise<T | { error: string }> => {
     try { return await fn(); }
     catch (e) { return { error: e instanceof Error ? e.message : String(e) }; }

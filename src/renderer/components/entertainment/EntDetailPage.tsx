@@ -9,7 +9,6 @@ import { Icon } from "../Icons";
 import { Rail } from "./EntRails";
 import { EntTrailerModal } from "./EntTrailerModal";
 import { pushToast } from "./EntToaster";
-import type { WatchPayload } from "./EntPlayer";
 import {
   tmdbImg,
   formatRuntime,
@@ -23,21 +22,19 @@ import {
   type TmdbMovieDetails,
   type TmdbSeason,
 } from "../../lib/tmdb-types";
-import { getContinueFor, recordHistory } from "../../lib/ent-store";
+import { recordHistory } from "../../lib/ent-store";
 import {
   getRating, setRating, getReview, setReview, deleteReview, getCollections, addToCollection,
   isWatched, setWatched, isHidden, setHidden,
   isEpisodeWatched, setEpisodeWatched, countSeasonWatched,
 } from "../../lib/ent-userdata";
 import { imgSize } from "../../lib/ent-prefs";
-import { getDownloadSettings, downloadOfflinePackage, removeDownload, isDownloaded, smartDownloadCleanup } from "../../lib/ent-downloads";
 
 interface DetailProps {
   mediaType: TmdbMediaType;
   id: number;
   onBack: () => void;
   onOpenDetail: (mediaType: TmdbMediaType, id: number) => void;
-  onWatch: (payload: WatchPayload) => void;
   inList: (mediaType: TmdbMediaType, id: number) => boolean;
   onToggleList: (item: { mediaType: TmdbMediaType; id: number; title: string; posterPath: string | null; rating: number; year: string }) => void;
   onHistoryChange?: () => void;
@@ -45,7 +42,7 @@ interface DetailProps {
 
 type Tab = "overview" | "episodes" | "cast" | "watch" | "facts" | "review";
 
-export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, inList, onToggleList, onHistoryChange }: DetailProps) {
+export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, inList, onToggleList, onHistoryChange }: DetailProps) {
   const [detail, setDetail] = useState<TmdbMovieDetails | null>(null);
   const [recs, setRecs] = useState<TmdbItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,8 +61,6 @@ export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, in
   // v8.0.0 — watched + hidden title state + per-episode watched refresh tick.
   const [watchedTick, setWatchedTick] = useState(0);
   const [hiddenTick, setHiddenTick] = useState(0);
-  // v9.0.0 — downloads.
-  const [dlTick, setDlTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -134,41 +129,7 @@ export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, in
   const titleHidden = detail ? isHidden(mediaType, id) : false;
   const trailerKey = detail?.trailerKey ?? null;
   const listed = inList(mediaType, id);
-  const resume = getContinueFor(mediaType, id);
   const ratingPct = detail ? Math.round(detail.rating * 10) : 0;
-  // v9.0.0 — download state for this title (or the resumed episode).
-  const _dt = dlTick; void _dt;
-  const dlSeason = isTv ? resume?.season : undefined;
-  const dlEpisode = isTv ? resume?.episode : undefined;
-  const downloaded = isDownloaded(mediaType, id, dlSeason, dlEpisode);
-  const doDownload = async () => {
-    if (!getDownloadSettings().location) {
-      pushToast("Choose a download location in Account first", "error", <Icon.Folder size={13} />);
-      return;
-    }
-    const entry = await downloadOfflinePackage({
-      mediaType, id, title,
-      posterPath: detail?.posterPath ?? null,
-      backdropPath: detail?.backdropPath ?? null,
-      overview: detail?.overview ?? "",
-      year: detail?.year ?? "",
-      rating: detail?.rating ?? 0,
-      season: dlSeason,
-      episode: dlEpisode,
-    });
-    if (entry) pushToast(`Downloaded “${title}” — see Account`, "success", <Icon.Download size={14} />);
-    else pushToast("Download failed — check the location in Account", "error", <Icon.Close size={13} />);
-    setDlTick(t => t + 1);
-  };
-
-  const watchPayload = (season?: number, episode?: number): WatchPayload => ({
-    mediaType, id, title,
-    posterPath: detail?.posterPath ?? null,
-    backdropPath: detail?.backdropPath ?? null,
-    numberOfSeasons: detail?.numberOfSeasons ?? null,
-    season, episode,
-    runtimeMin: detail?.runtime ?? null,
-  });
 
   return (
     <div className="ent-dp">
@@ -257,12 +218,10 @@ export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, in
       {/* ── Action bar (primary CTAs) ── */}
       {detail && (
         <div className="ent-dp-actionbar">
-          <button className="ent-cta primary lg" onClick={() => onWatch(watchPayload(resume?.season, resume?.episode))}>
-            <Icon.Play size={18} /> {resume ? (isTv ? `Resume S${resume.season} · E${resume.episode}` : "Resume") : "Watch Now"}
-          </button>
+          {/* v9.2.0 — Watch Now removed (stream embedding removed). Trailer is the playback path. */}
           {trailerKey && (
-            <button className="ent-cta ghost lg" onClick={() => setTrailerOpen(true)}>
-              <Icon.Film size={16} /> Watch Trailer
+            <button className="ent-cta primary lg" onClick={() => setTrailerOpen(true)}>
+              <Icon.Play size={18} /> Play Trailer
             </button>
           )}
           {detail.imdbId && (
@@ -347,26 +306,8 @@ export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, in
           >
             <Icon.EyeOff size={15} /> {titleHidden ? "Hidden" : "Hide"}
           </button>
-          {/* v9.0.0 — Download (offline package) */}
-          <button
-            className={downloaded ? "ent-cta ghost lg on" : "ent-cta ghost lg"}
-            onClick={() => {
-              if (downloaded) { removeDownload(mediaType, id, dlSeason, dlEpisode); setDlTick(t => t + 1); pushToast("Download removed", "info", <Icon.Trash size={13} />); }
-              else void doDownload();
-            }}
-            title={downloaded ? "Remove offline package" : "Save offline package to your download folder"}
-          >
-            {downloaded ? <Icon.CheckCircle size={15} /> : <Icon.Download size={15} />} {downloaded ? "Downloaded" : "Download"}
-          </button>
-          {/* Resume progress bar */}
-          {resume && (
-            <div className="ent-dp-actionbar-resume">
-              <span className="ent-dp-resume-bar"><span style={{ width: `${Math.round(resume.progress * 100)}%` }} /></span>
-              <span className="ent-dp-resume-label">
-                {isTv ? `You're on S${resume.season} · E${resume.episode}` : `${Math.round(resume.progress * 100)}% watched`}
-              </span>
-            </div>
-          )}
+          {/* v9.0.0 — Download (offline package) — removed in v9.2.0 (no stream sources to package). */}
+          {/* Resume progress bar — removed in v9.2.0 (wall-clock progress tracking depended on the embedded iframe). */}
         </div>
       )}
 
@@ -459,12 +400,11 @@ export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, in
                               <div key={ep.id} className={epW ? "ent-dp-ep watched" : "ent-dp-ep"}>
                                 <button
                                   className="ent-dp-ep-thumb"
-                                  onClick={() => onWatch(watchPayload(selSeason, ep.episodeNumber))}
-                                  title="Play this episode"
-                                  aria-label={`Play ${ep.name}`}
+                                  onClick={() => setEpisodeWatched(mediaType, id, selSeason, ep.episodeNumber, !epW)}
+                                  title={epW ? "Mark as not watched" : "Mark as watched"}
+                                  aria-label={`Toggle watched for ${ep.name}`}
                                 >
                                   {still ? <img src={still} alt={ep.name} loading="lazy" /> : <div className="ent-dp-ep-ph"><Icon.Film size={20} /></div>}
-                                  <span className="ent-dp-ep-play"><Icon.Play size={20} /></span>
                                   <span className="ent-dp-ep-num">E{ep.episodeNumber}</span>
                                 </button>
                                 <div className="ent-dp-ep-body">
@@ -478,14 +418,11 @@ export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, in
                                     {ep.airDate ? <span><Icon.Calendar size={11} /> {formatAirDate(ep.airDate)}</span> : null}
                                   </div>
                                   <div className="ent-dp-ep-actions">
-                                    <button className="ent-cta ghost sm" onClick={() => onWatch(watchPayload(selSeason, ep.episodeNumber))}>
-                                      <Icon.Play size={13} /> Play
-                                    </button>
+                                    {/* v9.2.0 — episode Play removed (stream embedding removed); only the watched toggle remains. */}
                                     <button
                                       className={epW ? "ent-dp-ep-watch on" : "ent-dp-ep-watch"}
                                       onClick={() => {
                                         setEpisodeWatched(mediaType, id, selSeason, ep.episodeNumber, !epW);
-                                        if (!epW) smartDownloadCleanup(mediaType, id, selSeason, ep.episodeNumber);
                                         setWatchedTick(t => t + 1);
                                       }}
                                       title={epW ? "Mark as not watched" : "Mark as watched"}
@@ -546,7 +483,7 @@ export function EntDetailPage({ mediaType, id, onBack, onOpenDetail, onWatch, in
                           </a>
                         )}
                       </div>
-                      <p className="ent-dp-prov-note">Streaming availability for your region (US). NEXUS TV streams via CineSrc regardless of these providers.</p>
+                      <p className="ent-dp-prov-note">Streaming availability for your region (US), via JustWatch. NEXUS TV itself is browse-only — open any provider's link to watch on their service.</p>
                     </div>
                   )}
 

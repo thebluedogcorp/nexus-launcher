@@ -50,30 +50,26 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v9.1.1"
-          $title = "NEXUS v9.1.1 — Hindi Dub honesty fix: verified-playback via CineSrc, fake audio switch removed"
+          $tag = "v9.2.0"
+          $title = "NEXUS v9.2.0 — Removed third-party stream embedding; entertainment is now browse-only"
           $notes = @"
           NEXUS — Universal Game Launcher & Entertainment Hub for Windows.
 
-          **v9.1.1 — Hindi Dub honesty fix. Clicking Hindi no longer errors; playback routes through the one source verified to actually play.**
+          **v9.2.0 — a clean release. All third-party stream embedding has been removed.**
 
-          **Fix: the CSP error on Hindi is gone.**
-          v9.1.0 routed Hindi to 2Embed, which the app's Content-Security-Policy blocked (ERR_BLOCKED_BY_CSP). That route is removed.
+          NEXUS no longer embeds or routes to any third-party streaming host. The CineSrc / 2Embed / VidSrc embed player, the stream-source selector, and the offline-package downloads of third-party content have all been removed. The Content-Security-Policy has been tightened (cinesrc.st removed from frame-src).
 
-          **Verified via network tracking: CineSrc is the only source that genuinely plays.**
-          CineSrc bootstraps a real HLS player (loads .m3u8 + init.mp4 + segments — 42 requests). 2Embed and VidSrc embeds return HTTP 200 but load only their document shell and make ZERO video requests — they do not play in an iframe. v9.1.0's verification (HTTP 200 + param echoed) was insufficient; this build verifies actual playback.
+          **Entertainment is now browse-only.**
+          TMDB metadata (movies, TV, anime, Hindi cinema), search, discover, recommendations, and YouTube trailers remain fully functional. There is no embedded playback of third-party streams. Opening a title's Watch flow now shows a clear notice that streaming was removed.
 
-          **Honest redesign.**
-          Removed the fake EN / हिं audio toggle that pretended to switch audio tracks (impossible cross-origin). All playback now uses CineSrc (verified-working, CSP-allowed). The stream-source selector remains: CineSrc (recommended) + 2Embed / VidSrc labeled experimental.
+          **A local media server arrives in v9.3.0** — stream your own files (DVDs, rips, recordings — anything you already own) from your own machine, with QR / invite-code access on your local network.
 
-          **Hindi Dub hub is the genuine Hindi delivery.**
-          Hindi-origin titles (Bollywood + Hindi cinema) play with Hindi audio automatically via CineSrc (India-focused). For Hollywood dubbed in Hindi, the player shows a one-time guide toast to pick a Hindi server in CineSrc's in-player Settings (gear) menu — verified there is no URL param to force Hindi (embed HTML is identical with/without ?lang=hi).
-
-          All v9.0.0 / v9.1.0 functionality preserved: Hindi Dub hub (press h), billboard hero, Anime + New & Popular hubs, Account with downloads, episodes tab, enhanced search, notifications, watched tracking, autoplay next episode, expanded settings.
+          **Game launcher fully preserved.**
+          Auto-detection across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox. RAWG metadata. Library, favorites, playtime tracking, plugins, command palette, and the in-app auto-updater all work as before.
 
           **Downloads:**
-          - NEXUS-Setup-9.1.1.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-9.1.1.exe — single-file portable build.
+          - NEXUS-Setup-9.2.0.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-9.2.0.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@

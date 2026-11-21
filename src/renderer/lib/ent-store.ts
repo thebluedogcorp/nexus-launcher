@@ -94,9 +94,12 @@ export function getContinueFor(mediaType: TmdbMediaType, id: number): ContinueEn
 }
 
 /**
- * Record (or refresh) a continue-watching entry. Called when the player
- * closes — or periodically while open. `progress` is an estimate because the
- * CineSrc iframe is cross-origin (we measure wall-clock time vs runtime).
+ * Record (or refresh) a continue-watching entry. Historically called when the
+ * CineSrc player iframe closed — progress was estimated from wall-clock time
+ * vs runtime because the iframe was cross-origin. In v9.2.0 the embedded
+ * player was removed (Entertainment is now browse-only), so this is no longer
+ * called by the player; it is kept as a harmless helper for any future
+ * local-media-server integration (v9.3.0).
  *
  * progress >= 0.95 → TV: auto-advance to the next episode; Movie: considered
  * finished and dropped from the row.

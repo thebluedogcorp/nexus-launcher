@@ -2,6 +2,11 @@
 // The actual TMDB fetches happen in the MAIN process (src/main/tmdb.ts) and
 // arrive via window.nexus.tmdb* IPC. These types mirror the main-process
 // shapes so the renderer can stay typed.
+//
+// v9.2.0 — Third-party stream embedding (CineSrc / 2Embed / VidSrc) and the
+// associated StreamSource / StreamLanguage types and URL builders have been
+// removed. Entertainment is now browse-only: TMDB metadata + YouTube trailers.
+// A local media server (stream your own files) arrives in v9.3.0.
 
 export type TmdbMediaType = "movie" | "tv";
 
@@ -171,93 +176,11 @@ export function isNewRelease(year: string | undefined): boolean {
 }
 
 /**
- * CineSrc embed URL — cinesrc.st is a free streaming API that embeds movies &
- * TV shows by TMDB ID (no scraping; it indexes streams against TMDB IDs).
- *  - Movie: https://cinesrc.st/embed/movie/{tmdbId}
- *  - TV:    https://cinesrc.st/embed/tv/{tmdbId}?season={s}&episode={e}
- * The embed pages return 200 with no X-Frame-Options, so they iframe cleanly.
- */
-export function cinesrcEmbedUrl(
-  mediaType: "movie" | "tv",
-  tmdbId: number,
-  season?: number,
-  episode?: number,
-): string {
-  if (mediaType === "tv") {
-    const s = Math.max(1, season ?? 1);
-    const e = Math.max(1, episode ?? 1);
-    return `https://cinesrc.st/embed/tv/${tmdbId}?season=${s}&episode=${e}`;
-  }
-  return `https://cinesrc.st/embed/movie/${tmdbId}`;
-}
-
-// ─── v9.1.1 — Streaming source resolution (honest, verified) ────────────────
-//
-// CineSrc is the ONLY source verified to actually play in an iframe — it
-// bootstraps a real HLS player (loads .m3u8 + init.mp4 + segments). 2Embed and
-// VidSrc embeds return HTTP 200 but load only their document shell and make
-// ZERO video requests (verified via network tracking 2026-11-05), so they do
-// not play. They are kept here ONLY as manual "experimental" fallback options
-// for advanced users (third-party sources change over time); the default is
-// always CineSrc.
-//
-// Hindi audio: CineSrc is India-focused and serves Hindi-origin titles with
-// Hindi audio by default. For Hollywood titles dubbed in Hindi, CineSrc's
-// in-player Settings (gear) menu exposes multi-server / multi-audio selection
-// — there is no URL param to force Hindi (verified: the embed HTML is identical
-// with/without ?lang=hi). The Hindi Dub hub surfaces content CineSrc most
-// reliably serves with Hindi audio, and the player shows a one-time guide
-// toast when opened from that hub.
-
-export type StreamSource = "auto" | "cinesrc" | "twoembed" | "vidsrc";
-export type StreamLanguage = "en" | "hi";
-
-/**
- * Build the embed URL for a given source. Language is intentionally NOT routed
- * to the URL — CineSrc (the only working source) is language-agnostic at the
- * URL level; Hindi audio is selected inside its in-player Settings menu.
- * `twoembed` and `vidsrc` are experimental fallbacks (may not play).
- */
-export function streamEmbedUrl(
-  mediaType: "movie" | "tv",
-  tmdbId: number,
-  season?: number,
-  episode?: number,
-  source: StreamSource = "auto",
-  _language?: StreamLanguage,
-): string {
-  const s: Exclude<StreamSource, "auto"> = source === "auto" ? "cinesrc" : source;
-  if (s === "cinesrc") {
-    return cinesrcEmbedUrl(mediaType, tmdbId, season, episode);
-  }
-  if (s === "vidsrc") {
-    if (mediaType === "tv") {
-      const se = Math.max(1, season ?? 1);
-      const ep = Math.max(1, episode ?? 1);
-      return `https://vidsrc.to/embed/tv/${tmdbId}/${se}/${ep}`;
-    }
-    return `https://vidsrc.to/embed/movie/${tmdbId}`;
-  }
-  // 2embed — experimental fallback (may not play in an iframe).
-  if (mediaType === "tv") {
-    const se = Math.max(1, season ?? 1);
-    const ep = Math.max(1, episode ?? 1);
-    return `https://www.2embed.cc/embedtv/${tmdbId}&s=${se}&e=${ep}`;
-  }
-  return `https://www.2embed.cc/embed/${tmdbId}`;
-}
-
-/** Human-readable label for the active source (shown in the player footer). */
-export function streamLabel(source: StreamSource): string {
-  const s: Exclude<StreamSource, "auto"> = source === "auto" ? "cinesrc" : source;
-  return s === "cinesrc" ? "CineSrc" : s === "twoembed" ? "2Embed (experimental)" : "VidSrc (experimental)";
-}
-
-/**
- * Curated list of popular Hollywood / international titles that are widely
- * available with Hindi dubs on the multi-audio streaming sources. TMDB IDs are
- * stable; the hub fetches full details (poster/title) per id at view-open time.
- * Used by the "Hollywood in Hindi" rail in the Hindi Dub hub.
+ * Curated list of popular Hollywood / international titles widely available
+ * with Hindi dubs. TMDB IDs are stable; the Hindi-language cinema hub fetches
+ * full details (poster/title) per id at view-open time. Used by the
+ * "Hollywood in Hindi" rail in the Hindi Dub hub (browse-only — surfaces
+ * titles likely to have Hindi dubs on legitimate services).
  */
 export const HINDI_DUBBED_HITS: ReadonlyArray<{ id: number; title: string }> = [
   { id: 299534, title: "Avengers: Endgame" },

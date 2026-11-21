@@ -586,10 +586,11 @@ export async function tmdbAnimeMovies(page = 1): Promise<TmdbItem[]> {
   return d.results.map(m => normalizeMulti({ ...m, media_type: "movie" }));
 }
 
-// ─── v9.1.0 — Hindi Dub hub ─────────────────────────────────────────────────
+// ─── v9.1.0 — Hindi-language cinema hub ─────────────────────────────────────
 // Hindi-original content (Bollywood + Hindi-language cinema & series) via
-// TMDB's with_original_language=hi filter. These are the titles the streaming
-// sources (CineSrc, 2embed aud=hi) most reliably serve with Hindi audio.
+// TMDB's with_original_language=hi filter. v9.2.0: these are browse-only
+// metadata queries (the streaming routing to CineSrc / 2embed was removed);
+// the hub surfaces Hindi-language titles for discovery.
 
 /** Popular Hindi-language movies (Bollywood + Hindi cinema), sorted by popularity. */
 export async function tmdbHindiMovies(page = 1): Promise<TmdbItem[]> {

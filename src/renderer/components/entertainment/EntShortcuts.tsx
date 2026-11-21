@@ -34,14 +34,14 @@ const GROUPS: { group: string; items: Shortcut[] }[] = [
     items: [
       { keys: ["a"], label: "Anime hub" },
       { keys: ["p"], label: "New & Popular" },
-      { keys: ["h"], label: "Hindi Dub — opens on Hindi audio" },
+      { keys: ["h"], label: "Hindi Cinema — browse Hindi-language films & series" },
       { keys: ["u"], label: "Account & Downloads" },
     ],
   },
   {
     group: "Discover",
     items: [
-      { keys: ["s"], label: "Surprise Me — play a random title" },
+      { keys: ["s"], label: "Surprise Me — open a random title's detail page" },
       { keys: ["←", "→"], label: "Move focus across cards" },
       { keys: ["↑", "↓"], label: "Jump to prev/next row" },
       { keys: ["Enter"], label: "Open focused card" },
@@ -52,14 +52,6 @@ const GROUPS: { group: string; items: Shortcut[] }[] = [
     items: [
       { keys: ["Hover"], label: "Reveal prev/next arrows" },
       { keys: ["Click dots"], label: "Jump to a featured title" },
-    ],
-  },
-  {
-    group: "Player",
-    items: [
-      { keys: ["Esc"], label: "Close player (saves progress)" },
-      { keys: ["S/E inputs"], label: "Change TV season / episode" },
-      { keys: ["Source"], label: "Switch stream source (CineSrc default)" },
     ],
   },
 ];

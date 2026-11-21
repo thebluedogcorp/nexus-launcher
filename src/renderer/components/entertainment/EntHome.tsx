@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 import { Icon } from "../Icons";
 import { EntHero } from "./EntHero";
 import { EntLandscapeCard, Rail, Top10Rail, type AnyItem } from "./EntRails";
-import type { WatchPayload } from "./EntPlayer";
 import { pushToast } from "./EntToaster";
 import { asItems, asMovies, tmdbImg, MOVIE_GENRES, TV_GENRES, type TmdbItem, type TmdbMovie, type TmdbMediaType } from "../../lib/tmdb-types";
 import { getContinue, removeFromContinue, getHistory, clearHistory, type ContinueEntry, type HistoryEntry } from "../../lib/ent-store";
@@ -15,14 +14,13 @@ interface HomeProps {
   progressTick: number;
   historyTick: number;
   onOpen: (mediaType: TmdbMediaType, id: number) => void;
-  onWatch: (payload: WatchPayload) => void;
   inList: (mediaType: TmdbMediaType, id: number) => boolean;
   onToggleList: (item: TmdbItem) => void;
   /** Jump to a filtered browse view. v6.7.0. */
   onBrowseGenre?: (mediaType: "movie" | "tv", genreId: number) => void;
 }
 
-export function EntHome({ progressTick, historyTick, onOpen, onWatch, inList, onToggleList, onBrowseGenre }: HomeProps) {
+export function EntHome({ progressTick, historyTick, onOpen, inList, onToggleList, onBrowseGenre }: HomeProps) {
   // Adapt the shell's TmdbItem-based toggle to the card's AnyItem signature.
   const toggleAny = (item: AnyItem) => {
     onToggleList({
@@ -131,19 +129,15 @@ export function EntHome({ progressTick, historyTick, onOpen, onWatch, inList, on
     return () => { cancelled = true; };
   }, [historyTick]);
 
-  // "Surprise Me" — pick a random trending title and start watching it.
+  // "Surprise Me" — pick a random trending title and open its detail page.
+  // v9.2.0 — previously this called onWatch (which opened the CineSrc player);
+  // streaming was removed, so it now opens the detail page for browsing.
   const surpriseMe = () => {
     const pool = [...trending, ...popularTv];
     if (pool.length === 0) return;
     const pick = pool[Math.floor(Math.random() * pool.length)];
-    onWatch({
-      mediaType: pick.mediaType,
-      id: pick.id,
-      title: pick.title,
-      posterPath: pick.posterPath ?? null,
-      backdropPath: pick.backdropPath ?? null,
-    });
-    pushToast(`Surprise! Playing ${pick.title}`, "success", <Icon.Sparkles size={14} />);
+    onOpen(pick.mediaType, pick.id);
+    pushToast(`Surprise! Opening ${pick.title}`, "success", <Icon.Sparkles size={14} />);
   };
 
   // Listen for the global "nx-surprise" event (triggered by the `s` shortcut).
@@ -153,19 +147,9 @@ export function EntHome({ progressTick, historyTick, onOpen, onWatch, inList, on
     return () => window.removeEventListener("nx-surprise", handler);
   }); // re-bind every render so surpriseMe closes over the latest trending pool
 
-  // Bridge: EntRails expects onWatch(mt, id, title) → adapt to full payload.
-  const watchFromCard = (mt: TmdbMediaType, id: number, title: string) => {
-    const fromList = trending.find(i => i.id === id && i.mediaType === mt)
-      ?? popularTv.find(i => i.id === id)
-      ?? topRatedTv.find(i => i.id === id);
-    onWatch({
-      mediaType: mt,
-      id,
-      title,
-      posterPath: fromList?.posterPath ?? null,
-      backdropPath: fromList?.backdropPath ?? null,
-    });
-  };
+  // v9.2.0 — watchFromCard removed (stream embedding removed). Card hover Play
+  // buttons are no longer rendered (Rail's onWatch is not passed). The hero's
+  // Play button redirects to the detail page (see EntHero onWatch below).
 
   return (
     <div className="ent-home">
@@ -173,7 +157,7 @@ export function EntHome({ progressTick, historyTick, onOpen, onWatch, inList, on
         items={trending.slice(0, 10)}
         loading={loading}
         onOpen={onOpen}
-        onWatch={(mt, id, title, backdropPath, posterPath) => onWatch({ mediaType: mt, id, title, backdropPath, posterPath })}
+        onWatch={(mt, id) => onOpen(mt, id)}
         inList={inList}
         onToggleList={toggleAny}
       />
@@ -225,17 +209,9 @@ export function EntHome({ progressTick, historyTick, onOpen, onWatch, inList, on
                   key={`${e.mediaType}-${e.id}`}
                   item={e}
                   forceMediaType={e.mediaType}
-                  onOpen={() => onWatch({
-                    mediaType: e.mediaType,
-                    id: e.id,
-                    title: e.title,
-                    posterPath: e.posterPath,
-                    backdropPath: e.backdropPath,
-                    season: e.season,
-                    episode: e.episode,
-                  })}
+                  onOpen={() => onOpen(e.mediaType, e.id)}
                   progress={e.progress}
-                  subLabel={e.mediaType === "tv" ? `S${e.season} · E${e.episode}` : "Resume"}
+                  subLabel={e.mediaType === "tv" ? `S${e.season} · E${e.episode}` : "Watched"}
                   onRemove={() => { removeFromContinue(e.mediaType, e.id); setCont(getContinue().slice(0, 12)); }}
                 />
               ))}
@@ -284,7 +260,6 @@ export function EntHome({ progressTick, historyTick, onOpen, onWatch, inList, on
             items={bcw.items}
             loading={false}
             onOpen={onOpen}
-            onWatch={watchFromCard}
             onToggleList={toggleAny}
             inList={inList}
             enableHover
@@ -298,7 +273,6 @@ export function EntHome({ progressTick, historyTick, onOpen, onWatch, inList, on
           forceMediaType="movie"
           loading={loading}
           onOpen={onOpen}
-          onWatch={watchFromCard}
           onToggleList={toggleAny}
           inList={inList}
         />
@@ -310,26 +284,25 @@ export function EntHome({ progressTick, historyTick, onOpen, onWatch, inList, on
           forceMediaType="tv"
           loading={loading}
           onOpen={onOpen}
-          onWatch={watchFromCard}
           onToggleList={toggleAny}
           inList={inList}
         />
 
-        <Rail title="Trending This Week" items={trending} loading={loading} onOpen={onOpen} onWatch={watchFromCard} onToggleList={toggleAny} inList={inList} enableHover />
-        <Rail title="Now Playing in Theaters" items={nowPlaying} forceMediaType="movie" loading={loading} onOpen={onOpen} onWatch={watchFromCard} onToggleList={toggleAny} inList={inList} enableHover />
-        <Rail title="Popular Movies" items={popular} forceMediaType="movie" loading={loading} onOpen={onOpen} onWatch={watchFromCard} onToggleList={toggleAny} inList={inList} enableHover />
-        <Rail title="Popular Series" items={popularTv} forceMediaType="tv" loading={loading} onOpen={onOpen} onWatch={watchFromCard} onToggleList={toggleAny} inList={inList} enableHover />
+        <Rail title="Trending This Week" items={trending} loading={loading} onOpen={onOpen} onToggleList={toggleAny} inList={inList} enableHover />
+        <Rail title="Now Playing in Theaters" items={nowPlaying} forceMediaType="movie" loading={loading} onOpen={onOpen} onToggleList={toggleAny} inList={inList} enableHover />
+        <Rail title="Popular Movies" items={popular} forceMediaType="movie" loading={loading} onOpen={onOpen} onToggleList={toggleAny} inList={inList} enableHover />
+        <Rail title="Popular Series" items={popularTv} forceMediaType="tv" loading={loading} onOpen={onOpen} onToggleList={toggleAny} inList={inList} enableHover />
 
         {/* Wave 2 rails (v9.0.0 — more content, staggered fetch) */}
-        <Rail title="Anime Spotlight" items={anime} forceMediaType="tv" loading={!wave2} onOpen={onOpen} onWatch={watchFromCard} onToggleList={toggleAny} inList={inList} enableHover />
-        <Rail title="Worth the Wait — Coming Soon" items={upcoming} forceMediaType="movie" loading={!wave2} onOpen={onOpen} onWatch={watchFromCard} onToggleList={toggleAny} inList={inList} enableHover />
-        <Rail title="Action &amp; Adventure" items={action} forceMediaType="movie" loading={!wave2} onOpen={onOpen} onWatch={watchFromCard} onToggleList={toggleAny} inList={inList} enableHover />
-        <Rail title="Comedies to Keep You Laughing" items={comedy} forceMediaType="movie" loading={!wave2} onOpen={onOpen} onWatch={watchFromCard} onToggleList={toggleAny} inList={inList} enableHover />
+        <Rail title="Anime Spotlight" items={anime} forceMediaType="tv" loading={!wave2} onOpen={onOpen} onToggleList={toggleAny} inList={inList} enableHover />
+        <Rail title="Worth the Wait — Coming Soon" items={upcoming} forceMediaType="movie" loading={!wave2} onOpen={onOpen} onToggleList={toggleAny} inList={inList} enableHover />
+        <Rail title="Action &amp; Adventure" items={action} forceMediaType="movie" loading={!wave2} onOpen={onOpen} onToggleList={toggleAny} inList={inList} enableHover />
+        <Rail title="Comedies to Keep You Laughing" items={comedy} forceMediaType="movie" loading={!wave2} onOpen={onOpen} onToggleList={toggleAny} inList={inList} enableHover />
 
         {/* Brand strip */}
         <div className="ent-brandstrip">
           <Icon.Sparkles size={14} />
-          <span>Thousands of films &amp; series — indexed against TMDB, streamed via CineSrc, progress saved locally on this PC.</span>
+          <span>Thousands of films &amp; series — browse metadata from TMDB, watch trailers on YouTube, save your list locally on this PC.</span>
         </div>
       </div>
     </div>

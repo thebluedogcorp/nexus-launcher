@@ -110,7 +110,8 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
   const watch = useCallback((payload: WatchPayload) => {
     setWatching(payload);
     recordWatchDay(); // track watch streak (v7.2.0)
-    pushToast(`Now playing: ${payload.title}`, "success", <Icon.Play size={14} />);
+    // v9.2.0 — streaming was removed; the overlay now shows a notice panel.
+    pushToast(`Streaming removed — opening notice for ${payload.title}`, "info", <Icon.Shield size={14} />);
   }, []);
 
   // Card → watch bridge (EntRails uses onWatch(mt, id, title); detail page
@@ -138,7 +139,7 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
     { id: "tv", label: "Browse TV Shows", icon: <Icon.Tv size={15} />, group: "Navigate", run: () => go("tv") },
     { id: "anime", label: "Anime Hub", hint: "a", icon: <Icon.Sparkles size={15} />, group: "Navigate", run: () => go("anime") },
     { id: "new", label: "New & Popular", hint: "p", icon: <Icon.TrendingUp size={15} />, group: "Navigate", run: () => go("new") },
-    { id: "hindi", label: "Hindi Dub", hint: "h", icon: <Icon.Globe size={15} />, group: "Navigate", run: () => go("hindi") },
+    { id: "hindi", label: "Hindi Cinema", hint: "h", icon: <Icon.Globe size={15} />, group: "Navigate", run: () => go("hindi") },
     { id: "mylist", label: "Open My List", icon: <Icon.Bookmark size={15} />, group: "Navigate", run: () => go("mylist") },
     { id: "collections", label: "My Collections", icon: <Icon.Library size={15} />, group: "Navigate", run: () => go("collections") },
     { id: "stats", label: "Statistics Dashboard", icon: <Icon.TrendingUp size={15} />, group: "Navigate", run: () => go("stats") },
@@ -305,7 +306,7 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
         <div className="ent-side-sep" />
         {sideBtn(view === "anime", "Anime  (press a)", <Icon.Sparkles size={17} />, () => go("anime"))}
         {sideBtn(view === "new", "New & Popular  (press p)", <Icon.TrendingUp size={17} />, () => go("new"))}
-        {sideBtn(view === "hindi", "Hindi Dub  (press h)", <Icon.Globe size={17} />, () => go("hindi"))}
+        {sideBtn(view === "hindi", "Hindi Cinema  (press h)", <Icon.Globe size={17} />, () => go("hindi"))}
         <div className="ent-side-sep" />
         {/* My List with count badge */}
         <button
@@ -373,7 +374,6 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
             progressTick={progressTick}
             historyTick={historyTick}
             onOpen={openDetail}
-            onWatch={watch}
             inList={inListFn}
             onToggleList={toggleListItem}
             onBrowseGenre={browseToGenre}
@@ -395,7 +395,7 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
               <EntNewPopularView onOpen={openDetail} onWatch={watch} inList={inListFn} onToggleList={toggleListFn} />
             )}
             {view === "hindi" && (
-              <EntHindiDubView onOpen={openDetail} onWatch={watch} inList={inListFn} onToggleList={toggleListFn} />
+              <EntHindiDubView onOpen={openDetail} inList={inListFn} onToggleList={toggleListFn} />
             )}
             {view === "account" && (
               <EntAccountView onOpen={openDetail} onDataChanged={() => setListTick(t => t + 1)} />
@@ -427,7 +427,6 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
                 id={detail.id}
                 onBack={backFromDetail}
                 onOpenDetail={openDetail}
-                onWatch={watch}
                 inList={inListFn}
                 onToggleList={toggleListFn}
                 onHistoryChange={() => setHistoryTick(t => t + 1)}
@@ -452,10 +451,10 @@ export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
         <footer className="ent-foot">
           <div className="ent-foot-brand">
             <span className="ent-foot-mark"><NexusMark size={14} /></span>
-            <strong>NEXUS TV</strong> · <span className="dim">Metadata by TMDB · Streams via CineSrc</span>
+            <strong>NEXUS TV</strong> · <span className="dim">Metadata by TMDB · Trailers via YouTube · Browse-only</span>
           </div>
           <div className="ent-foot-meta">
-            <span><Icon.Play size={11} /> Full streaming</span>
+            <span><Icon.Film size={11} /> YouTube trailers</span>
             <span><Icon.Bookmark size={11} /> Local watchlist</span>
             <span><Icon.Shield size={11} /> No telemetry</span>
           </div>
