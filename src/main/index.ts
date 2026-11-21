@@ -11,6 +11,12 @@ import { cleanupInstallerCache } from "./updater";
 import { createTray, registerStartupCloseIpc, handleCloseRequest, getIsQuitting, destroyTray } from "./startup-close";
 import { getAllSettings } from "./db";
 import { initOverlay, cleanupOverlay, setActiveGame } from "./overlay";
+// v9.3.0 (M1) — Local Media Server. Importing this module at the top level
+// (BEFORE app.whenReady) is required because it calls
+// `protocol.registerSchemesAsPrivileged` at module-load time, and that call
+// must complete before the app is ready. `registerMediaProtocol` itself is
+// called after ready (see below).
+import { registerMediaProtocol } from "./media";
 
 // Prevent garbage collection of the main window.
 let mainWindow: BrowserWindow | null = null;
@@ -145,6 +151,15 @@ app.whenReady().then(() => {
       `NEXUS could not initialize its local database.\n\n${err instanceof Error ? err.stack || err.message : String(err)}\n\n` +
         `If better-sqlite3 reports an ABI mismatch, the app was built against a different Electron version. Re-download the latest release.`,
     );
+  }
+
+  // v9.3.0 (M1) — Register the nexus-media:// streaming protocol. Must run
+  // after app ready (protocol.handle requires a ready app); the privileged
+  // scheme registration was done at module-load time in ./media.
+  try {
+    registerMediaProtocol();
+  } catch (err) {
+    console.warn("[media] Failed to register nexus-media:// protocol:", err instanceof Error ? err.message : String(err));
   }
 
   // Register startup-close IPC handlers (launch-on-startup, close behavior)

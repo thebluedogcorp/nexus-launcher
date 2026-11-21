@@ -11,6 +11,8 @@ import type {
   DetectedGame,
   Game,
   LauncherSettings,
+  MediaItem,
+  MediaScanSummary,
   MetadataResult,
   ScanSummary,
   Stats,
@@ -241,6 +243,24 @@ const api = {
   getSettings: () => ipcRenderer.invoke("settings:get") as Promise<LauncherSettings>,
   setSettings: (s: Partial<LauncherSettings>) =>
     ipcRenderer.invoke("settings:set", s) as Promise<LauncherSettings>,
+
+  // ===== v9.3.0 (M1) — Local Media Server =====
+  // Scans configured folders (or the passed paths) for video files; upserts
+  // them into the media table; removes stale rows. Returns a summary count.
+  mediaScan: (paths?: string[]) =>
+    ipcRenderer.invoke("media:scan", paths) as Promise<MediaScanSummary>,
+  mediaList: (opts?: { q?: string; dir?: string }) =>
+    ipcRenderer.invoke("media:list", opts) as Promise<MediaItem[]>,
+  mediaGet: (id: number) =>
+    ipcRenderer.invoke("media:get", id) as Promise<MediaItem | null>,
+  mediaDelete: (id: number) =>
+    ipcRenderer.invoke("media:delete", id) as Promise<boolean>,
+  mediaClear: () =>
+    ipcRenderer.invoke("media:clear") as Promise<boolean>,
+  // Returns `nexus-media://media/<id>/stream` — the stable URL the renderer
+  // <video> uses as its src. The protocol serves ONLY the user's own files.
+  mediaStreamUrl: (id: number) =>
+    ipcRenderer.invoke("media:streamUrl", id) as Promise<string>,
 
   // ===== Playtime tracking =====
   stopPlaytimeTracking: (gameId: number) =>

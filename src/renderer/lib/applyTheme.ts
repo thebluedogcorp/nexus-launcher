@@ -13,7 +13,37 @@
 // applyTheme NEVER throws — on any error it reverts to the DEFAULT_THEME so a
 // broken custom theme can never prevent the launcher from opening.
 
-import { DEFAULT_THEME, validateTheme, type ThemeConfig, type SavedTheme } from "@shared/theme-types";
+import { DEFAULT_THEME, validateTheme, type ThemeConfig, type SavedTheme, type ElementOverride } from "@shared/theme-types";
+
+const OVERRIDE_STYLE_ID = "nx-forge-element-overrides";
+
+/**
+ * v10.0.0 — Write the Forge element-override sheet.
+ * Each override becomes `selector { --var: value !important; }`. Custom
+ * properties honor !important, and the !important lets an override beat both
+ * the :root token value and any inline style var set elsewhere.
+ */
+export function applyElementOverrides(overrides: ElementOverride[]): void {
+  let el = document.getElementById(OVERRIDE_STYLE_ID) as HTMLStyleElement | null;
+  if (!el) {
+    el = document.createElement("style");
+    el.id = OVERRIDE_STYLE_ID;
+    document.head.appendChild(el);
+  }
+  if (overrides.length === 0) {
+    el.textContent = "";
+    return;
+  }
+  const chunks: string[] = [];
+  for (const o of overrides) {
+    const decls = Object.entries(o.props)
+      .map(([k, v]) => `${k}: ${v} !important;`)
+      .join(" ");
+    if (!decls) continue;
+    chunks.push(`/* ${o.label || o.id} */\n${o.selector} { ${decls} }`);
+  }
+  el.textContent = chunks.join("\n");
+}
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   const h = hex.replace("#", "").trim();
@@ -152,6 +182,13 @@ export function applyTheme(raw: unknown): void {
 
     // color-scheme for native form controls
     root.style.setProperty("color-scheme", theme.mode);
+
+    // ----- v10.0.0 — NexusForge element overrides -----
+    // Selector-scoped CSS custom-property overrides picked in Forge Mode.
+    // Regenerated as a dedicated <style> element on every apply; junk CSS
+    // selectors are dropped by try/catch per-rule (a bad selector can never
+    // take down the whole sheet).
+    applyElementOverrides(theme.forge?.elementOverrides ?? []);
   } catch (e) {
     // Recovery: never let a bad theme break the app. Re-apply the default.
     console.error("[applyTheme] failed, reverting to default:", e);

@@ -19,7 +19,7 @@ interface Props {
   onCheckUpdates: () => void;
 }
 
-type TabId = "general" | "appearance" | "library" | "sidebar" | "plugins" | "developer" | "startup" | "overlay" | "about";
+type TabId = "general" | "appearance" | "library" | "sidebar" | "plugins" | "developer" | "startup" | "overlay" | "media" | "about";
 
 interface TabDef { id: TabId; label: string; icon: ReactNode }
 const TABS: TabDef[] = [
@@ -31,6 +31,8 @@ const TABS: TabDef[] = [
   { id: "developer", label: "Developer", icon: <Icon.Cpu size={15} /> },
   { id: "startup", label: "Startup & Close", icon: <Icon.Shield size={15} /> },
   { id: "overlay", label: "Overlay", icon: <Icon.Gamepad size={15} /> },
+  // v9.3.0 (M1) — Local Media Server.
+  { id: "media", label: "Media Server", icon: <Icon.Film size={15} /> },
   { id: "about", label: "About", icon: <Icon.Info size={15} /> },
 ];
 
@@ -73,6 +75,10 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
   const [tab, setTab] = useState<TabId>("general");
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ type: "info" | "success" | "error"; msg: string } | null>(null);
+  // v9.3.0 (M1) — Local Media Server settings.
+  const [mediaPaths, setMediaPaths] = useState(initial.mediaPaths ?? "");
+  const [mediaAccessCode, setMediaAccessCode] = useState(initial.mediaAccessCode ?? "");
+  const [mediaScanning, setMediaScanning] = useState(false);
   // v4.3.0 — sidebar customization state.
   const [hiddenPlatforms, setHiddenPlatforms] = useState<Set<string>>(
     () => new Set((initial.hiddenPlatforms ?? "").split("|").filter(Boolean))
@@ -177,6 +183,8 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
         // v4.3.0 — persist platform visibility (pipe-separated) + sidebar collapse default
         hiddenPlatforms: Array.from(hiddenPlatforms).join("|"),
         sidebarCollapsed: localStorage.getItem("nx-plat-collapsed") === "1",
+        // v9.3.0 (M1) — Local Media Server settings.
+        mediaPaths, mediaAccessCode,
       });
       flash("success", "Settings saved.");
     } catch (e) {
@@ -679,6 +687,147 @@ export function SettingsPage({ initial, onClose, onSave, onCheckUpdates }: Props
                           {feature}
                         </div>
                       ))}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* ===== MEDIA SERVER TAB (v9.3.0 / M1) ===== */}
+            {tab === "media" && (
+              <>
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />Media Folders</div>
+                  <div className="settings-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 10 }}>
+                    <div className="label-stack">
+                      <div className="t">Folders to scan for video files</div>
+                      <div className="d">
+                        One absolute path per line. NEXUS walks each folder (up to 6 levels deep) looking for video files
+                        (MP4, MKV, WebM, MOV, AVI, FLV, WMV, M4V, TS, MPG, MPEG, M2TS) and adds them to the local media
+                        library. Hidden files and folders are skipped. Only files on this machine are ever served — no
+                        third-party stream hosts, no cloud, no piracy sources.
+                      </div>
+                    </div>
+                    <textarea
+                      className="field-input"
+                      value={mediaPaths}
+                      onChange={(e) => setMediaPaths(e.target.value)}
+                      placeholder={"C:\\Users\\you\\Videos\\Movies\nD:\\Shows\nE:\\Clips"}
+                      rows={5}
+                      style={{ fontFamily: '"Cascadia Code", Consolas, monospace', fontSize: 12 }}
+                    />
+                    <div className="settings-choice-row">
+                      <button
+                        className="settings-choice"
+                        style={{ minWidth: 0 }}
+                        onClick={async () => {
+                          const r = await window.nexus.pickFolder({ title: "Pick a media folder" });
+                          if (r.ok && r.path) {
+                            const cur = mediaPaths.trim();
+                            setMediaPaths(cur ? `${cur}\n${r.path}` : r.path);
+                          }
+                        }}
+                        title="Open the OS folder picker and append the chosen path"
+                      >
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          <Icon.Folder size={14} /> Pick Folder…
+                        </span>
+                      </button>
+                      <button
+                        className="settings-choice"
+                        style={{ minWidth: 0 }}
+                        onClick={async () => {
+                          // Save first so the scan picks up the latest paths,
+                          // then trigger the scan via the media IPC.
+                          setMediaScanning(true);
+                          try {
+                            await onSave({ mediaPaths, mediaAccessCode });
+                            const summary = await window.nexus.mediaScan(
+                              mediaPaths.split(/\r?\n/).map((s) => s.trim()).filter(Boolean),
+                            );
+                            flash(
+                              "success",
+                              `Scan complete: ${summary.scanned} found · ${summary.added} added · ${summary.updated} updated · ${summary.removed} removed`,
+                            );
+                          } catch (e) {
+                            flash("error", "Scan failed: " + (e instanceof Error ? e.message : String(e)));
+                          } finally {
+                            setMediaScanning(false);
+                          }
+                        }}
+                        disabled={mediaScanning || !mediaPaths.trim()}
+                        title="Save paths + scan now"
+                      >
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          {mediaScanning ? <Icon.Spinner size={14} /> : <Icon.Scan size={14} />}
+                          {mediaScanning ? "Scanning…" : "Save & Scan"}
+                        </span>
+                      </button>
+                    </div>
+                    <div className="field-hint">
+                      <Icon.Info size={12} />
+                      <span>Click Save (below) to persist path changes, or Save &amp; Scan to persist + scan immediately.</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />LAN Access Code</div>
+                  <div className="settings-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 10 }}>
+                    <div className="label-stack">
+                      <div className="t">Access code</div>
+                      <div className="d">
+                        A short code other devices on your local network enter to browse &amp; stream your media
+                        library. Leave blank to disable code-required access. The host PC must stay running while
+                        streaming. Best performance is on a wired or strong Wi-Fi LAN.
+                      </div>
+                    </div>
+                    <div className="settings-choice-row">
+                      <input
+                        className="field-input"
+                        type="text"
+                        value={mediaAccessCode}
+                        onChange={(e) => setMediaAccessCode(e.target.value.toUpperCase().slice(0, 12))}
+                        placeholder="e.g. NX4Q2L"
+                        style={{ maxWidth: 260, fontFamily: '"Cascadia Code", Consolas, monospace', letterSpacing: "0.15em" }}
+                      />
+                      <button
+                        className="settings-choice"
+                        style={{ minWidth: 0 }}
+                        onClick={() => setMediaAccessCode(Math.random().toString(36).slice(2, 8).toUpperCase())}
+                        title="Generate a random 6-character code"
+                      >
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          <Icon.Refresh size={14} /> Generate
+                        </span>
+                      </button>
+                      <button
+                        className="settings-choice"
+                        style={{ minWidth: 0 }}
+                        onClick={() => setMediaAccessCode("")}
+                        disabled={!mediaAccessCode}
+                        title="Clear the access code"
+                      >
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          <Icon.Trash size={14} /> Clear
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="settings-section">
+                  <div className="settings-section-title"><span className="bar" />How streaming works</div>
+                  <div className="settings-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 8 }}>
+                    <div className="label-stack">
+                      <div className="t">Local-only, range-aware</div>
+                      <div className="d">
+                        The in-app player streams each file through NEXUS&apos;s custom <code style={{ fontFamily: "Cascadia Code, Consolas, monospace" }}>nexus-media://</code> protocol,
+                        which serves bytes straight from disk with HTTP Range support (206 Partial Content) so video
+                        seeking works. Chromium natively plays MP4, WebM, MOV, M4V, and OGG; other containers
+                        (MKV, AVI, FLV, WMV, TS, MPG, MPEG, M2TS) show the file path so you can open them in your
+                        system media player. The protocol serves ONLY files indexed by the media scan — nothing else.
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -13,7 +13,7 @@
 import { app } from "electron";
 import { join, dirname } from "path";
 import { mkdirSync, existsSync } from "fs";
-import type { Game, DetectedGame, LauncherSettings, Collection, CollectionKind } from "@shared/types";
+import type { Game, DetectedGame, LauncherSettings, Collection, CollectionKind, MediaItem } from "@shared/types";
 // v4.4.1 — CRITICAL: the main process is compiled to CommonJS, and Node's
 // runtime resolver does NOT understand the @shared/* path alias (only tsc
 // type-checking + the Vite-bundled renderer do). These are VALUE imports
@@ -199,6 +199,26 @@ function migrate(conn: import("better-sqlite3").Database) {
       builtin INTEGER NOT NULL DEFAULT 0,
       createdAt TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    -- v9.3.0 (M1) — Local Media Server.
+    -- Stores video files discovered by scanning the user's configured folders.
+    -- Each row maps 1:1 to a real file on disk and is streamed back to the
+    -- in-app HTML5 player via the custom nexus-media:// protocol. The
+    -- launcher serves ONLY files on the user's local disk — no third-party
+    -- stream hosts, no piracy sources.
+    CREATE TABLE IF NOT EXISTS media (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      title       TEXT NOT NULL,
+      filePath    TEXT NOT NULL UNIQUE,
+      fileSize    INTEGER NOT NULL,
+      fileExt     TEXT NOT NULL,
+      container   TEXT NOT NULL,
+      dir         TEXT NOT NULL,
+      durationSec REAL,
+      scannedAt   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_media_title ON media(title);
+    CREATE INDEX IF NOT EXISTS idx_media_dir   ON media(dir);
   `);
   addColumnIfMissing(conn, "games", "completionStatus", "TEXT");
   addColumnIfMissing(conn, "games", "userRating", "INTEGER");
@@ -794,6 +814,9 @@ export function getAllSettings(): LauncherSettings {
     sidebarCollapsed: getSetting("sidebarCollapsed") === "true",
     // v4.4.0 — active theme id (0 = default, not yet saved)
     activeThemeId: Number(getSetting("activeThemeId") ?? "0") || 0,
+    // v9.3.0 (M1) — Local Media Server settings.
+    mediaPaths: getSetting("mediaPaths") ?? "",
+    mediaAccessCode: getSetting("mediaAccessCode") ?? "",
   };
 }
 
@@ -809,6 +832,9 @@ export function setAllSettings(s: Partial<LauncherSettings>): LauncherSettings {
   if (s.hiddenPlatforms !== undefined) setSetting("hiddenPlatforms", s.hiddenPlatforms);
   if (s.sidebarCollapsed !== undefined) setSetting("sidebarCollapsed", String(s.sidebarCollapsed));
   if (s.activeThemeId !== undefined) setSetting("activeThemeId", String(s.activeThemeId));
+  // v9.3.0 (M1) — Local Media Server settings.
+  if (s.mediaPaths !== undefined) setSetting("mediaPaths", s.mediaPaths);
+  if (s.mediaAccessCode !== undefined) setSetting("mediaAccessCode", s.mediaAccessCode);
   return getAllSettings();
 }
 
@@ -1542,4 +1568,145 @@ export function getDefaultOverlayConfig(): OverlayConfig {
     },
     hotkey: "",
   };
+}
+
+// ===== v9.3.0 (M1) — Local Media Server =====
+//
+// CRUD for the `media` table. Each row maps 1:1 to a real video file on the
+// user's disk (no third-party stream hosts). The main-process media module
+// scans configured folders and upserts discovered files here; the
+// `nexus-media://` protocol handler reads rows by id and streams the bytes
+// back to the in-app HTML5 player with HTTP Range support so seeking works.
+
+interface MediaRow {
+  id: number;
+  title: string;
+  filePath: string;
+  fileSize: number;
+  fileExt: string;
+  container: string;
+  dir: string;
+  durationSec: number | null;
+  scannedAt: string;
+}
+
+function rowToMedia(r: MediaRow): MediaItem {
+  return {
+    id: r.id,
+    title: r.title,
+    filePath: r.filePath,
+    fileSize: r.fileSize,
+    fileExt: r.fileExt,
+    container: r.container,
+    dir: r.dir,
+    durationSec: r.durationSec === null || r.durationSec === undefined ? null : Number(r.durationSec),
+    scannedAt: r.scannedAt,
+  };
+}
+
+export interface UpsertMediaInput {
+  title: string;
+  filePath: string;
+  fileSize: number;
+  fileExt: string;
+  container: string;
+  dir: string;
+}
+
+/**
+ * Insert a media file if its filePath isn't already indexed. If it IS present,
+ * refresh title / size / ext / container / dir (and bump scannedAt) so a
+ * re-scan keeps the row current without losing the stable id (the protocol
+ * handler relies on the id being stable across re-scans). Returns true if a
+ * new row was inserted, false if an existing row was updated.
+ */
+export function upsertMediaFile(f: UpsertMediaInput): boolean {
+  const conn = db();
+  const existing = conn.prepare("SELECT id, fileSize, title FROM media WHERE filePath = ?").get(f.filePath) as
+    | { id: number; fileSize: number; title: string }
+    | undefined;
+  if (existing) {
+    // Only write if something actually changed (avoids needless WAL churn).
+    if (existing.fileSize !== f.fileSize || existing.title !== f.title) {
+      conn.prepare(
+        "UPDATE media SET title = ?, fileSize = ?, fileExt = ?, container = ?, dir = ?, scannedAt = datetime('now') WHERE id = ?",
+      ).run(f.title, f.fileSize, f.fileExt, f.container, f.dir, existing.id);
+    } else {
+      conn.prepare("UPDATE media SET scannedAt = datetime('now') WHERE id = ?").run(existing.id);
+    }
+    return false;
+  }
+  conn.prepare(
+    "INSERT INTO media (title, filePath, fileSize, fileExt, container, dir) VALUES (?, ?, ?, ?, ?, ?)",
+  ).run(f.title, f.filePath, f.fileSize, f.fileExt, f.container, f.dir);
+  return true;
+}
+
+export function listMedia(opts?: { q?: string; dir?: string }): MediaItem[] {
+  const conn = db();
+  const q = (opts?.q ?? "").trim();
+  const dir = (opts?.dir ?? "").trim();
+  const where: string[] = [];
+  const params: (string | number)[] = [];
+  if (q) {
+    where.push("title LIKE ?");
+    params.push(`%${q}%`);
+  }
+  if (dir) {
+    where.push("dir = ?");
+    params.push(dir);
+  }
+  const sql = where.length > 0
+    ? `SELECT id, title, filePath, fileSize, fileExt, container, dir, durationSec, scannedAt FROM media WHERE ${where.join(" AND ")} ORDER BY title COLLATE NOCASE ASC`
+    : "SELECT id, title, filePath, fileSize, fileExt, container, dir, durationSec, scannedAt FROM media ORDER BY title COLLATE NOCASE ASC";
+  const rows = conn.prepare(sql).all(...params) as MediaRow[];
+  return rows.map(rowToMedia);
+}
+
+export function getMedia(id: number): MediaItem | null {
+  const conn = db();
+  const row = conn.prepare(
+    "SELECT id, title, filePath, fileSize, fileExt, container, dir, durationSec, scannedAt FROM media WHERE id = ?",
+  ).get(id) as MediaRow | undefined;
+  return row ? rowToMedia(row) : null;
+}
+
+export function deleteMedia(id: number): void {
+  db().prepare("DELETE FROM media WHERE id = ?").run(id);
+}
+
+export function clearMedia(): void {
+  db().prepare("DELETE FROM media").run();
+}
+
+/**
+ * Remove rows whose filePath is no longer present on disk (the file was
+ * deleted/moved between scans). `keepFilePaths` is the set of paths discovered
+ * in the latest scan. Returns the count of removed rows.
+ */
+export function removeStaleMedia(keepFilePaths: string[]): number {
+  const conn = db();
+  // Three strategies depending on input size — all avoid SQL injection by
+  // binding the keep list as parameters (never string-interpolated).
+  if (keepFilePaths.length === 0) {
+    const info = conn.prepare("DELETE FROM media").run();
+    return Number(info.changes ?? 0);
+  }
+  if (keepFilePaths.length <= 999) {
+    const placeholders = keepFilePaths.map(() => "?").join(",");
+    const info = conn.prepare(`DELETE FROM media WHERE filePath NOT IN (${placeholders})`).run(...keepFilePaths);
+    return Number(info.changes ?? 0);
+  }
+  // > 999 paths: SQLite has a parameter limit, so fall back to deleting in
+  // batches of 999 against NOT IN. We collect every id present in the DB,
+  // diff against the keep set in JS, then delete the survivors by id.
+  const allRows = conn.prepare("SELECT id, filePath FROM media").all() as Array<{ id: number; filePath: string }>;
+  const keepSet = new Set(keepFilePaths);
+  const toDelete = allRows.filter((r) => !keepSet.has(r.filePath)).map((r) => r.id);
+  let removed = 0;
+  const delStmt = conn.prepare("DELETE FROM media WHERE id = ?");
+  for (const id of toDelete) {
+    removed += Number(delStmt.run(id).changes ?? 0);
+  }
+  return removed;
 }

@@ -34,7 +34,13 @@ import {
   updateTheme,
   deleteTheme,
   duplicateTheme,
+  // v9.3.0 (M1) — Local Media Server
+  listMedia,
+  getMedia,
+  deleteMedia,
+  clearMedia,
 } from "./db";
+import { scanMediaLibrary, mediaStreamUrl } from "./media";
 import { runScan } from "./detectors";
 import { launchGame } from "./launchers";
 import { searchRawg } from "./metadata/rawg";
@@ -254,6 +260,29 @@ export function registerIpc(): void {
   ipcMain.handle("stats:get", () => getStats());
   ipcMain.handle("settings:get", () => getAllSettings());
   ipcMain.handle("settings:set", (_e, s) => setAllSettings(s));
+
+  // ===== v9.3.0 (M1) — Local Media Server =====
+  // Scan configured folders for video files; upsert into the `media` table;
+  // remove stale rows. If no paths are passed, falls back to the settings'
+  // mediaPaths (newline-separated). Serves ONLY the user's own files.
+  ipcMain.handle("media:scan", async (_e, paths?: string[]) => {
+    const list = paths ?? getAllSettings().mediaPaths?.split(/\r?\n/).map((s) => s.trim()).filter(Boolean) ?? [];
+    return scanMediaLibrary(list);
+  });
+  ipcMain.handle("media:list", (_e, opts?: { q?: string; dir?: string }) => listMedia(opts ?? {}));
+  ipcMain.handle("media:get", (_e, id: number) => getMedia(id));
+  ipcMain.handle("media:delete", (_e, id: number) => {
+    deleteMedia(id);
+    return true;
+  });
+  ipcMain.handle("media:clear", () => {
+    clearMedia();
+    return true;
+  });
+  // Returns the stable `nexus-media://media/<id>/stream` URL the renderer
+  // <video> element uses as its src. The protocol handler supports HTTP Range
+  // requests so seeking works.
+  ipcMain.handle("media:streamUrl", (_e, id: number) => mediaStreamUrl(id));
 
   // ===== Auto-update =====
   ipcMain.handle("updater:check", async () => {

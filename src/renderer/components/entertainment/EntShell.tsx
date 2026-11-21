@@ -33,12 +33,57 @@ import type { TmdbItem, TmdbMediaType } from "../../lib/tmdb-types";
 
 type EntView = "home" | "movies" | "tv" | "anime" | "new" | "hindi" | "mylist" | "search" | "detail" | "stats" | "collections" | "discover" | "account";
 
+/**
+ * v10.0.0 universal-shell port — the App calls EntShell with the new prop
+ * shape below (view, onNavigate, etc.). EntShell keeps its own INTERNAL
+ * routing state and ignores the externally-supplied `view` for now (the
+ * universal shell is being progressively ported). The new props are typed
+ * here so the call site compiles; runtime behavior is unchanged.
+ *
+ * `onBackToSplash` and `onSwitchToGames` are kept as optional — the
+ * universal-shell call site doesn't pass them, so EntShell falls back to
+ * no-op handlers when they're absent.
+ *
+ * `EntNavView` is the subset of EntView that maps to a ShellView — i.e. the
+ * externally-routeable views. `search` and `detail` are EntShell-internal
+ * sub-views (not first-class shell destinations) so they're excluded.
+ */
+export type EntNavView = Exclude<EntView, "search" | "detail">;
+
 interface ShellProps {
-  onBackToSplash: () => void;
-  onSwitchToGames: () => void;
+  // Legacy / direct props (still used by the in-progress universal shell).
+  onBackToSplash?: () => void;
+  onSwitchToGames?: () => void;
+  // v10.0.0 universal-shell props — accepted but currently ignored.
+  // (They will be wired up when the universal-shell port completes.)
+  view?: EntNavView;
+  onNavigate?: (v: EntNavView) => void;
+  active?: boolean;
+  searchSignal?: number;
+  games?: import("@shared/types").Game[];
+  onLaunchGame?: (g: import("@shared/types").Game) => void;
+  onOpenGame?: (id: number) => void;
+  ui?: {
+    cmdOpen: boolean;
+    setCmdOpen: (v: boolean) => void;
+    scOpen: boolean;
+    setScOpen: (v: boolean) => void;
+    wnOpen: boolean;
+    setWnOpen: (v: boolean) => void;
+    notifOpen: boolean;
+    setNotifOpen: (v: boolean) => void;
+  };
+  notifCount?: number;
+  onNotifCountChange?: (n: number) => void;
 }
 
-export function EntShell({ onBackToSplash, onSwitchToGames }: ShellProps) {
+export function EntShell(props: ShellProps) {
+  // Pull the legacy props out with fallbacks so the rest of the component
+  // doesn't need to know they're optional. The universal-shell props are
+  // intentionally NOT destructured into local state — EntShell keeps its own
+  // internal view routing for now.
+  const onBackToSplash = props.onBackToSplash ?? (() => {});
+  const onSwitchToGames = props.onSwitchToGames ?? (() => {});
   const [view, setView] = useState<EntView>("home");
   const [detail, setDetail] = useState<{ mediaType: TmdbMediaType; id: number } | null>(null);
   const [watching, setWatching] = useState<WatchPayload | null>(null);
