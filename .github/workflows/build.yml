@@ -50,26 +50,25 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v9.3.0"
-          $title = "NEXUS v9.3.0 — Local Media Server: stream your own files"
+          $tag = "v9.4.0"
+          $title = "NEXUS v9.4.0 — Restored game launcher + rebuilt Media Server (fixes v9.3.0)"
           $notes = @"
-          NEXUS — Universal Game Launcher & Entertainment Hub for Windows.
+          NEXUS — Universal Game Launcher & Media Server for Windows.
 
-          **v9.3.0 — Local Media Server. Stream your own files.**
+          **v9.4.0 — fixes the broken v9.3.0. The original game launcher is back, and entertainment is rebuilt from the ground up as the local Media Server.**
 
-          A built-in media server now serves the video files already on your machine. Configure your folders in Settings → Media Server, scan, and play — movies, shows, clips, anything you own. Files stream through a custom nexus-media:// protocol with full HTTP Range support, so seeking works natively in the in-app HTML5 player. MP4 / WebM / MOV play in-browser; MKV / AVI / others show their file path for a system player.
+          **Restored: the game launcher.**
+          v9.3.0 shipped an unfinished "universal shell" that removed the Games & Entertainment startup selector and left the game launcher unusable. v9.4.0 reverts that. The startup selector is back, and the full game launcher works again — auto-detection across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox, RAWG metadata, library, collections, playtime, stats, plugins, themes, one-click launch.
 
-          **LAN sharing.** A QR code + access-code panel lets other devices on your network browse and stream your library. The host PC must stay running; it is LAN-only and nothing is uploaded — your files, your network.
+          **Rebuilt: Media Server (the new second mode).**
+          The old TMDB "NEXUS TV" entertainment mode is torn down. The second mode is now the local Media Server: browse, play, and host your own video files. Scan your folders, play in-app with full seeking (nexus-media:// protocol, HTTP Range / 206), and share your library to other devices on your LAN via QR + access code. MP4/WebM/MOV play in-browser; other containers show their file path for a system player. Your files only — nothing uploaded, no cloud.
 
           **Still clean — no piracy.**
-          Entertainment remains browse-only (TMDB metadata + YouTube trailers). No third-party stream hosts are embedded or routed. The media server only ever serves files from your own configured folders.
-
-          **Game launcher fully preserved.**
-          Auto-detection across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox. RAWG metadata. Library, favorites, playtime tracking, plugins, command palette, and the in-app auto-updater all work as before.
+          No third-party stream hosts are embedded or routed. Entertainment serves ONLY files on the user's own disk. The game launcher is fully preserved.
 
           **Downloads:**
-          - NEXUS-Setup-9.3.0.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-9.3.0.exe — single-file portable build.
+          - NEXUS-Setup-9.4.0.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-9.4.0.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@

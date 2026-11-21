@@ -24,9 +24,11 @@ interface MediaViewProps {
   settings: { mediaPaths: string; mediaAccessCode: string } | null;
   /** Navigate to the Settings → Media tab. */
   onConfigure: () => void;
+  /** Return to the mode selector / games mode. */
+  onBack?: () => void;
 }
 
-export function MediaView({ settings, onConfigure }: MediaViewProps) {
+export function MediaView({ settings, onConfigure, onBack }: MediaViewProps) {
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -108,6 +110,11 @@ export function MediaView({ settings, onConfigure }: MediaViewProps) {
       {/* Hero */}
       <div className="ent-page-head">
         <div>
+          {onBack && (
+            <button className="tb-logo nx-media-back" onClick={onBack} title="Back to mode selector" aria-label="Back">
+              <Icon.ArrowLeft size={16} />
+            </button>
+          )}
           <div className="ent-page-label">
             <Icon.HardDrive size={11} />
             <span style={{ marginLeft: 6 }}>Local Media Server · streams only files on this machine</span>

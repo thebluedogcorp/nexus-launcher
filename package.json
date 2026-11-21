@@ -1,7 +1,7 @@
 {
   "name": "nexus-launcher",
-  "version": "9.3.0",
-  "description": "NEXUS — Universal Game Launcher & Entertainment Hub for Windows. Detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox, patches rich metadata via RAWG, and launches games natively. NEXUS TV: an OTT-style movie + TV browse experience powered by TMDB (browse-only: metadata + YouTube trailers). A local media server arrives in v9.3.0.",
+  "version": "9.4.0",
+  "description": "NEXUS — Universal Game Launcher & Media Server for Windows. Detects every installed game across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox, patches rich metadata via RAWG, and launches games natively. Plus a local Media Server: browse, play, and host your own video files on your LAN.",
   "author": "NEXUS",
   "license": "MIT",
   "main": "dist-electron/main/index.js",

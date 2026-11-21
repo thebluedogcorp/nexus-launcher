@@ -4,11 +4,8 @@ import { PLATFORM_LIST, PLATFORMS } from "@shared/types";
 import { Icon } from "./components/Icons";
 import { NexusMark } from "./components/Logo";
 import { ModeToggle } from "./components/ModeToggle";
-import { Shell, type ShellView } from "./components/Shell";
-import { EntShell, type EntNavView } from "./components/entertainment/EntShell";
-import { EntToaster } from "./components/entertainment/EntToaster";
-import { unreadNotificationCount } from "./lib/ent-userdata";
-import { Workspace, ForgePanel } from "./forge/Workspace";
+import { ModeSplash } from "./components/ModeSplash";
+import { MediaView } from "./components/media/MediaView";
 import { PlatformMark } from "./components/PlatformMark";
 import { IconGlyph } from "./components/IconGlyph";
 import { ThemeStudio } from "./components/theme/ThemeStudio";
@@ -26,8 +23,6 @@ import { AddGameDialog } from "./components/AddGameDialog";
 import { ScanDialog } from "./components/ScanDialog";
 import { SettingsPage } from "./components/SettingsPage";
 import { UpdateDialog } from "./components/UpdateDialog";
-// v9.3.0 (M1) — Local Media Server.
-import { MediaView } from "./components/media/MediaView";
 import { ToastContainer, type Toast } from "./components/Toast";
 import { useGamepadController } from "./lib/useGamepad";
 import { formatPlaytime, formatPlaytimeShort, formatSize, platformColor, platformLabel, gradientFor, initials, relativeTime } from "./lib/helpers";
@@ -44,19 +39,13 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
 ];
 
 export function App() {
-  // v10.0.0 — Universal shell: ONE app, ONE navigation. Games and Entertainment
-  // are views inside a single shell — no more separated cores or mode selector.
-  const [view, setView] = useState<ShellView>("home");
-  const navigate = useCallback((v: ShellView) => setView(v), []);
-  // Lifted media-overlay states (palette / shortcuts / what's-new / notifications)
-  // so the universal rail can trigger them while EntShell stays the host.
-  const [cmdOpen, setCmdOpen] = useState(false);
-  const [scOpen, setScOpen] = useState(false);
-  const [wnOpen, setWnOpen] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
-  const [notifCount, setNotifCount] = useState(() => unreadNotificationCount());
-  // Search signal: bumped by the topbar search button; EntShell reacts to it.
-  const [searchSignal, setSearchSignal] = useState(0);
+  // v5.0.0 — Top-level app mode: the "Games & Entertainment" startup selector
+  // decides whether the user lands in the game launcher or NEXUS TV. Always
+  // starts on "splash" so the selector shows on every app open.
+  const [appMode, setAppMode] = useState<"splash" | "games" | "media">("splash");
+  const goSplash = useCallback(() => setAppMode("splash"), []);
+  const goGames = useCallback(() => setAppMode("games"), []);
+  const goMedia = useCallback(() => setAppMode("media"), []);
 
   const [games, setGames] = useState<Game[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -70,6 +59,7 @@ export function App() {
   const [pageGame, setPageGame] = useState<Game | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [focusedIdx, setFocusedIdxState] = useState(0);
   // TRULY synchronous ref — updated BEFORE React state, so the gamepad
@@ -435,16 +425,17 @@ export function App() {
   gpZoneRef.current = gpZone;
   // Sub-index within each zone (e.g. which button in the topbar)
   const gpSubIdx = useRef(0);
-  const stateRef = useRef({ games, pageGame, addOpen, scanOpen, updateDialogOpen });
-  stateRef.current = { games, pageGame, addOpen, scanOpen, updateDialogOpen };
+  const stateRef = useRef({ games, pageGame, addOpen, scanOpen, settingsOpen, updateDialogOpen });
+  stateRef.current = { games, pageGame, addOpen, scanOpen, settingsOpen, updateDialogOpen };
 
   const onGamepad = useCallback((action: string) => {
     const s = stateRef.current;
     // Modal handling — controller navigates within the modal
-    if (s.addOpen || s.scanOpen || s.updateDialogOpen) {
+    if (s.addOpen || s.scanOpen || s.settingsOpen || s.updateDialogOpen) {
       if (action === "back") {
         if (s.addOpen) setAddOpen(false);
         else if (s.scanOpen) setScanOpen(false);
+        else if (s.settingsOpen) setSettingsOpen(false);
         else if (s.updateDialogOpen) setUpdateDialogOpen(false);
       } else if (action === "confirm" || action === "play") {
         // Click the focused element in the modal
@@ -514,7 +505,7 @@ export function App() {
       else if (action === "confirm") { const g = s.games[focusedIdxRef.current]; if (g) openPage(g.id); }
       else if (action === "play") { const g = s.games[focusedIdxRef.current]; if (g) handleLaunch(g); }
       else if (action === "details") { const g = s.games[focusedIdxRef.current]; if (g) openPage(g.id); }
-      else if (action === "menu") navigate("settings");
+      else if (action === "menu") setSettingsOpen(true);
       else if (action === "scan") setScanOpen(true);
     } else if (zone === "topbar") {
       // Topbar: left/right navigates between buttons
@@ -550,7 +541,7 @@ export function App() {
         if (focusables[gpSubIdx.current]) focusables[gpSubIdx.current].click();
       }
     }
-  }, [handleLaunch, openPage, navigate]);
+  }, [handleLaunch, openPage]);
 
   // Get all focusable elements within a zone
   const getZoneFocusables = (zone: string): HTMLElement[] => {
@@ -649,11 +640,7 @@ export function App() {
       lastKeyTime = now;
 
       if (pageGame) { if (e.key === "Escape") setPageGame(null); return; }
-      // v10 — Ctrl/Cmd+K opens the command palette everywhere (EntShell hosts it).
-      if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) { e.preventDefault(); setCmdOpen((o) => !o); return; }
-      // Games shortcuts only apply while the Games view is on screen.
-      if (view !== "games") return;
-      if (e.key === "/") { e.preventDefault(); const el = document.querySelector(".tb-search input") as HTMLInputElement; el?.focus(); }
+      if (e.key === "/" || ((e.ctrlKey || e.metaKey) && e.key === "k")) { e.preventDefault(); const el = document.querySelector(".tb-search input") as HTMLInputElement; el?.focus(); }
       else if (e.key === "ArrowLeft") { focusSourceRef.current = "nav"; setFocusedIdx((i) => Math.max(0, i - 1)); }
       else if (e.key === "ArrowRight") { focusSourceRef.current = "nav"; setFocusedIdx((i) => Math.min(games.length - 1, i + 1)); }
       else if (e.key === "Enter") { const g = games[focusedIdx]; if (g) openPage(g.id); }
@@ -662,7 +649,7 @@ export function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [pageGame, view, games, focusedIdx, openPage]);
+  }, [pageGame, games, focusedIdx, openPage]);
 
   // Track whether the last focus change was from mouse or keyboard/controller.
   // Mouse hover should NOT trigger auto-scroll — the instant scroll repositions
@@ -687,15 +674,105 @@ export function App() {
 
   const focusedGame = games[focusedIdx] ?? null;
 
-  // ── v10.0.0 — Universal Shell composition ─────────────────────────────
+  // v5.0.0 — Mode selector + Entertainment (NEXUS TV). When the user hasn't
+  // picked a mode yet (or switched back), show the splash; "tv" shows the
+  // OTT-style browse view. Otherwise fall through to the game launcher below.
+  if (appMode === "splash") {
+    return <ModeSplash onChoose={(m) => setAppMode(m)} />;
+  }
+  if (appMode === "media") {
+    return <MediaView settings={settings} onConfigure={() => setSettingsOpen(true)} onBack={goSplash} />;
+  }
 
-  // v10 — Games · Desktop mode (Epic-style grid + sidebar), rendered inside the
-  // universal shell. The shared topbar is injected into the Shell separately.
-  const desktopScreen = (
-    <div className="app desktop-mode">
-      <div className="desktop-layout">
-        <Workspace id="games-desktop">
-          <ForgePanel type="library-sidebar" title="Library Sidebar" minW={180} minH={220}>
+  // Game page
+  if (pageGame) {
+    return (
+      <>
+        <GamePage game={pageGame} onClose={() => setPageGame(null)} onLaunch={handleLaunch} onPatch={handlePatch} onDelete={handleDelete} onToggleFav={handleToggleFav} onUpdate={handleUpdateFromPage} onOpenDir={handleOpenDir} onAddToCollection={(g) => setCollPickerGame({ id: g.id, title: g.title })} onGet={(g) => setAcquireGame({ id: g.id, title: g.title, installed: g.installed })} />
+        {controllerConnected && <div className="hints-bar"><span className="hint"><span className="k r">B</span> Back</span><span className="hint"><span className="k r">A</span>/<span className="k r">X</span> Play</span></div>}
+        {/* v4.3.0 — Collection dialogs accessible from the game page too */}
+        {createCollOpen && <CreateCollectionDialog onClose={() => setCreateCollOpen(false)} onSave={handleCreateCollection} />}
+        {editColl && <CreateCollectionDialog initial={editColl} onClose={() => setEditColl(null)} onSave={(d) => handleUpdateCollection(editColl.id, d)} />}
+        {collPickerGame && (
+          <CollectionPicker
+            gameId={collPickerGame.id}
+            gameTitle={collPickerGame.title}
+            collections={collections}
+            onClose={() => setCollPickerGame(null)}
+            onToggle={(cid, add) => handleToggleGameInCollection(cid, collPickerGame.id, add)}
+            onCreateNew={() => { setCollPickerGame(null); setCreateCollOpen(true); }}
+          />
+        )}
+        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+        {pluginDialog && <PluginDialogModal req={pluginDialog} bodyRef={pluginDialogBodyRef} onClose={() => setPluginDialog(null)} />}
+        {studioOpen && <ThemeStudio onClose={() => setStudioOpen(false)} />}
+        {acquireGame && <AcquisitionPicker gameId={acquireGame.id} gameTitle={acquireGame.title} installed={acquireGame.installed} onClose={() => setAcquireGame(null)} onStarted={() => setAcquireGame(null)} />}
+      </>
+    );
+  }
+
+  // Main UI — Console mode (PS5 carousel) or Desktop mode (Epic-style grid + sidebar)
+  if (uiMode === "desktop" && !pageGame) {
+    return (
+      <div className="app desktop-mode">
+        {/* Top bar */}
+        <header className="topbar">
+          <div className="tb-brand">
+            <button className="tb-logo" onClick={goSplash} title="Switch mode" aria-label="Switch mode"><NexusMark size={18} /></button>
+            <div><div className="tb-name">NEXUS</div><div className="tb-sub">Launcher</div></div>
+            <button className="tb-mode-tv" onClick={goMedia} title="Open Media Server">
+              <Icon.Film size={12} /> Media
+            </button>
+          </div>
+          <div className="tb-search">
+            <span className="icon"><Icon.Search size={15} /></span>
+            <input value={filters.query} onChange={(e) => setFilters((f) => ({ ...f, query: e.target.value }))} placeholder="Search library…" />
+          </div>
+          <select className="tb-select" value={filters.sort} onChange={(e) => setFilters((f) => ({ ...f, sort: e.target.value as SortKey }))}>
+            {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+          {updateAvailable && (
+            <button className="update-badge" onClick={() => setUpdateDialogOpen(true)} title={`NEXUS ${updateAvailable.version} available`}>
+              <Icon.DownloadCloud size={13} /> {updateAvailable.version}
+            </button>
+          )}
+          {activePlaytime && (
+            <button
+              className="playtime-badge"
+              onClick={async () => { await window.nexus.stopPlaytimeTracking(activePlaytime.gameId); setActivePlaytime(null); }}
+              title={`Click to stop tracking — ${activePlaytime.gameTitle}`}
+            >
+              <span className="playtime-badge__dot" />
+              <span className="playtime-badge__text">{activePlaytime.gameTitle}</span>
+              <span className="playtime-badge__time">{formatPlaytimeShort(activePlaytime.elapsedSec)}</span>
+              <span className="playtime-badge__stop">Stop</span>
+            </button>
+          )}
+          <ModeToggle current={uiMode} onSwitch={setUiModeAndPersist} />
+          {/* v4.9.0 — Plugin status indicators (live widgets in the topbar). */}
+          {pluginStatus.length > 0 && (
+            <div className="plugin-status-strip">
+              {pluginStatus.map((s) => <PluginStatusWidget key={s.id} ext={s} />)}
+            </div>
+          )}
+          {/* v4.9.0 — Plugin topbar actions. */}
+          {pluginTopbar.length > 0 && (
+            <div className="plugin-topbar-actions">
+              {pluginTopbar.map((a) => (
+                <button key={a.id} className="tb-icon" onClick={a.onClick} title={a.label} aria-label={a.label}>
+                  <PluginIcon name={a.icon} size={15} />
+                </button>
+              ))}
+            </div>
+          )}
+          <button className="tb-icon" onClick={() => setScanOpen(true)} title="Scan"><Icon.Scan size={16} /></button>
+          <button className="tb-icon primary" onClick={() => setAddOpen(true)} title="Add"><Icon.Plus size={15} /> Add</button>
+          <button className="tb-icon" onClick={() => setStudioOpen(true)} title="Theme Studio"><IconGlyph k="palette" size={16} /></button>
+          <button className="tb-icon" onClick={() => setSettingsOpen(true)} title="Settings"><Icon.Settings size={16} /></button>
+        </header>
+
+        {/* Desktop layout: left sidebar + main content */}
+        <div className="desktop-layout">
           {/* Left sidebar */}
           <aside className="dt-sidebar">
             <div className="dt-sidebar-brand">
@@ -797,10 +874,8 @@ export function App() {
               </div>
             )}
           </aside>
-          </ForgePanel>
 
           {/* Main content area */}
-          <ForgePanel type="library-main" title="Library" minW={280} minH={220}>
           <main className="dt-main">
             {/* v4.7.0 — Plugin page rendering (when a plugin page is active) */}
             {activePluginPage && (() => {
@@ -979,19 +1054,116 @@ export function App() {
             )}
             </>  )}
           </main>
-          </ForgePanel>
-        </Workspace>
-      </div>
-    </div>
-  );
+        </div>
 
-  // v10 — Games · Console mode (PS5-style carousel) inside the universal shell.
-  const consoleScreen = (
+        {/* Dialogs */}
+        {addOpen && <AddGameDialog onClose={() => setAddOpen(false)} onAdd={handleAdd} />}
+        {scanOpen && <ScanDialog onClose={() => setScanOpen(false)} onRunScan={handleRunScan} onImport={handleImport} onDeepScan={handleDeepScan} />}
+        {settingsOpen && settings && <SettingsPage initial={settings} onClose={() => setSettingsOpen(false)} onSave={handleSaveSettings} onCheckUpdates={handleCheckUpdates} />}
+        {updateDialogOpen && updateAvailable && <UpdateDialog info={updateAvailable} onClose={() => setUpdateDialogOpen(false)} />}
+
+        {/* Context menu */}
+        {ctxMenu && (
+          <div className="ctx-menu" style={{ left: ctxMenu.x, top: ctxMenu.y }} onClick={() => setCtxMenu(null)}>
+            <button className="ctx-item" onClick={() => { handleLaunch(ctxMenu.game); setCtxMenu(null); }}><Icon.Play size={15} /> Play</button>
+            <button className="ctx-item" onClick={() => { openPage(ctxMenu.game.id); setCtxMenu(null); }}><Icon.Info size={15} /> Details</button>
+            <div className="ctx-sep" />
+            <button className="ctx-item" onClick={() => { handleToggleFav(ctxMenu.game); setCtxMenu(null); }}><Icon.Star size={15} filled={ctxMenu.game.favorite} /> {ctxMenu.game.favorite ? "Unfavorite" : "Favorite"}</button>
+            <button className="ctx-item" onClick={() => { setCollPickerGame({ id: ctxMenu.game.id, title: ctxMenu.game.title }); setCtxMenu(null); }}><Icon.Folder size={15} /> Add to Collection</button>
+            <button className="ctx-item" onClick={() => { handleOpenDir(ctxMenu.game); setCtxMenu(null); }}><Icon.Folder size={15} /> Open Directory</button>
+            <button className="ctx-item" onClick={() => { handlePatch(ctxMenu.game); setCtxMenu(null); }}><Icon.Refresh size={15} /> Patch Metadata</button>
+            <button className="ctx-item" onClick={() => { setEditorGame(ctxMenu.game); setCtxMenu(null); }}><Icon.FileCog size={15} /> Edit Game</button>
+            <div className="ctx-sep" />
+            <button className="ctx-item danger" onClick={() => { handleDelete(ctxMenu.game); setCtxMenu(null); }}><Icon.Trash size={15} /> Remove</button>
+          </div>
+        )}
+        {/* v4.3.0 — Collection dialogs (create/edit + add-to-collection picker) */}
+        {createCollOpen && <CreateCollectionDialog onClose={() => setCreateCollOpen(false)} onSave={handleCreateCollection} />}
+        {editColl && <CreateCollectionDialog initial={editColl} onClose={() => setEditColl(null)} onSave={(d) => handleUpdateCollection(editColl.id, d)} />}
+        {collPickerGame && (
+          <CollectionPicker
+            gameId={collPickerGame.id}
+            gameTitle={collPickerGame.title}
+            collections={collections}
+            onClose={() => setCollPickerGame(null)}
+            onToggle={(cid, add) => handleToggleGameInCollection(cid, collPickerGame.id, add)}
+            onCreateNew={() => { setCollPickerGame(null); setCreateCollOpen(true); }}
+          />
+        )}
+        {editorGame && <GameEditor game={editorGame} onSave={(patch) => handleEditGame(editorGame, patch)} onClose={() => setEditorGame(null)} />}
+
+        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+        {studioOpen && <ThemeStudio onClose={() => setStudioOpen(false)} />}
+        {acquireGame && <AcquisitionPicker gameId={acquireGame.id} gameTitle={acquireGame.title} installed={acquireGame.installed} onClose={() => setAcquireGame(null)} onStarted={() => setAcquireGame(null)} />}
+      </div>
+    );
+  }
+
+  // Console mode UI (PS5-style carousel)
+  return (
     <div className="app">
       <DynamicBackground games={games} focusedIdx={focusedIdx} focusedGame={focusedGame} />
-      <Workspace id="games-console">
-        <ForgePanel type="console-stage" title="Console Stage" minW={320} minH={240}>
-          <div className="nx-console-inner">
+
+      {/* Top bar */}
+      <header className="topbar">
+        <div className="tb-brand">
+          <button className="tb-logo" onClick={goSplash} title="Switch mode" aria-label="Switch mode">{<NexusMark size={18} />}</button>
+          <div><div className="tb-name">NEXUS</div><div className="tb-sub">Launcher</div></div>
+          <button className="tb-mode-tv" onClick={goMedia} title="Open Media Server">
+            <Icon.Film size={12} /> Media
+          </button>
+        </div>
+        <div className="tb-search">
+          <span className="icon"><Icon.Search size={15} /></span>
+          <input value={filters.query} onChange={(e) => setFilters((f) => ({ ...f, query: e.target.value }))} placeholder="Search library…  (press /)" />
+        </div>
+        <select className="tb-select" value={filters.sort} onChange={(e) => setFilters((f) => ({ ...f, sort: e.target.value as SortKey }))}>
+          {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        {updateAvailable && (
+          <button className="update-badge" onClick={() => setUpdateDialogOpen(true)} title={`NEXUS ${updateAvailable.version} available`}>
+            <Icon.DownloadCloud size={13} /> {updateAvailable.version}
+          </button>
+        )}
+        {activePlaytime && (
+          <button
+            className="playtime-badge"
+            onClick={async () => {
+              await window.nexus.stopPlaytimeTracking(activePlaytime.gameId);
+              setActivePlaytime(null);
+            }}
+            title={`Click to stop tracking — ${activePlaytime.gameTitle}`}
+          >
+            <span className="playtime-badge__dot" />
+            <span className="playtime-badge__text">{activePlaytime.gameTitle}</span>
+            <span className="playtime-badge__time">{formatPlaytimeShort(activePlaytime.elapsedSec)}</span>
+            <span className="playtime-badge__stop">Stop</span>
+          </button>
+        )}
+        {/* v4.0.0 — Mode toggle: Console carousel ↔ Desktop grid */}
+        <ModeToggle current={uiMode} onSwitch={setUiModeAndPersist} />
+        {/* v4.9.0 — Plugin status indicators (live widgets in the topbar). */}
+        {pluginStatus.length > 0 && (
+          <div className="plugin-status-strip">
+            {pluginStatus.map((s) => <PluginStatusWidget key={s.id} ext={s} />)}
+          </div>
+        )}
+        {/* v4.9.0 — Plugin topbar actions. */}
+        {pluginTopbar.length > 0 && (
+          <div className="plugin-topbar-actions">
+            {pluginTopbar.map((a) => (
+              <button key={a.id} className="tb-icon" onClick={a.onClick} title={a.label} aria-label={a.label}>
+                <PluginIcon name={a.icon} size={15} />
+              </button>
+            ))}
+          </div>
+        )}
+        <button className="tb-icon" onClick={() => setScanOpen(true)} title="Scan (S)"><Icon.Scan size={16} /></button>
+        <button className="tb-icon primary" onClick={() => setAddOpen(true)} title="Add (A)"><Icon.Plus size={15} /> Add</button>
+        <button className="tb-icon" onClick={() => setStatsOpen(true)} title="Stats dashboard"><Icon.TrendingUp size={16} /></button>
+        <button className="tb-icon" onClick={() => setStudioOpen(true)} title="Theme Studio"><IconGlyph k="palette" size={16} /></button>
+        <button className="tb-icon" onClick={() => setSettingsOpen(true)} title="Settings"><Icon.Settings size={16} /></button>
+      </header>
 
       {/* Stage: carousel + info zone */}
       {/* Nav tabs */}
@@ -1291,7 +1463,7 @@ export function App() {
                   <button className="dash-quick-btn" onClick={() => setScanOpen(true)}><span className="icon"><Icon.Scan size={16} /></span><span className="label">Scan</span></button>
                   <button className="dash-quick-btn" onClick={() => setAddOpen(true)}><span className="icon"><Icon.Plus size={16} /></span><span className="label">Add</span></button>
                   <button className="dash-quick-btn" onClick={() => setStatsOpen(true)}><span className="icon"><Icon.TrendingUp size={16} /></span><span className="label">Stats</span></button>
-                  <button className="dash-quick-btn" onClick={() => navigate("settings")}><span className="icon"><Icon.Settings size={16} /></span><span className="label">Settings</span></button>
+                  <button className="dash-quick-btn" onClick={() => setSettingsOpen(true)}><span className="icon"><Icon.Settings size={16} /></span><span className="label">Settings</span></button>
                 </div>
               </div>
             </div>
@@ -1299,147 +1471,12 @@ export function App() {
         )}
         </>
         )}
-          </main>
-          </div>
-        </ForgePanel>
-      </Workspace>
+      </main>
 
-      {controllerConnected && !pageGame && <div className="hints-bar"><span className="hint"><span className="k">↑↓</span> {gpZone === "topbar" ? "Top Bar" : gpZone === "filters" ? "Filters" : gpZone === "carousel" ? "Games" : "Actions"}</span><span className="hint"><span className="k">←→</span> Navigate</span><span className="hint"><span className="k r">A</span> Select</span><span className="hint"><span className="k r">X</span> Play</span><span className="hint"><span className="k r">Y</span> Details</span><span className="hint"><span className="k r">B</span> Back</span><span className="hint"><span className="k"><Icon.Settings size={10} /></span> Settings</span></div>}
-    </div>
-  );
-
-  // ── v10.0.0 — Final composition: Universal Shell + global overlays ────────
-  const isGamesView = view === "games";
-  // v9.3.0 (M1) — The Media view is its own first-class view (local files),
-  // not part of the Entertainment shell. Hide EntShell when it's active.
-  const isMediaView = view === "media";
-  const mediaVisible = view !== "games" && view !== "settings" && view !== "media";
-
-  const renderTopbar = () => (
-    <header className="topbar">
-      <div className="tb-brand">
-        <div><div className="tb-name">NEXUS</div><div className="tb-sub">{isGamesView ? "Games" : isMediaView ? "Media Server" : view === "settings" ? "Settings" : view === "home" ? "Home" : "Entertainment"}</div></div>
-      </div>
-      {isGamesView ? (
-        <>
-          <div className="tb-search">
-            <span className="icon"><Icon.Search size={15} /></span>
-            <input value={filters.query} onChange={(e) => setFilters((f) => ({ ...f, query: e.target.value }))} placeholder="Search library…  (press /)" />
-          </div>
-          <select className="tb-select" value={filters.sort} onChange={(e) => setFilters((f) => ({ ...f, sort: e.target.value as SortKey }))}>
-            {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-          <ModeToggle current={uiMode} onSwitch={setUiModeAndPersist} />
-        </>
-      ) : view !== "settings" ? (
-        <button className="tb-search-trigger" onClick={() => setSearchSignal((s) => s + 1)} title="Search  (press /)">
-          <Icon.Search size={15} /> <span>Search</span> <kbd>/</kbd>
-        </button>
-      ) : null}
-      {updateAvailable && (
-        <button className="update-badge" onClick={() => setUpdateDialogOpen(true)} title={`NEXUS ${updateAvailable.version} available`}>
-          <Icon.DownloadCloud size={13} /> {updateAvailable.version}
-        </button>
-      )}
-      {activePlaytime && (
-        <button
-          className="playtime-badge"
-          onClick={async () => { await window.nexus.stopPlaytimeTracking(activePlaytime.gameId); setActivePlaytime(null); }}
-          title={`Click to stop tracking — ${activePlaytime.gameTitle}`}
-        >
-          <span className="playtime-badge__dot" />
-          <span className="playtime-badge__text">{activePlaytime.gameTitle}</span>
-          <span className="playtime-badge__time">{formatPlaytimeShort(activePlaytime.elapsedSec)}</span>
-          <span className="playtime-badge__stop">Stop</span>
-        </button>
-      )}
-      {/* v4.9.0 — Plugin status indicators (live widgets in the topbar). */}
-      {pluginStatus.length > 0 && (
-        <div className="plugin-status-strip">
-          {pluginStatus.map((s) => <PluginStatusWidget key={s.id} ext={s} />)}
-        </div>
-      )}
-      {/* v4.9.0 — Plugin topbar actions. */}
-      {pluginTopbar.length > 0 && (
-        <div className="plugin-topbar-actions">
-          {pluginTopbar.map((a) => (
-            <button key={a.id} className="tb-icon" onClick={a.onClick} title={a.label} aria-label={a.label}>
-              <PluginIcon name={a.icon} size={15} />
-            </button>
-          ))}
-        </div>
-      )}
-      {isGamesView && (<>
-        <button className="tb-icon" onClick={() => setScanOpen(true)} title="Scan (S)"><Icon.Scan size={16} /></button>
-        <button className="tb-icon primary" onClick={() => setAddOpen(true)} title="Add (A)"><Icon.Plus size={15} /> Add</button>
-        <button className="tb-icon" onClick={() => setStatsOpen(true)} title="Stats dashboard"><Icon.TrendingUp size={16} /></button>
-      </>)}
-      <button className="tb-icon" onClick={() => setStudioOpen(true)} title="Theme Studio"><IconGlyph k="palette" size={16} /></button>
-      <button className="tb-icon" onClick={() => navigate("settings")} title="Settings — universal"><Icon.Settings size={16} /></button>
-    </header>
-  );
-
-  const renderRailExtras = () => (
-    <>
-      <button className="nx-nav-item" onClick={() => setWnOpen(true)} title="What's New  (n)">
-        <span className="nx-nav-ico"><Icon.Sparkles size={16} /></span>
-        <span className="nx-nav-label">What's New</span>
-      </button>
-      <button className="nx-nav-item" onClick={() => setNotifOpen(true)} title="Notifications  (b)">
-        <span className="nx-nav-ico"><Icon.Bell size={16} /></span>
-        <span className="nx-nav-label">Alerts</span>
-        {notifCount > 0 && <span className="nx-nav-badge">{notifCount > 9 ? "9+" : notifCount}</span>}
-      </button>
-      <button className="nx-nav-item" onClick={() => setScOpen(true)} title="Keyboard shortcuts  (?)">
-        <span className="nx-nav-ico"><Icon.Keyboard size={16} /></span>
-        <span className="nx-nav-label">Shortcuts</span>
-      </button>
-    </>
-  );
-
-  return (
-    <>
-      <Shell view={view} onNavigate={navigate} topbar={renderTopbar()} railExtras={renderRailExtras()}>
-        {/* Media + merged Home — kept mounted so detail/home state survives. */}
-        <div className={mediaVisible ? "nx-media-host" : "nx-media-host hidden"}>
-          <EntShell
-            view={view as EntNavView}
-            onNavigate={(v) => navigate(v)}
-            active={mediaVisible}
-            searchSignal={searchSignal}
-            games={games}
-            onLaunchGame={handleLaunch}
-            onOpenGame={openPage}
-            ui={{ cmdOpen, setCmdOpen, scOpen, setScOpen, wnOpen, setWnOpen, notifOpen, setNotifOpen }}
-            notifCount={notifCount}
-            onNotifCountChange={setNotifCount}
-          />
-        </div>
-
-        {/* Games core */}
-        {isGamesView && (uiMode === "desktop" ? desktopScreen : consoleScreen)}
-
-        {/* v9.3.0 (M1) — Local Media Server view. Streams ONLY the user's
-            own files via the nexus-media:// protocol. Renders above (in place
-            of) the Entertainment shell — the `mediaVisible` flag above hides
-            the .nx-media-host when this view is active. */}
-        {isMediaView && settings && (
-          <MediaView settings={settings} onConfigure={() => navigate("settings")} />
-        )}
-
-        {/* Universal Settings (full-page view) */}
-        {view === "settings" && settings && (
-          <SettingsPage initial={settings} onClose={() => navigate("home")} onSave={handleSaveSettings} onCheckUpdates={handleCheckUpdates} />
-        )}
-      </Shell>
-
-      {/* ── Global overlays (available from any view) ── */}
-      {pageGame && (<>
-        <GamePage game={pageGame} onClose={() => setPageGame(null)} onLaunch={handleLaunch} onPatch={handlePatch} onDelete={handleDelete} onToggleFav={handleToggleFav} onUpdate={handleUpdateFromPage} onOpenDir={handleOpenDir} onAddToCollection={(g) => setCollPickerGame({ id: g.id, title: g.title })} onGet={(g) => setAcquireGame({ id: g.id, title: g.title, installed: g.installed })} />
-        {controllerConnected && <div className="hints-bar"><span className="hint"><span className="k r">B</span> Back</span><span className="hint"><span className="k r">A</span>/<span className="k r">X</span> Play</span></div>}
-      </>)}
+      {/* Dialogs */}
       {addOpen && <AddGameDialog onClose={() => setAddOpen(false)} onAdd={handleAdd} />}
       {scanOpen && <ScanDialog onClose={() => setScanOpen(false)} onRunScan={handleRunScan} onImport={handleImport} onDeepScan={handleDeepScan} />}
+      {settingsOpen && settings && <SettingsPage initial={settings} onClose={() => setSettingsOpen(false)} onSave={handleSaveSettings} onCheckUpdates={handleCheckUpdates} />}
       {updateDialogOpen && updateAvailable && <UpdateDialog info={updateAvailable} onClose={() => setUpdateDialogOpen(false)} />}
 
       {/* Context menu (right-click on tiles) */}
@@ -1480,12 +1517,13 @@ export function App() {
       )}
       {statsOpen && <StatsDashboard onClose={() => setStatsOpen(false)} onExport={handleExport} onImport={handleImportFile} onCheckMissing={handleCheckMissing} />}
 
+      {controllerConnected && !pageGame && <div className="hints-bar"><span className="hint"><span className="k">↑↓</span> {gpZone === "topbar" ? "Top Bar" : gpZone === "filters" ? "Filters" : gpZone === "carousel" ? "Games" : "Actions"}</span><span className="hint"><span className="k">←→</span> Navigate</span><span className="hint"><span className="k r">A</span> Select</span><span className="hint"><span className="k r">X</span> Play</span><span className="hint"><span className="k r">Y</span> Details</span><span className="hint"><span className="k r">B</span> Back</span><span className="hint"><span className="k"><Icon.Settings size={10} /></span> Settings</span></div>}
+
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
-      <EntToaster />
       {pluginDialog && <PluginDialogModal req={pluginDialog} bodyRef={pluginDialogBodyRef} onClose={() => setPluginDialog(null)} />}
-      {studioOpen && <ThemeStudio onClose={() => setStudioOpen(false)} />}
-      {acquireGame && <AcquisitionPicker gameId={acquireGame.id} gameTitle={acquireGame.title} installed={acquireGame.installed} onClose={() => setAcquireGame(null)} onStarted={() => setAcquireGame(null)} />}
-    </>
+        {studioOpen && <ThemeStudio onClose={() => setStudioOpen(false)} />}
+        {acquireGame && <AcquisitionPicker gameId={acquireGame.id} gameTitle={acquireGame.title} installed={acquireGame.installed} onClose={() => setAcquireGame(null)} onStarted={() => setAcquireGame(null)} />}
+    </div>
   );
 }
 
