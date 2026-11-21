@@ -50,25 +50,44 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Continue"
-          $tag = "v9.4.0"
-          $title = "NEXUS v9.4.0 — Restored game launcher + rebuilt Media Server (fixes v9.3.0)"
+          $tag = "v9.5.0"
+          $title = "NEXUS v9.5.0 — Real local media server + libraries + TMDB identification"
           $notes = @"
           NEXUS — Universal Game Launcher & Media Server for Windows.
 
-          **v9.4.0 — fixes the broken v9.3.0. The original game launcher is back, and entertainment is rebuilt from the ground up as the local Media Server.**
+          **v9.5.0 — the Media Server mode is now a real personal media platform.**
 
-          **Restored: the game launcher.**
-          v9.3.0 shipped an unfinished "universal shell" that removed the Games & Entertainment startup selector and left the game launcher unusable. v9.4.0 reverts that. The startup selector is back, and the full game launcher works again — auto-detection across Steam, Epic, GOG, Battle.net, EA, Ubisoft, Riot and Xbox, RAWG metadata, library, collections, playtime, stats, plugins, themes, one-click launch.
+          **Real local media server (the headline).**
+          A real Node HTTP server binds to your LAN (0.0.0.0:port) and serves a browseable web UI + a library API + range-streamed playback at /stream/:id (HTTP 206, Content-Range, Accept-Ranges — seeking works). Start/stop/restart/status reflect the actual server process. The QR code encodes the real http://<lan-ip>:<port> URL and only renders when the server is genuinely running. Port-conflict detection. Other devices on your network scan the QR and browse/play your library from a browser.
 
-          **Rebuilt: Media Server (the new second mode).**
-          The old TMDB "NEXUS TV" entertainment mode is torn down. The second mode is now the local Media Server: browse, play, and host your own video files. Scan your folders, play in-app with full seeking (nexus-media:// protocol, HTTP Range / 206), and share your library to other devices on your LAN via QR + access code. MP4/WebM/MOV play in-browser; other containers show their file path for a system player. Your files only — nothing uploaded, no cloud.
+          **Multiple media libraries.**
+          Create Movies, TV Shows, Anime, Documentaries, Personal, or Custom libraries. Per-library folders via the native folder picker. Create / rename / delete / rescan.
 
-          **Still clean — no piracy.**
-          No third-party stream hosts are embedded or routed. Entertainment serves ONLY files on the user's own disk. The game launcher is fully preserved.
+          **Real scanning + indexing.**
+          Per-library async scan with live progress. S01E01 / 1x01 filename parsing groups TV episodes under shows with season/episode numbers. Dedup + stale-file reconciliation (moved/renamed/deleted files cleaned up on rescan).
+
+          **TMDB metadata (server-side key).**
+          Automatic identification: filename → TMDB search → confidence-based match. Manual identify: search → pick the right title → apply. Movie + TV details (overview, poster, backdrop, genres, runtime, rating, cast, seasons/episodes). The TMDB API key stays in the main process — never sent to the renderer or LAN clients.
+
+          **Playback + resume.**
+          In-app HTML5 player with range streaming + Continue Watching (resume from saved position).
+
+          **Onboarding + dashboard + detail pages.**
+          Guided first-run setup (pick folder → name library → scan → identify → server). Dashboard rails: Continue Watching, Recently Added, Movies, TV Shows, per-library. Media detail pages with backdrop, poster, metadata, Play, and Identify. TV: season selector + episode list.
+
+          **Server dashboard.**
+          Create server configs (name, port, exposed libraries, optional auth code). Real status indicator, real URL + QR, library summary, port-conflict feedback.
+
+          **Entertainment settings + theming.**
+          Media Libraries / Media Server / Playback / Appearance / Metadata. Theming wired (presets + live preview + persistence), scoped to entertainment — Gaming stays visually unchanged.
+
+          **Still clean — no piracy.** The server streams ONLY files from your configured libraries, looked up by id from the local DB. No third-party stream hosts. Gaming fully untouched.
+
+          **Deferred (future release):** FFmpeg transcoding (direct play only this release — MKV/AVI that browsers can't play show their file path for a system player), subtitle/audio-track selection, deep per-token theme customizer (presets + apply work now).
 
           **Downloads:**
-          - NEXUS-Setup-9.4.0.exe — NSIS installer (recommended, supports auto-update).
-          - NEXUS-Portable-9.4.0.exe — single-file portable build.
+          - NEXUS-Setup-9.5.0.exe — NSIS installer (recommended, supports auto-update).
+          - NEXUS-Portable-9.5.0.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit.
           "@

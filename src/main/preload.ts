@@ -13,6 +13,17 @@ import type {
   LauncherSettings,
   MediaItem,
   MediaScanSummary,
+  MediaScanProgress,
+  MediaLibrary,
+  MediaLibraryCategory,
+  MediaLibraryPath,
+  MediaContinueWatchingItem,
+  MediaProgress,
+  MediaServerConfig,
+  MediaServerStatus,
+  MediaServerStartResult,
+  MediaTmdbCandidate,
+  MediaAutoIdentifyResult,
   MetadataResult,
   ScanSummary,
   Stats,
@@ -261,6 +272,71 @@ const api = {
   // <video> uses as its src. The protocol serves ONLY the user's own files.
   mediaStreamUrl: (id: number) =>
     ipcRenderer.invoke("media:streamUrl", id) as Promise<string>,
+
+  // ===== E1 — Libraries + per-library scanning + TMDB identification + progress + servers =====
+  // Live scan progress events broadcast by scanLibrary().
+  onMediaScanProgress: (cb: (p: MediaScanProgress) => void) => {
+    const listener = (_e: unknown, p: MediaScanProgress) => cb(p);
+    ipcRenderer.on("media:scanProgress", listener);
+    return () => ipcRenderer.removeListener("media:scanProgress", listener);
+  },
+
+  // Libraries (CRUD + paths).
+  librariesList: () => ipcRenderer.invoke("libraries:list") as Promise<MediaLibrary[]>,
+  librariesCreate: (name: string, category: MediaLibraryCategory) =>
+    ipcRenderer.invoke("libraries:create", name, category) as Promise<MediaLibrary>,
+  librariesDelete: (id: number) => ipcRenderer.invoke("libraries:delete", id) as Promise<boolean>,
+  librariesAddPath: (libraryId: number, p: string) =>
+    ipcRenderer.invoke("libraries:addPath", libraryId, p) as Promise<boolean>,
+  librariesRemovePath: (libraryId: number, p: string) =>
+    ipcRenderer.invoke("libraries:removePath", libraryId, p) as Promise<boolean>,
+  librariesListPaths: (libraryId: number) =>
+    ipcRenderer.invoke("libraries:listPaths", libraryId) as Promise<MediaLibraryPath[]>,
+
+  // Per-library media queries + TV episode grouping.
+  mediaListByLibrary: (libraryId: number, opts?: { q?: string; sort?: "title" | "year" | "added" | "rating"; mediaType?: "movie" | "tv"; limit?: number }) =>
+    ipcRenderer.invoke("media:listByLibrary", libraryId, opts) as Promise<MediaItem[]>,
+  mediaListTvShows: (libraryId: number) =>
+    ipcRenderer.invoke("media:listTvShows", libraryId) as Promise<MediaItem[]>,
+  mediaListEpisodes: (tvShowId: number, season?: number) =>
+    ipcRenderer.invoke("media:listEpisodes", tvShowId, season) as Promise<MediaItem[]>,
+  mediaListSeasons: (tvShowId: number) =>
+    ipcRenderer.invoke("media:listSeasons", tvShowId) as Promise<number[]>,
+  // Per-library scan (emits onMediaScanProgress).
+  mediaScanLibrary: (libraryId: number) =>
+    ipcRenderer.invoke("media:scanLibrary", libraryId) as Promise<MediaScanSummary>,
+
+  // TMDB identification (the key stays server-side — these return only
+  // metadata + candidates, never the API key).
+  mediaAutoIdentify: (mediaId: number) =>
+    ipcRenderer.invoke("media:autoIdentify", mediaId) as Promise<MediaAutoIdentifyResult>,
+  mediaSearchTmdb: (query: string, mediaType?: "movie" | "tv") =>
+    ipcRenderer.invoke("media:searchTmdb", query, mediaType) as Promise<MediaTmdbCandidate[]>,
+  mediaIdentifyAs: (mediaId: number, tmdbId: number, mediaType: "movie" | "tv") =>
+    ipcRenderer.invoke("media:identifyAs", mediaId, tmdbId, mediaType) as Promise<MediaItem | null>,
+  mediaSetMetadata: (mediaId: number, patch: Record<string, unknown>) =>
+    ipcRenderer.invoke("media:setMetadata", mediaId, patch) as Promise<MediaItem | null>,
+
+  // Progress + continue-watching + recently-added.
+  mediaProgressRecord: (mediaId: number, positionSec: number, durationSec?: number | null) =>
+    ipcRenderer.invoke("media:progress:record", mediaId, positionSec, durationSec ?? null) as Promise<boolean>,
+  mediaProgressGet: (mediaId: number) =>
+    ipcRenderer.invoke("media:progress:get", mediaId) as Promise<MediaProgress | null>,
+  mediaContinueWatching: (limit?: number) =>
+    ipcRenderer.invoke("media:continueWatching", limit) as Promise<MediaContinueWatchingItem[]>,
+  mediaRecentlyAdded: (limit?: number) =>
+    ipcRenderer.invoke("media:recentlyAdded", limit) as Promise<MediaItem[]>,
+
+  // Server configs + lifecycle. startMediaServer is a REAL http.Server bind
+  // to 0.0.0.0:<port>; the returned URL is http://<lanIp>:<port> (real).
+  serversList: () => ipcRenderer.invoke("servers:list") as Promise<MediaServerConfig[]>,
+  serversCreate: (name: string, port: number, libraryIds: number[], authCode?: string | null) =>
+    ipcRenderer.invoke("servers:create", name, port, libraryIds, authCode ?? null) as Promise<MediaServerConfig>,
+  serversDelete: (id: number) => ipcRenderer.invoke("servers:delete", id) as Promise<boolean>,
+  serversStart: (id: number) =>
+    ipcRenderer.invoke("servers:start", id) as Promise<MediaServerStartResult>,
+  serversStop: (id: number) => ipcRenderer.invoke("servers:stop", id) as Promise<boolean>,
+  serversStatus: (id: number) => ipcRenderer.invoke("servers:status", id) as Promise<MediaServerStatus>,
 
   // ===== Playtime tracking =====
   stopPlaytimeTracking: (gameId: number) =>

@@ -10,17 +10,29 @@
 //     streams files back to the in-app HTML5 player with full HTTP Range
 //     support (206 Partial Content) so video seeking works.
 //
+// E1 — added `scanLibrary(libraryId)` which scans ONE library's root folders,
+// parses SxxExx / xyy patterns to set mediaType='tv' + season + episode and
+// groups episodes under a synthetic "show" media row, and emits live scan
+// progress to the renderer via the `media:scanProgress` IPC channel.
+//
 // No piracy. No third-party stream hosts (CineSrc / 2embed / vidsrc / bingr /
 // allmovieland — none of these). The protocol serves ONLY files on the user's
 // own disk, looked up by id from the local SQLite DB.
 
-import { protocol } from "electron";
+import { protocol, BrowserWindow } from "electron";
 import { promises as fs } from "node:fs";
 import { createReadStream } from "node:fs";
 import path from "node:path";
 import { Readable } from "node:stream";
-import type { MediaScanSummary } from "@shared/types";
-import { upsertMediaFile, removeStaleMedia, getMedia } from "./db";
+import type { MediaScanSummary, MediaScanProgress } from "@shared/types";
+import {
+  upsertMediaFile,
+  removeStaleMedia,
+  removeStaleMediaForLibrary,
+  getMedia,
+  listLibraryPaths,
+  findOrCreateTvShow,
+} from "./db";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Extension metadata — ported from the Next.js reference (src/lib/media.ts).
@@ -150,6 +162,168 @@ export async function scanMediaLibrary(paths: string[]): Promise<MediaScanSummar
   }
 
   const removed = removeStaleMedia(keepFilePaths);
+  return { scanned, added, updated, removed };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// E1 — Per-library scanner + filename parsing.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Result of parsing a video filename into a (clean) title + optional year +
+ * optional TV season/episode markers. Examples:
+ *   "The.Matrix.1999.1080p.mp4"            → { title: "The Matrix", year: 1999 }
+ *   "Breaking Bad - S02E03 -720p.mkv"      → { title: "Breaking Bad", season: 2, episode: 3 }
+ *   "Mr.Robot.1x05.mp4"                     → { title: "Mr Robot", season: 1, episode: 5 }
+ *   "Show.Name.S01E01E02.mp4"               → { title: "Show Name", season: 1, episode: 1 }
+ */
+export interface ParsedMediaName {
+  title: string;
+  year: number | null;
+  season: number | null;
+  episode: number | null;
+  isTv: boolean;
+}
+
+const SEASON_EPISODE_RE = [
+  // S01E01 / s01e01 / S01E01E02 (we only take the first episode)
+  /[Ss](\d{1,2})[Ee](\d{1,3})/,
+  // 1x05 / 12x23
+  /(\d{1,2})x(\d{1,3})/,
+];
+const YEAR_RE = /[\(\[]?(19\d{2}|20\d{2})[\)\]]?/;
+
+/** Strip extension + dots/underscores → spaces, then collapse. */
+function cleanName(raw: string): string {
+  return raw
+    .replace(/\./g, " ")
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Parse a video file's basename into title / year / season / episode. */
+export function parseMediaName(fileNameOrBasenameNoExt: string): ParsedMediaName {
+  let s = fileNameOrBasenameNoExt;
+  let season: number | null = null;
+  let episode: number | null = null;
+  for (const re of SEASON_EPISODE_RE) {
+    const m = re.exec(s);
+    if (m) {
+      season = Number(m[1]);
+      episode = Number(m[2]);
+      // Drop everything from the match onward — the show name is what's left.
+      s = s.slice(0, m.index);
+      break;
+    }
+  }
+  let year: number | null = null;
+  if (!season) {
+    // Year is only meaningful for non-TV rows (TV episodes' years would be the
+    // episode air year, which we don't want as the row's `year`).
+    const ym = YEAR_RE.exec(s);
+    if (ym) {
+      year = Number(ym[1]);
+      s = s.slice(0, ym.index) + s.slice(ym.index + ym[0].length);
+    }
+  }
+  // Strip common release-tag junk at the tail (resolution, codec, source).
+  // We do this AFTER extracting year/season/episode so those keep priority.
+  const junkIdx = s.search(/\b(1080p|720p|480p|2160p|4K|HDR|10bit|x264|h264|h265|x265|HEVC|WEBRip|WEB-DL|BRRip|BluRay|BDRip|DVDRip|CAM|TS|TC)\b/i);
+  if (junkIdx >= 0) s = s.slice(0, junkIdx);
+  const title = cleanName(s).replace(/^-+|-+$/g, "").trim();
+  return {
+    title: title || cleanName(fileNameOrBasenameNoExt),
+    year,
+    season,
+    episode,
+    isTv: season !== null && episode !== null,
+  };
+}
+
+/** Broadcast scan progress to every renderer window. */
+function emitScanProgress(p: MediaScanProgress): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send("media:scanProgress", p);
+  }
+}
+
+/**
+ * Scan ONE library's root folders. Walks each path, parses filenames for TV
+ * markers, upserts movies directly + episodes grouped under a synthetic show
+ * row, and removes stale rows whose files are no longer on disk. Emits live
+ * progress events. Returns a summary.
+ */
+export async function scanLibrary(libraryId: number): Promise<MediaScanSummary> {
+  const roots = listLibraryPaths(libraryId).map((p) => p.path);
+  if (roots.length === 0) {
+    return { scanned: 0, added: 0, updated: 0, removed: 0 };
+  }
+
+  let scanned = 0;
+  let added = 0;
+  let updated = 0;
+  const keepFilePaths: string[] = [];
+
+  for (const root of roots) {
+    const found = await scanDirectory(root);
+    emitScanProgress({ libraryId, discovered: found.length, indexed: 0, current: root });
+    let i = 0;
+    for (const f of found) {
+      scanned++;
+      keepFilePaths.push(f.filePath);
+      i++;
+      const parsed = parseMediaName(f.title);
+      if (parsed.isTv) {
+        // Find or create a synthetic show row for this show name, then upsert
+        // the episode row with tvShowId pointing at it. findOrCreateTvShow
+        // stamps the show row with the same libraryId.
+        const showId = findOrCreateTvShow(libraryId, parsed.title, null);
+        const inserted = upsertMediaFile({
+          title: f.title,
+          filePath: f.filePath,
+          fileSize: f.fileSize,
+          fileExt: f.fileExt,
+          container: f.container,
+          dir: f.dir,
+          libraryId,
+          mediaType: "tv",
+          tvShowId: showId,
+          season: parsed.season,
+          episode: parsed.episode,
+        });
+        if (inserted) added++;
+        else updated++;
+      } else {
+        const inserted = upsertMediaFile({
+          title: parsed.title || f.title,
+          filePath: f.filePath,
+          fileSize: f.fileSize,
+          fileExt: f.fileExt,
+          container: f.container,
+          dir: f.dir,
+          libraryId,
+          mediaType: "movie",
+          year: parsed.year,
+        });
+        if (inserted) added++;
+        else updated++;
+      }
+      if (i % 5 === 0 || i === found.length) {
+        emitScanProgress({
+          libraryId,
+          discovered: found.length,
+          indexed: i,
+          current: f.fileName,
+        });
+      }
+    }
+  }
+
+  // Reconcile: remove this library's rows whose files no longer exist in the
+  // scanned set. SCOPED to this library — other libraries are untouched.
+  const removed = removeStaleMediaForLibrary(libraryId, keepFilePaths);
+  emitScanProgress({ libraryId, discovered: scanned, indexed: scanned, current: null });
   return { scanned, added, updated, removed };
 }
 

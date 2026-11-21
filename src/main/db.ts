@@ -13,7 +13,7 @@
 import { app } from "electron";
 import { join, dirname } from "path";
 import { mkdirSync, existsSync } from "fs";
-import type { Game, DetectedGame, LauncherSettings, Collection, CollectionKind, MediaItem } from "@shared/types";
+import type { Game, DetectedGame, LauncherSettings, Collection, CollectionKind, MediaItem, MediaLibrary, MediaLibraryCategory, MediaLibraryPath, MediaProgress, MediaServerConfig, MediaContinueWatchingItem } from "@shared/types";
 // v4.4.1 — CRITICAL: the main process is compiled to CommonJS, and Node's
 // runtime resolver does NOT understand the @shared/* path alias (only tsc
 // type-checking + the Vite-bundled renderer do). These are VALUE imports
@@ -206,6 +206,10 @@ function migrate(conn: import("better-sqlite3").Database) {
     -- in-app HTML5 player via the custom nexus-media:// protocol. The
     -- launcher serves ONLY files on the user's local disk — no third-party
     -- stream hosts, no piracy sources.
+    --
+    -- E1 — the schema is expanded with libraryId + TMDB metadata + TV
+    -- season/episode fields + lock flag. The new columns are added via
+    -- addColumnIfMissing below so existing DBs upgrade in place.
     CREATE TABLE IF NOT EXISTS media (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       title       TEXT NOT NULL,
@@ -219,6 +223,44 @@ function migrate(conn: import("better-sqlite3").Database) {
     );
     CREATE INDEX IF NOT EXISTS idx_media_title ON media(title);
     CREATE INDEX IF NOT EXISTS idx_media_dir   ON media(dir);
+
+    -- E1 — Libraries + their root folders.
+    CREATE TABLE IF NOT EXISTS media_libraries (
+      id        INTEGER PRIMARY KEY AUTOINCREMENT,
+      name      TEXT NOT NULL,
+      category  TEXT NOT NULL,
+      createdAt TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_media_libraries_category ON media_libraries(category);
+
+    CREATE TABLE IF NOT EXISTS media_library_paths (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      libraryId  INTEGER NOT NULL,
+      path       TEXT NOT NULL,
+      UNIQUE(libraryId, path),
+      FOREIGN KEY (libraryId) REFERENCES media_libraries(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_media_library_paths_lib ON media_library_paths(libraryId);
+
+    -- E1 — Per-item playback progress (continue-watching).
+    CREATE TABLE IF NOT EXISTS media_progress (
+      mediaId     INTEGER PRIMARY KEY,
+      positionSec REAL NOT NULL,
+      durationSec REAL,
+      updatedAt   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_media_progress_updated ON media_progress(updatedAt);
+
+    -- E1 — Saved server configs (port + libraries + auth code). Started/stopped
+    -- at runtime; the live HTTP server instances live in media-server.ts.
+    CREATE TABLE IF NOT EXISTS media_servers (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      name       TEXT NOT NULL,
+      port       INTEGER NOT NULL,
+      libraryIds TEXT NOT NULL DEFAULT '',
+      authCode   TEXT,
+      createdAt  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
   addColumnIfMissing(conn, "games", "completionStatus", "TEXT");
   addColumnIfMissing(conn, "games", "userRating", "INTEGER");
@@ -242,6 +284,29 @@ function migrate(conn: import("better-sqlite3").Database) {
   addColumnIfMissing(conn, "collections", "description", "TEXT");
   addColumnIfMissing(conn, "collections", "pinned", "INTEGER DEFAULT 0");
   addColumnIfMissing(conn, "collections", "sortOrder", "INTEGER DEFAULT 0");
+
+  // E1 — Media table expansion (libraryId + TMDB metadata + TV grouping +
+  // lock). All nullable so existing rows keep working until re-scanned.
+  addColumnIfMissing(conn, "media", "libraryId",  "INTEGER");
+  addColumnIfMissing(conn, "media", "tmdbId",     "INTEGER");
+  addColumnIfMissing(conn, "media", "mediaType",  "TEXT");
+  addColumnIfMissing(conn, "media", "year",       "INTEGER");
+  addColumnIfMissing(conn, "media", "overview",   "TEXT");
+  addColumnIfMissing(conn, "media", "posterPath",  "TEXT");
+  addColumnIfMissing(conn, "media", "backdropPath","TEXT");
+  addColumnIfMissing(conn, "media", "genres",     "TEXT");
+  addColumnIfMissing(conn, "media", "runtimeMin", "INTEGER");
+  addColumnIfMissing(conn, "media", "rating",     "REAL");
+  addColumnIfMissing(conn, "media", "matchedAt",  "TEXT");
+  addColumnIfMissing(conn, "media", "locked",     "INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing(conn, "media", "tvShowId",   "INTEGER");
+  addColumnIfMissing(conn, "media", "season",     "INTEGER");
+  addColumnIfMissing(conn, "media", "episode",    "INTEGER");
+  // Indexes for the new columns (no-op if already present).
+  try { conn.exec("CREATE INDEX IF NOT EXISTS idx_media_libraryId ON media(libraryId);"); } catch { /* ignore */ }
+  try { conn.exec("CREATE INDEX IF NOT EXISTS idx_media_tvShowId ON media(tvShowId);"); } catch { /* ignore */ }
+  try { conn.exec("CREATE INDEX IF NOT EXISTS idx_media_tmdbId   ON media(tmdbId);"); } catch { /* ignore */ }
+  try { conn.exec("CREATE INDEX IF NOT EXISTS idx_media_scannedAt ON media(scannedAt);"); } catch { /* ignore */ }
 
   // v4.3.0 — Seed the built-in Smart Collections (auto:*) on first run.
   // These are read-only virtual collections whose membership is computed from
@@ -1577,6 +1642,10 @@ export function getDefaultOverlayConfig(): OverlayConfig {
 // scans configured folders and upserts discovered files here; the
 // `nexus-media://` protocol handler reads rows by id and streams the bytes
 // back to the in-app HTML5 player with HTTP Range support so seeking works.
+//
+// E1 — extended with libraryId + TMDB metadata + TV season/episode grouping
+// + per-item playback progress + library + server-config tables. All
+// functions are synchronous (better-sqlite3 style).
 
 interface MediaRow {
   id: number;
@@ -1588,7 +1657,29 @@ interface MediaRow {
   dir: string;
   durationSec: number | null;
   scannedAt: string;
+  // E1 — nullable on existing rows; addColumnIfMissing backfills them.
+  libraryId?: number | null;
+  tmdbId?: number | null;
+  mediaType?: string | null;
+  year?: number | null;
+  overview?: string | null;
+  posterPath?: string | null;
+  backdropPath?: string | null;
+  genres?: string | null;
+  runtimeMin?: number | null;
+  rating?: number | null;
+  matchedAt?: string | null;
+  locked?: number | null;
+  tvShowId?: number | null;
+  season?: number | null;
+  episode?: number | null;
 }
+
+/** Canonical media SELECT column list (E1 expanded). */
+const MEDIA_SELECT_COLS =
+  "id, title, filePath, fileSize, fileExt, container, dir, durationSec, scannedAt, " +
+  "libraryId, tmdbId, mediaType, year, overview, posterPath, backdropPath, genres, " +
+  "runtimeMin, rating, matchedAt, locked, tvShowId, season, episode";
 
 function rowToMedia(r: MediaRow): MediaItem {
   return {
@@ -1601,6 +1692,21 @@ function rowToMedia(r: MediaRow): MediaItem {
     dir: r.dir,
     durationSec: r.durationSec === null || r.durationSec === undefined ? null : Number(r.durationSec),
     scannedAt: r.scannedAt,
+    libraryId: r.libraryId ?? null,
+    tmdbId: r.tmdbId ?? null,
+    mediaType: (r.mediaType === "movie" || r.mediaType === "tv") ? r.mediaType : null,
+    year: r.year ?? null,
+    overview: r.overview ?? null,
+    posterPath: r.posterPath ?? null,
+    backdropPath: r.backdropPath ?? null,
+    genres: r.genres ? r.genres.split(",").map((s) => s.trim()).filter(Boolean) : [],
+    runtimeMin: r.runtimeMin ?? null,
+    rating: r.rating ?? null,
+    matchedAt: r.matchedAt ?? null,
+    locked: !!r.locked,
+    tvShowId: r.tvShowId ?? null,
+    season: r.season ?? null,
+    episode: r.episode ?? null,
   };
 }
 
@@ -1611,6 +1717,12 @@ export interface UpsertMediaInput {
   fileExt: string;
   container: string;
   dir: string;
+  libraryId?: number | null;
+  mediaType?: "movie" | "tv" | null;
+  tvShowId?: number | null;
+  season?: number | null;
+  episode?: number | null;
+  year?: number | null;
 }
 
 /**
@@ -1619,26 +1731,44 @@ export interface UpsertMediaInput {
  * re-scan keeps the row current without losing the stable id (the protocol
  * handler relies on the id being stable across re-scans). Returns true if a
  * new row was inserted, false if an existing row was updated.
+ *
+ * E1 — also persists libraryId + mediaType + TV season/episode fields when
+ * supplied (the scanner parses S01E01 / 1x01 patterns). TMDB metadata is
+ * NOT touched here — use upsertMediaMetadata() for that (so a re-scan never
+ * clobbers a user's TMDB match).
  */
 export function upsertMediaFile(f: UpsertMediaInput): boolean {
   const conn = db();
-  const existing = conn.prepare("SELECT id, fileSize, title FROM media WHERE filePath = ?").get(f.filePath) as
-    | { id: number; fileSize: number; title: string }
+  const existing = conn.prepare("SELECT id, fileSize, title, libraryId, mediaType, season, episode FROM media WHERE filePath = ?").get(f.filePath) as
+    | { id: number; fileSize: number; title: string; libraryId: number | null; mediaType: string | null; season: number | null; episode: number | null }
     | undefined;
   if (existing) {
-    // Only write if something actually changed (avoids needless WAL churn).
-    if (existing.fileSize !== f.fileSize || existing.title !== f.title) {
-      conn.prepare(
-        "UPDATE media SET title = ?, fileSize = ?, fileExt = ?, container = ?, dir = ?, scannedAt = datetime('now') WHERE id = ?",
-      ).run(f.title, f.fileSize, f.fileExt, f.container, f.dir, existing.id);
-    } else {
-      conn.prepare("UPDATE media SET scannedAt = datetime('now') WHERE id = ?").run(existing.id);
-    }
+    // Refresh only file-system-derived fields + libraryId. Preserve TMDB
+    // metadata + locked flag. Scanner-derived mediaType/season/episode are
+    // refreshed only if the existing row didn't already have them (so a
+    // manually re-tagged row isn't reset by a re-scan).
+    const mediaTypeToWrite = existing.mediaType ?? f.mediaType ?? null;
+    const seasonToWrite = existing.season ?? f.season ?? null;
+    const episodeToWrite = existing.episode ?? f.episode ?? null;
+    conn.prepare(
+      "UPDATE media SET title = ?, fileSize = ?, fileExt = ?, container = ?, dir = ?, " +
+      "libraryId = COALESCE(?, libraryId), mediaType = ?, season = ?, episode = ?, " +
+      "scannedAt = datetime('now') WHERE id = ?",
+    ).run(
+      f.title, f.fileSize, f.fileExt, f.container, f.dir,
+      f.libraryId ?? null, mediaTypeToWrite, seasonToWrite, episodeToWrite,
+      existing.id,
+    );
     return false;
   }
   conn.prepare(
-    "INSERT INTO media (title, filePath, fileSize, fileExt, container, dir) VALUES (?, ?, ?, ?, ?, ?)",
-  ).run(f.title, f.filePath, f.fileSize, f.fileExt, f.container, f.dir);
+    "INSERT INTO media (title, filePath, fileSize, fileExt, container, dir, libraryId, mediaType, tvShowId, season, episode, year) " +
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  ).run(
+    f.title, f.filePath, f.fileSize, f.fileExt, f.container, f.dir,
+    f.libraryId ?? null, f.mediaType ?? null, f.tvShowId ?? null,
+    f.season ?? null, f.episode ?? null, f.year ?? null,
+  );
   return true;
 }
 
@@ -1657,8 +1787,8 @@ export function listMedia(opts?: { q?: string; dir?: string }): MediaItem[] {
     params.push(dir);
   }
   const sql = where.length > 0
-    ? `SELECT id, title, filePath, fileSize, fileExt, container, dir, durationSec, scannedAt FROM media WHERE ${where.join(" AND ")} ORDER BY title COLLATE NOCASE ASC`
-    : "SELECT id, title, filePath, fileSize, fileExt, container, dir, durationSec, scannedAt FROM media ORDER BY title COLLATE NOCASE ASC";
+    ? `SELECT ${MEDIA_SELECT_COLS} FROM media WHERE ${where.join(" AND ")} ORDER BY title COLLATE NOCASE ASC`
+    : `SELECT ${MEDIA_SELECT_COLS} FROM media ORDER BY title COLLATE NOCASE ASC`;
   const rows = conn.prepare(sql).all(...params) as MediaRow[];
   return rows.map(rowToMedia);
 }
@@ -1666,7 +1796,7 @@ export function listMedia(opts?: { q?: string; dir?: string }): MediaItem[] {
 export function getMedia(id: number): MediaItem | null {
   const conn = db();
   const row = conn.prepare(
-    "SELECT id, title, filePath, fileSize, fileExt, container, dir, durationSec, scannedAt FROM media WHERE id = ?",
+    `SELECT ${MEDIA_SELECT_COLS} FROM media WHERE id = ?`,
   ).get(id) as MediaRow | undefined;
   return row ? rowToMedia(row) : null;
 }
@@ -1709,4 +1839,406 @@ export function removeStaleMedia(keepFilePaths: string[]): number {
     removed += Number(delStmt.run(id).changes ?? 0);
   }
   return removed;
+}
+
+/**
+ * Remove stale rows for a SINGLE library (only paths that belong to that
+ * library's root folders, scoped by libraryId). Used by scanLibrary().
+ */
+export function removeStaleMediaForLibrary(libraryId: number, keepFilePaths: string[]): number {
+  const conn = db();
+  if (keepFilePaths.length === 0) {
+    const info = conn.prepare("DELETE FROM media WHERE libraryId = ?").run(libraryId);
+    return Number(info.changes ?? 0);
+  }
+  // Collect this library's rows + diff against the keep set in JS, then
+  // delete the survivors by id. (Avoids the SQLite 999-param limit + scopes
+  // the delete to one library so a scan of library A never nukes library B.)
+  const rows = conn.prepare("SELECT id, filePath FROM media WHERE libraryId = ?").all(libraryId) as
+    Array<{ id: number; filePath: string }>;
+  const keepSet = new Set(keepFilePaths);
+  const toDelete = rows.filter((r) => !keepSet.has(r.filePath)).map((r) => r.id);
+  let removed = 0;
+  const delStmt = conn.prepare("DELETE FROM media WHERE id = ?");
+  for (const id of toDelete) {
+    removed += Number(delStmt.run(id).changes ?? 0);
+  }
+  return removed;
+}
+
+// ── E1 — Media metadata patch (TMDB identification result) ──────────────────
+//
+// Updates a single media row with TMDB-derived metadata. NEVER touches the
+// filePath / fileSize / fileExt / container / dir / scannedAt columns (those
+// belong to the scanner). Respects the `locked` flag — if a row is locked,
+// the patch is silently dropped (the user explicitly locked the metadata).
+export function upsertMediaMetadata(id: number, patch: {
+  tmdbId?: number | null;
+  mediaType?: "movie" | "tv" | null;
+  title?: string;
+  year?: number | null;
+  overview?: string | null;
+  posterPath?: string | null;
+  backdropPath?: string | null;
+  genres?: string[] | null;
+  runtimeMin?: number | null;
+  rating?: number | null;
+  locked?: boolean | null;
+  tvShowId?: number | null;
+  season?: number | null;
+  episode?: number | null;
+  matchedAt?: string | null;
+}): MediaItem | null {
+  const conn = db();
+  const cur = conn.prepare("SELECT locked FROM media WHERE id = ?").get(id) as { locked?: number } | undefined;
+  if (!cur) return null;
+  if (cur.locked === 1 && patch.locked !== false) {
+    // Row is locked — respect it.
+    return getMedia(id);
+  }
+  const sets: string[] = [];
+  const params: (string | number | null)[] = [];
+  if (patch.tmdbId !== undefined) { sets.push("tmdbId = ?"); params.push(patch.tmdbId ?? null); }
+  if (patch.mediaType !== undefined) { sets.push("mediaType = ?"); params.push(patch.mediaType ?? null); }
+  if (patch.title !== undefined) { sets.push("title = ?"); params.push(patch.title); }
+  if (patch.year !== undefined) { sets.push("year = ?"); params.push(patch.year ?? null); }
+  if (patch.overview !== undefined) { sets.push("overview = ?"); params.push(patch.overview ?? null); }
+  if (patch.posterPath !== undefined) { sets.push("posterPath = ?"); params.push(patch.posterPath ?? null); }
+  if (patch.backdropPath !== undefined) { sets.push("backdropPath = ?"); params.push(patch.backdropPath ?? null); }
+  if (patch.genres !== undefined) { sets.push("genres = ?"); params.push((patch.genres ?? []).join(",")); }
+  if (patch.runtimeMin !== undefined) { sets.push("runtimeMin = ?"); params.push(patch.runtimeMin ?? null); }
+  if (patch.rating !== undefined) { sets.push("rating = ?"); params.push(patch.rating ?? null); }
+  if (patch.tvShowId !== undefined) { sets.push("tvShowId = ?"); params.push(patch.tvShowId ?? null); }
+  if (patch.season !== undefined) { sets.push("season = ?"); params.push(patch.season ?? null); }
+  if (patch.episode !== undefined) { sets.push("episode = ?"); params.push(patch.episode ?? null); }
+  if (patch.locked !== undefined) { sets.push("locked = ?"); params.push(patch.locked ? 1 : 0); }
+  // Always stamp the matchedAt when a TMDB patch is applied (caller can override).
+  sets.push("matchedAt = COALESCE(?, matchedAt)");
+  params.push(patch.matchedAt ?? null);
+  if (sets.length === 0) return getMedia(id);
+  params.push(id);
+  conn.prepare(`UPDATE media SET ${sets.join(", ")} WHERE id = ?`).run(...params);
+  return getMedia(id);
+}
+
+// ── E1 — Per-library queries + TV episode grouping ──────────────────────────
+
+export interface ListMediaByLibraryOpts {
+  q?: string;
+  sort?: "title" | "year" | "added" | "rating";
+  mediaType?: "movie" | "tv";
+  limit?: number;
+}
+
+export function listMediaByLibrary(libraryId: number, opts: ListMediaByLibraryOpts = {}): MediaItem[] {
+  const conn = db();
+  const where: string[] = ["libraryId = ?"];
+  const params: (string | number)[] = [libraryId];
+  // Exclude episode rows from the default library view (they're shown via
+  // the TV detail page's episode list). Show rows have tvShowId IS NULL.
+  where.push("tvShowId IS NULL");
+  if (opts.q && opts.q.trim()) {
+    where.push("title LIKE ?");
+    params.push(`%${opts.q.trim()}%`);
+  }
+  if (opts.mediaType) {
+    where.push("mediaType = ?");
+    params.push(opts.mediaType);
+  }
+  const orderBy = (() => {
+    switch (opts.sort) {
+      case "year":   return "year DESC NULLS LAST, title COLLATE NOCASE ASC";
+      case "added":  return "scannedAt DESC, title COLLATE NOCASE ASC";
+      case "rating": return "rating DESC NULLS LAST, title COLLATE NOCASE ASC";
+      default:       return "title COLLATE NOCASE ASC";
+    }
+  })();
+  let sql = `SELECT ${MEDIA_SELECT_COLS} FROM media WHERE ${where.join(" AND ")} ORDER BY ${orderBy}`;
+  if (opts.limit && opts.limit > 0) {
+    sql += ` LIMIT ${Math.floor(opts.limit)}`;
+  }
+  const rows = conn.prepare(sql).all(...params) as MediaRow[];
+  return rows.map(rowToMedia);
+}
+
+/** List TV shows in a library (mediaType='tv' AND tvShowId IS NULL). */
+export function listTvShows(libraryId: number): MediaItem[] {
+  const conn = db();
+  const rows = conn.prepare(
+    `SELECT ${MEDIA_SELECT_COLS} FROM media WHERE libraryId = ? AND mediaType = 'tv' AND tvShowId IS NULL ORDER BY title COLLATE NOCASE ASC`,
+  ).all(libraryId) as MediaRow[];
+  return rows.map(rowToMedia);
+}
+
+/** List episodes for a TV show, optionally filtered by season. */
+export function listEpisodes(tvShowId: number, season?: number): MediaItem[] {
+  const conn = db();
+  const rows = season === undefined
+    ? conn.prepare(
+      `SELECT ${MEDIA_SELECT_COLS} FROM media WHERE tvShowId = ? ORDER BY season ASC NULLS LAST, episode ASC NULLS LAST`,
+    ).all(tvShowId) as MediaRow[]
+    : conn.prepare(
+      `SELECT ${MEDIA_SELECT_COLS} FROM media WHERE tvShowId = ? AND season = ? ORDER BY episode ASC NULLS LAST`,
+    ).all(tvShowId, season) as MediaRow[];
+  return rows.map(rowToMedia);
+}
+
+/** Returns the seasons present for a show (distinct season numbers, sorted). */
+export function listSeasons(tvShowId: number): number[] {
+  const conn = db();
+  const rows = conn.prepare(
+    "SELECT DISTINCT season FROM media WHERE tvShowId = ? AND season IS NOT NULL ORDER BY season ASC",
+  ).all(tvShowId) as Array<{ season: number }>;
+  return rows.map((r) => Number(r.season));
+}
+
+/** Find or create a synthetic "show" media row for a TV series. */
+export function findOrCreateTvShow(libraryId: number, name: string, year?: number | null): number {
+  const conn = db();
+  // Match by library + lowercased name + mediaType='tv' + tvShowId IS NULL.
+  const existing = conn.prepare(
+    "SELECT id FROM media WHERE libraryId = ? AND mediaType = 'tv' AND tvShowId IS NULL AND LOWER(title) = LOWER(?) LIMIT 1",
+  ).get(libraryId, name.trim()) as { id: number } | undefined;
+  if (existing) return existing.id;
+  const info = conn.prepare(
+    "INSERT INTO media (title, filePath, fileSize, fileExt, container, dir, libraryId, mediaType, year) " +
+    "VALUES (?, ?, 0, '', 'tv', '', ?, 'tv', ?)",
+  ).run(name.trim(), name.trim() + " (show)", libraryId, year ?? null);
+  return Number(info.lastInsertRowid);
+}
+
+/** Find a media row by libraryId + filePath (used by the scanner to attach
+ *  episode rows under the right show after upserting). */
+export function findMediaByPath(filePath: string): MediaItem | null {
+  const conn = db();
+  const row = conn.prepare(`SELECT ${MEDIA_SELECT_COLS} FROM media WHERE filePath = ?`).get(filePath) as
+    MediaRow | undefined;
+  return row ? rowToMedia(row) : null;
+}
+
+/** Find an episode row by show + season + episode (for the LAN API's
+ *  "play S01E05" lookup). Returns the row, or null if no such episode. */
+export function findEpisode(tvShowId: number, season: number, episode: number): MediaItem | null {
+  const conn = db();
+  const row = conn.prepare(
+    `SELECT ${MEDIA_SELECT_COLS} FROM media WHERE tvShowId = ? AND season = ? AND episode = ? LIMIT 1`,
+  ).get(tvShowId, season, episode) as MediaRow | undefined;
+  return row ? rowToMedia(row) : null;
+}
+
+// ── E1 — Recently added + continue-watching ─────────────────────────────────
+
+export function listRecentlyAdded(limit = 24): MediaItem[] {
+  const conn = db();
+  const n = Math.max(1, Math.min(200, Math.floor(limit)));
+  // Skip synthetic show rows (fileSize = 0 + container 'tv' + dir '').
+  const rows = conn.prepare(
+    `SELECT ${MEDIA_SELECT_COLS} FROM media WHERE tvShowId IS NULL AND NOT (fileSize = 0 AND container = 'tv' AND dir = '') ORDER BY scannedAt DESC LIMIT ${n}`,
+  ).all() as MediaRow[];
+  return rows.map(rowToMedia);
+}
+
+export function recordProgress(mediaId: number, positionSec: number, durationSec?: number | null): void {
+  const conn = db();
+  conn.prepare(
+    "INSERT INTO media_progress (mediaId, positionSec, durationSec, updatedAt) " +
+    "VALUES (?, ?, ?, datetime('now')) " +
+    "ON CONFLICT(mediaId) DO UPDATE SET positionSec = excluded.positionSec, " +
+    "durationSec = COALESCE(excluded.durationSec, media_progress.durationSec), updatedAt = datetime('now')",
+  ).run(mediaId, positionSec, durationSec ?? null);
+}
+
+export function getProgress(mediaId: number): MediaProgress | null {
+  const conn = db();
+  const row = conn.prepare(
+    "SELECT mediaId, positionSec, durationSec, updatedAt FROM media_progress WHERE mediaId = ?",
+  ).get(mediaId) as
+    | { mediaId: number; positionSec: number; durationSec: number | null; updatedAt: string }
+    | undefined;
+  if (!row) return null;
+  return {
+    mediaId: row.mediaId,
+    positionSec: Number(row.positionSec),
+    durationSec: row.durationSec === null ? null : Number(row.durationSec),
+    updatedAt: row.updatedAt,
+  };
+}
+
+export interface ContinueWatchingRow {
+  mediaId: number;
+  positionSec: number;
+  durationSec: number | null;
+  updatedAt: string;
+}
+
+export function listContinueWatching(limit = 24): MediaContinueWatchingItem[] {
+  const conn = db();
+  const n = Math.max(1, Math.min(200, Math.floor(limit)));
+  // Join media + progress; only items with positionSec < 95% of duration (so
+  // finished items fall off the rail). Items with no duration are always shown.
+  const cleanRows = conn.prepare(
+    `SELECT m.id, m.title, m.filePath, m.fileSize, m.fileExt, m.container, m.dir, m.durationSec, m.scannedAt, ` +
+    `m.libraryId, m.tmdbId, m.mediaType, m.year, m.overview, m.posterPath, m.backdropPath, m.genres, ` +
+    `m.runtimeMin, m.rating, m.matchedAt, m.locked, m.tvShowId, m.season, m.episode, ` +
+    `p.positionSec AS p_pos, p.durationSec AS p_dur, p.updatedAt AS p_at ` +
+    `FROM media_progress p JOIN media m ON m.id = p.mediaId ` +
+    `WHERE (p.durationSec IS NULL OR p.positionSec < p.durationSec * 0.95) ` +
+    `ORDER BY p.updatedAt DESC LIMIT ${n}`,
+  ).all() as Array<MediaRow & { p_pos: number; p_dur: number | null; p_at: string }>;
+  return cleanRows.map((r) => ({
+    media: rowToMedia(r),
+    positionSec: Number(r.p_pos),
+    durationSec: r.p_dur === null || r.p_dur === undefined ? null : Number(r.p_dur),
+    updatedAt: r.p_at,
+  }));
+}
+
+// ── E1 — Libraries CRUD ─────────────────────────────────────────────────────
+
+interface LibraryRow {
+  id: number;
+  name: string;
+  category: string;
+  createdAt: string;
+}
+
+function rowToLibrary(r: LibraryRow, paths: string[], itemCount: number): MediaLibrary {
+  return {
+    id: r.id,
+    name: r.name,
+    category: r.category as MediaLibraryCategory,
+    createdAt: r.createdAt,
+    paths,
+    itemCount,
+  };
+}
+
+export function listLibraries(): MediaLibrary[] {
+  const conn = db();
+  const libs = conn.prepare("SELECT id, name, category, createdAt FROM media_libraries ORDER BY id ASC").all() as LibraryRow[];
+  const pathRows = conn.prepare("SELECT libraryId, path FROM media_library_paths ORDER BY id ASC").all() as
+    Array<{ libraryId: number; path: string }>;
+  const pathsByLib = new Map<number, string[]>();
+  for (const p of pathRows) {
+    const arr = pathsByLib.get(p.libraryId) ?? [];
+    arr.push(p.path);
+    pathsByLib.set(p.libraryId, arr);
+  }
+  const countRows = conn.prepare(
+    "SELECT libraryId, COUNT(*) AS cnt FROM media WHERE libraryId IS NOT NULL GROUP BY libraryId",
+  ).all() as Array<{ libraryId: number; cnt: number }>;
+  const countByLib = new Map<number, number>();
+  for (const c of countRows) countByLib.set(c.libraryId, Number(c.cnt));
+  return libs.map((l) => rowToLibrary(l, pathsByLib.get(l.id) ?? [], countByLib.get(l.id) ?? 0));
+}
+
+export function createLibrary(name: string, category: MediaLibraryCategory): MediaLibrary {
+  const conn = db();
+  const cleanName = name.trim() || "Untitled Library";
+  const info = conn.prepare(
+    "INSERT INTO media_libraries (name, category) VALUES (?, ?)",
+  ).run(cleanName, category);
+  const id = Number(info.lastInsertRowid);
+  return rowToLibrary(
+    { id, name: cleanName, category, createdAt: new Date().toISOString().replace("T", " ").slice(0, 19) },
+    [],
+    0,
+  );
+}
+
+export function deleteLibrary(id: number): void {
+  const conn = db();
+  // ON DELETE CASCADE on media_library_paths handles the junction; we also
+  // null out media.libraryId (episodes + show rows keep their metadata, just
+  // orphaned from the library — they're cleaned up by removeStaleMedia later).
+  conn.prepare("UPDATE media SET libraryId = NULL WHERE libraryId = ?").run(id);
+  conn.prepare("DELETE FROM media_libraries WHERE id = ?").run(id);
+}
+
+export function addLibraryPath(libraryId: number, path: string): void {
+  const conn = db();
+  const clean = (path ?? "").trim();
+  if (!clean) return;
+  conn.prepare(
+    "INSERT OR IGNORE INTO media_library_paths (libraryId, path) VALUES (?, ?)",
+  ).run(libraryId, clean);
+}
+
+export function removeLibraryPath(libraryId: number, path: string): void {
+  const conn = db();
+  conn.prepare(
+    "DELETE FROM media_library_paths WHERE libraryId = ? AND path = ?",
+  ).run(libraryId, (path ?? "").trim());
+}
+
+export function listLibraryPaths(libraryId: number): MediaLibraryPath[] {
+  const conn = db();
+  return conn.prepare(
+    "SELECT id, libraryId, path FROM media_library_paths WHERE libraryId = ? ORDER BY id ASC",
+  ).all(libraryId) as MediaLibraryPath[];
+}
+
+// ── E1 — Media server configs ───────────────────────────────────────────────
+
+interface ServerConfigRow {
+  id: number;
+  name: string;
+  port: number;
+  libraryIds: string;
+  authCode: string | null;
+  createdAt: string;
+}
+
+function rowToServerConfig(r: ServerConfigRow): MediaServerConfig {
+  return {
+    id: r.id,
+    name: r.name,
+    port: Number(r.port),
+    libraryIds: r.libraryIds
+      ? r.libraryIds.split(",").map((s) => Number(s.trim())).filter((n) => Number.isFinite(n) && n > 0)
+      : [],
+    authCode: r.authCode ?? null,
+    createdAt: r.createdAt,
+  };
+}
+
+export function listServerConfigs(): MediaServerConfig[] {
+  const conn = db();
+  const rows = conn.prepare(
+    "SELECT id, name, port, libraryIds, authCode, createdAt FROM media_servers ORDER BY id ASC",
+  ).all() as ServerConfigRow[];
+  return rows.map(rowToServerConfig);
+}
+
+export function createServerConfig(
+  name: string,
+  port: number,
+  libraryIds: number[],
+  authCode: string | null,
+): MediaServerConfig {
+  const conn = db();
+  const cleanName = name.trim() || "Media Server";
+  const safePort = Math.max(1, Math.min(65535, Math.floor(port)));
+  const idsStr = (libraryIds ?? []).filter((n) => Number.isFinite(n) && n > 0).join(",");
+  const info = conn.prepare(
+    "INSERT INTO media_servers (name, port, libraryIds, authCode) VALUES (?, ?, ?, ?)",
+  ).run(cleanName, safePort, idsStr, authCode && authCode.trim() ? authCode.trim() : null);
+  const id = Number(info.lastInsertRowid);
+  return rowToServerConfig({
+    id, name: cleanName, port: safePort, libraryIds: idsStr,
+    authCode: authCode && authCode.trim() ? authCode.trim() : null,
+    createdAt: new Date().toISOString().replace("T", " ").slice(0, 19),
+  });
+}
+
+export function deleteServerConfig(id: number): void {
+  db().prepare("DELETE FROM media_servers WHERE id = ?").run(id);
+}
+
+export function getServerConfig(id: number): MediaServerConfig | null {
+  const conn = db();
+  const row = conn.prepare(
+    "SELECT id, name, port, libraryIds, authCode, createdAt FROM media_servers WHERE id = ?",
+  ).get(id) as ServerConfigRow | undefined;
+  return row ? rowToServerConfig(row) : null;
 }

@@ -13,12 +13,16 @@
 //     MPEG, M2TS) we show the file path so the user can open it in their
 //     system media player.
 //
+// E1 — resume from saved progress on open + record progress on close /
+// periodic tick (every 5s while playing).
+//
 // Only the user's own files are ever served — no third-party stream hosts.
 
 import { useEffect, useRef, useState } from "react";
 import type { MediaItem } from "@shared/types";
 import { Icon } from "../Icons";
 import { streamUrlFor } from "../../lib/media-ipc";
+import { recordProgress, getProgress } from "../../lib/media-ipc";
 import { formatSize } from "../../lib/helpers";
 
 interface MediaPlayerProps {
@@ -63,6 +67,52 @@ export function MediaPlayer({ item, onClose }: MediaPlayerProps) {
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, [onClose]);
+
+  // E1 — Resume from saved progress + record progress periodically while
+  // playing + record final position on unmount. Resume only seeks once the
+  // metadata has loaded (we can't seek before duration is known).
+  const resumedRef = useRef(false);
+  useEffect(() => {
+    if (!ready) return;
+    if (resumedRef.current) return;
+    resumedRef.current = true;
+    (async () => {
+      try {
+        const p = await getProgress(item.id);
+        if (p && p.positionSec > 5 && videoRef.current) {
+          // Don't resume if we're within 10s of the end — that's "finished".
+          if (p.durationSec && p.positionSec > p.durationSec - 10) return;
+          videoRef.current.currentTime = p.positionSec;
+        }
+      } catch {
+        // non-fatal — just start from 0
+      }
+    })();
+  }, [ready, item.id]);
+
+  // Periodic progress recording (every 5s while playing).
+  useEffect(() => {
+    if (!ready) return;
+    const v = videoRef.current;
+    if (!v) return;
+    const interval = setInterval(() => {
+      if (!v.paused && Number.isFinite(v.currentTime) && v.currentTime > 0) {
+        void recordProgress(item.id, v.currentTime, Number.isFinite(v.duration) ? v.duration : null);
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [ready, item.id]);
+
+  // Final progress record on unmount (or src change) so the resume point is
+  // accurate even if the user closes mid-playback.
+  useEffect(() => {
+    return () => {
+      const v = videoRef.current;
+      if (v && Number.isFinite(v.currentTime) && v.currentTime > 0) {
+        void recordProgress(item.id, v.currentTime, Number.isFinite(v.duration) ? v.duration : null);
+      }
+    };
+  }, [item.id]);
 
   const playable = PLAYABLE_CONTAINERS.has(item.container);
 

@@ -235,6 +235,9 @@ export interface AcquisitionOption {
 // A discovered video file on the user's disk, indexed by the media scan and
 // streamed back to the in-app player via the custom `nexus-media://` protocol.
 // Only the user's own files are ever served — no third-party stream hosts.
+//
+// E1 — extended with libraryId, TMDB metadata, TV season/episode fields,
+// progress, etc. All new columns are nullable so existing rows keep working.
 export interface MediaItem {
   id: number;
   title: string;
@@ -245,6 +248,22 @@ export interface MediaItem {
   dir: string;
   durationSec: number | null;
   scannedAt: string; // ISO
+  // E1 — library + TMDB metadata + TV grouping.
+  libraryId: number | null;
+  tmdbId: number | null;
+  mediaType: "movie" | "tv" | null;
+  year: number | null;
+  overview: string | null;
+  posterPath: string | null;       // TMDB poster_path (e.g. "/abc.jpg")
+  backdropPath: string | null;     // TMDB backdrop_path
+  genres: string[];                // comma-separated in DB, split here
+  runtimeMin: number | null;
+  rating: number | null;
+  matchedAt: string | null;
+  locked: boolean;                 // when true, autoIdentify skips this row
+  tvShowId: number | null;         // for episodes — references another media row
+  season: number | null;
+  episode: number | null;
 }
 
 export interface MediaScanSummary {
@@ -252,5 +271,98 @@ export interface MediaScanSummary {
   added: number;
   updated: number;
   removed: number;
+}
+
+// E1 — Per-library scan progress (broadcast via media:scanProgress).
+export interface MediaScanProgress {
+  libraryId: number;
+  discovered: number;
+  indexed: number;
+  current: string | null;
+}
+
+// E1 — Library categories.
+export type MediaLibraryCategory =
+  | "movies"
+  | "tv"
+  | "anime"
+  | "documentaries"
+  | "personal"
+  | "custom";
+
+export interface MediaLibrary {
+  id: number;
+  name: string;
+  category: MediaLibraryCategory;
+  createdAt: string;
+  // Derived at read time — the configured root folders + media counts.
+  paths: string[];
+  itemCount: number;
+}
+
+export interface MediaLibraryPath {
+  id: number;
+  libraryId: number;
+  path: string;
+}
+
+// E1 — Continue-watching row (media item + its progress entry).
+export interface MediaContinueWatchingItem {
+  media: MediaItem;
+  positionSec: number;
+  durationSec: number | null;
+  updatedAt: string;
+}
+
+export interface MediaProgress {
+  mediaId: number;
+  positionSec: number;
+  durationSec: number | null;
+  updatedAt: string;
+}
+
+// E1 — Server config (persisted) + runtime status (live).
+export interface MediaServerConfig {
+  id: number;
+  name: string;
+  port: number;
+  libraryIds: number[];   // parsed from comma-separated column
+  authCode: string | null;
+  createdAt: string;
+}
+
+export interface MediaServerStatus {
+  running: boolean;
+  url: string | null;     // http://<lanIp>:<port> — null when not running
+  port: number | null;
+  lanIp: string | null;
+  startedAt: string | null;
+  error: string | null;
+}
+
+export interface MediaServerStartResult {
+  ok: boolean;
+  port?: number;
+  lanIp?: string;
+  url?: string;
+  error?: string;
+}
+
+// E1 — TMDB match candidates returned by autoIdentifyMedia / searchTmdbForMedia.
+export interface MediaTmdbCandidate {
+  tmdbId: number;
+  mediaType: "movie" | "tv";
+  title: string;
+  year: string;
+  overview: string;
+  posterPath: string | null;
+  rating: number;
+}
+
+export interface MediaAutoIdentifyResult {
+  matched: boolean;
+  confidence: number;       // 0..1
+  applied: MediaItem | null;     // the updated row when matched=true
+  candidates: MediaTmdbCandidate[];
 }
 

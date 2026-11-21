@@ -259,4 +259,12 @@ app.on("before-quit", () => {
   } catch {
     // ignore — best-effort
   }
+  // E1 — Stop every running media server so the ports are released + no
+  // zombie http.Server outlives the app. Best-effort; never blocks quit.
+  try {
+    const { stopAllMediaServers } = require("./media-server");
+    stopAllMediaServers();
+  } catch {
+    // ignore — best-effort
+  }
 });

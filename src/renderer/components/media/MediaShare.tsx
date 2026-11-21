@@ -1,143 +1,92 @@
-// v9.3.0 (M1) — MediaShare: QR + access-code panel for LAN sharing.
+// v9.3.0 (M1) / E1 — MediaShare: QR + access-code panel for LAN sharing.
 //
-// Ported from the Next.js reference (src/components/media/media-share.tsx).
-// Adaptations:
-//   • `useSettings` (React Query) → settings passed in as a prop from the
-//     parent MediaView, which reads them via window.nexus.getSettings().
-//   • Access code persistence: `fetch("/api/settings", { settings: {...} })`
-//     → `window.nexus.setSettings({ mediaAccessCode })`.
-//   • LAN origin: in the Electron app there's no `window.location.hostname`
-//     that gives the host PC's LAN IP (the renderer loads from
-//     `file://`/`http://localhost:5173` in dev). Showing a fake URL would be
-//     dishonest, so the panel shows the access code + a plain-language note
-//     about entering it on another device on the same network. The QR
-//     encodes the access code itself — usable once a LAN discovery endpoint
-//     ships (deferred per task spec).
+// E1 — now deprecated as a standalone panel (the Entertainment shell's
+// Server Dashboard renders the real QR using the live server status). This
+// component is kept as a thin wrapper for any external caller that still
+// imports it; it renders nothing when no live server URL is provided.
 //
-// Only the user's own files are ever served — no third-party stream hosts.
+// The QR encodes the REAL server URL (`http://<lanIp>:<port>`) — never a
+// fake. It only renders when the server is actually running.
 
-import { useCallback, useState } from "react";
+import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Icon } from "../Icons";
+import { listServerConfigs, getMediaServerStatus } from "../../lib/media-ipc";
+import type { MediaServerStatus } from "@shared/types";
 
 interface MediaShareProps {
-  settings: { mediaPaths: string; mediaAccessCode: string } | null;
+  /** Kept for backward compatibility — unused in E1. */
+  settings?: { mediaPaths: string; mediaAccessCode: string } | null;
 }
 
-export function MediaShare({ settings }: MediaShareProps) {
-  const code = settings?.mediaAccessCode ?? "";
-  const [savedCode, setSavedCode] = useState<string>(code);
-  const [busy, setBusy] = useState(false);
-  const [flash, setFlash] = useState<{ kind: "info" | "success" | "error"; msg: string } | null>(null);
+export function MediaShare(_: MediaShareProps) {
+  const [status, setStatus] = useState<MediaServerStatus | null>(null);
 
-  // Sync local state when the parent settings change (e.g. after save).
-  // We only update if the prop changes — never overwrite an in-flight edit.
-  // (Using a simple equality check; the parent re-reads on save.)
-  if (code !== savedCode && !busy && savedCode === "") {
-    setSavedCode(code);
-  }
-
-  const persist = useCallback(async (newCode: string) => {
-    setBusy(true);
-    try {
-      await window.nexus.setSettings({ mediaAccessCode: newCode });
-      setSavedCode(newCode);
-      setFlash({ kind: "success", msg: newCode ? "Access code saved." : "Access code cleared." });
-    } catch (e) {
-      setFlash({ kind: "error", msg: "Couldn't save access code: " + (e instanceof Error ? e.message : String(e)) });
-    } finally {
-      setBusy(false);
-    }
+  useEffect(() => {
+    let cancelled = false;
+    const poll = async () => {
+      const configs = await listServerConfigs();
+      if (configs.length === 0) { if (!cancelled) setStatus(null); return; }
+      const st = await getMediaServerStatus(configs[0].id);
+      if (!cancelled) setStatus(st);
+    };
+    void poll();
+    const interval = setInterval(poll, 2000);
+    return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
-  const regenerate = useCallback(() => {
-    // 6-char base36 code (uppercase). Enough entropy for a LAN access code.
-    const newCode = Math.random().toString(36).slice(2, 8).toUpperCase();
-    void persist(newCode);
-  }, [persist]);
-
-  const copy = useCallback((text: string, label: string) => {
-    if (!text) return;
-    try {
-      navigator.clipboard.writeText(text);
-      setFlash({ kind: "success", msg: `${label} copied.` });
-    } catch {
-      setFlash({ kind: "error", msg: "Clipboard write failed." });
-    }
-  }, []);
-
-  // Auto-dismiss flash after 4s.
-  if (flash) {
-    setTimeout(() => setFlash(null), 4000);
-  }
-
-  return (
-    <section className="nx-media-share">
-      <div className="nx-media-share-head">
-        <Icon.Share size={14} />
-        <h3>Local Network Sharing</h3>
-      </div>
-
-      <div className="nx-media-share-body">
-        {/* QR — encodes the access code. Renders even when empty (the QR
-            library handles empty strings as a blank-ish code). */}
-        <div className="nx-media-share-qr-col">
-          <div className="nx-media-share-qr">
-            <QRCodeSVG value={code || "nexus-media"} size={148} level="M" />
-          </div>
-          <p className="nx-media-share-qr-cap">Access code QR</p>
-        </div>
-
-        <div className="nx-media-share-details">
-          <div className="nx-media-share-field">
-            <label>Access Code</label>
-            <div className="nx-media-share-row">
-              <code className="nx-media-share-code">{code || "—"}</code>
-              <button
-                className="nx-media-btn"
-                onClick={regenerate}
-                disabled={busy}
-                title="Generate a new 6-character access code"
-              >
-                {busy ? <Icon.Spinner size={13} /> : <Icon.Refresh size={13} />}
-                <span>New</span>
-              </button>
-              <button
-                className="nx-media-btn"
-                onClick={() => copy(code, "Code")}
-                disabled={!code}
-                title="Copy the access code"
-              >
-                <Icon.Tag size={13} />
-                <span>Copy</span>
-              </button>
+  if (!status || !status.running || !status.url) {
+    return (
+      <section className="nx-media-share">
+        <div className="nx-media-share-head"><Icon.Share size={14} /><h3>Local Network Sharing</h3></div>
+        <div className="nx-media-share-body">
+          <div className="nx-media-share-qr-col">
+            <div className="nx-media-share-qr nx-ent-server-qr-off">
+              <Icon.Lock size={36} />
+              <p>Server stopped</p>
+              <p className="nx-media-share-qr-cap">Start a server in the Servers tab to generate the QR.</p>
             </div>
           </div>
+          <div className="nx-media-share-details">
+            <p className="nx-media-share-note-row warn">
+              <Icon.Lock size={12} />
+              <span>No server is currently running. Configure one in the Servers tab — when running, the QR encodes the real LAN URL.</span>
+            </p>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
+  const url = status.url;
+  return (
+    <section className="nx-media-share">
+      <div className="nx-media-share-head"><Icon.Share size={14} /><h3>Local Network Sharing</h3></div>
+      <div className="nx-media-share-body">
+        <div className="nx-media-share-qr-col">
+          <div className="nx-media-share-qr">
+            <QRCodeSVG value={url} size={148} level="M" />
+          </div>
+          <p className="nx-media-share-qr-cap">Open on a LAN device</p>
+        </div>
+        <div className="nx-media-share-details">
+          <div className="nx-media-share-field">
+            <label>LAN URL</label>
+            <code className="nx-media-share-code">{url}</code>
+            <button className="nx-media-btn" onClick={() => { try { navigator.clipboard.writeText(url); } catch { /* ignore */ } }}>
+              <Icon.Tag size={13} /><span>Copy</span>
+            </button>
+          </div>
           <div className="nx-media-share-note">
             <p className="nx-media-share-note-row">
               <Icon.Volume size={12} />
-              <span>
-                Other devices on the same Wi-Fi / LAN open NEXUS, go to Media,
-                and the host PC streams from your library.
-              </span>
+              <span>Other devices on the same Wi-Fi / LAN scan the QR (or open the URL) to browse + play your library.</span>
             </p>
             <p className="nx-media-share-note-row warn">
               <Icon.Lock size={12} />
-              <span>
-                The host PC must stay running while streaming. Only your own
-                files are served — nothing leaves your machine, no cloud, no
-                telemetry, no third-party stream hosts.
-              </span>
+              <span>The host PC must stay running. Only your own files are served — nothing leaves your machine, no cloud, no telemetry, no third-party stream hosts.</span>
             </p>
           </div>
-
-          {flash && (
-            <div className={`nx-media-toast inline ${flash.kind}`}>
-              {flash.kind === "success" ? <Icon.CheckCircle size={12} /> : <Icon.Info size={12} />}
-              <span>{flash.msg}</span>
-            </div>
-          )}
         </div>
       </div>
     </section>

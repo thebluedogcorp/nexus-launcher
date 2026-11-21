@@ -39,8 +39,33 @@ import {
   getMedia,
   deleteMedia,
   clearMedia,
+  // E1 — libraries + per-library media + progress + server configs.
+  listLibraries,
+  createLibrary,
+  deleteLibrary,
+  addLibraryPath,
+  removeLibraryPath,
+  listLibraryPaths,
+  listMediaByLibrary,
+  listTvShows,
+  listEpisodes,
+  listSeasons,
+  upsertMediaMetadata,
+  recordProgress,
+  getProgress,
+  listContinueWatching,
+  listRecentlyAdded,
+  listServerConfigs,
+  createServerConfig,
+  deleteServerConfig,
 } from "./db";
-import { scanMediaLibrary, mediaStreamUrl } from "./media";
+import { scanMediaLibrary, mediaStreamUrl, scanLibrary } from "./media";
+import {
+  startMediaServer,
+  stopMediaServer,
+  getMediaServerStatus,
+} from "./media-server";
+import { autoIdentifyMedia, searchTmdbForMedia, identifyMediaAs } from "./tmdb-match";
 import { runScan } from "./detectors";
 import { launchGame } from "./launchers";
 import { searchRawg } from "./metadata/rawg";
@@ -64,6 +89,7 @@ import type {
   PlatformId,
   ScanSummary,
   AcquisitionOption,
+  MediaLibraryCategory,
 } from "@shared/types";
 
 export function registerIpc(): void {
@@ -283,6 +309,52 @@ export function registerIpc(): void {
   // <video> element uses as its src. The protocol handler supports HTTP Range
   // requests so seeking works.
   ipcMain.handle("media:streamUrl", (_e, id: number) => mediaStreamUrl(id));
+
+  // ===== E1 — Libraries + per-library scanning + TMDB identification + progress + servers =====
+  // Libraries (CRUD + paths). Categories: movies | tv | anime | documentaries | personal | custom.
+  ipcMain.handle("libraries:list", () => listLibraries());
+  ipcMain.handle("libraries:create", (_e, name: string, category: MediaLibraryCategory) => createLibrary(name, category));
+  ipcMain.handle("libraries:delete", (_e, id: number) => { deleteLibrary(id); return true; });
+  ipcMain.handle("libraries:addPath", (_e, libraryId: number, p: string) => { addLibraryPath(libraryId, p); return true; });
+  ipcMain.handle("libraries:removePath", (_e, libraryId: number, p: string) => { removeLibraryPath(libraryId, p); return true; });
+  ipcMain.handle("libraries:listPaths", (_e, libraryId: number) => listLibraryPaths(libraryId));
+
+  // Per-library media queries + TV episode grouping.
+  ipcMain.handle("media:listByLibrary", (_e, libraryId: number, opts?: { q?: string; sort?: "title" | "year" | "added" | "rating"; mediaType?: "movie" | "tv"; limit?: number }) =>
+    listMediaByLibrary(libraryId, opts ?? {}),
+  );
+  ipcMain.handle("media:listTvShows", (_e, libraryId: number) => listTvShows(libraryId));
+  ipcMain.handle("media:listEpisodes", (_e, tvShowId: number, season?: number) => listEpisodes(tvShowId, season));
+  ipcMain.handle("media:listSeasons", (_e, tvShowId: number) => listSeasons(tvShowId));
+
+  // Per-library scanning. Emits `media:scanProgress` events to the renderer.
+  ipcMain.handle("media:scanLibrary", async (_e, libraryId: number) => scanLibrary(libraryId));
+
+  // TMDB identification. The key stays server-side — only metadata +
+  // candidates are sent back.
+  ipcMain.handle("media:autoIdentify", async (_e, mediaId: number) => autoIdentifyMedia(mediaId));
+  ipcMain.handle("media:searchTmdb", async (_e, query: string, mediaType?: "movie" | "tv") => searchTmdbForMedia(query, mediaType));
+  ipcMain.handle("media:identifyAs", async (_e, mediaId: number, tmdbId: number, mediaType: "movie" | "tv") => identifyMediaAs(mediaId, tmdbId, mediaType));
+  ipcMain.handle("media:setMetadata", (_e, mediaId: number, patch: Parameters<typeof upsertMediaMetadata>[1]) => upsertMediaMetadata(mediaId, patch));
+
+  // Progress + continue-watching + recently-added.
+  ipcMain.handle("media:progress:record", (_e, mediaId: number, pos: number, dur?: number | null) => {
+    recordProgress(mediaId, pos, dur ?? null);
+    return true;
+  });
+  ipcMain.handle("media:progress:get", (_e, mediaId: number) => getProgress(mediaId));
+  ipcMain.handle("media:continueWatching", (_e, limit?: number) => listContinueWatching(limit ?? 24));
+  ipcMain.handle("media:recentlyAdded", (_e, limit?: number) => listRecentlyAdded(limit ?? 24));
+
+  // Server configs + lifecycle.
+  ipcMain.handle("servers:list", () => listServerConfigs());
+  ipcMain.handle("servers:create", (_e, name: string, port: number, libraryIds: number[], authCode?: string | null) =>
+    createServerConfig(name, port, libraryIds, authCode ?? null),
+  );
+  ipcMain.handle("servers:delete", (_e, id: number) => { deleteServerConfig(id); return true; });
+  ipcMain.handle("servers:start", async (_e, id: number) => startMediaServer(id));
+  ipcMain.handle("servers:stop", (_e, id: number) => stopMediaServer(id));
+  ipcMain.handle("servers:status", (_e, id: number) => getMediaServerStatus(id));
 
   // ===== Auto-update =====
   ipcMain.handle("updater:check", async () => {
