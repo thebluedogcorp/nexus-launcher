@@ -52,7 +52,10 @@ jobs:
           $ErrorActionPreference = "Continue"
           $tag = "v10.0.0"
           $title = "NEXUS v10.0.0 — Working media server: MKV/HEVC playback, LAN QR fix, library-edit"
-          $notes = @"
+          # Single-quoted here-string (@'...'@) so markdown backticks in the
+          # notes aren't interpreted as PowerShell escape characters (they broke
+          # the build as a ParserError in the v10.0.0 first attempt).
+          $notes = @'
           NEXUS — Universal Game Launcher & Media Server for Windows.
 
           **v10.0.0 — the media server actually works now.** This release fixes every issue reported against v9.5.0 (server showed nothing, phone couldn't connect, QR didn't open, MKV wouldn't play) and was verified end-to-end with REAL .mkv files + a REAL HTTP server + REAL ffmpeg in a Node integration harness (206 Range streaming, fMP4 remux, auth-code enforcement, multi-IP detection, live library patching — all assertion-tested).
@@ -90,7 +93,7 @@ jobs:
           - NEXUS-Portable-10.0.0.exe — single-file portable build.
 
           Minimum: Windows 10 64-bit. FFmpeg/FFprobe are bundled with the app.
-          "@
+          '@
 
           # Create or update the release (idempotent). Use globs so the
           # workflow stays correct across version bumps.
